@@ -116,6 +116,9 @@ pub async fn login_dev(mut req: Request, ctx: RouteContext<App>) -> worker::Resu
     let secret = app.secret.clone().unwrap_or_default();
     let session = auth::new_session(&secret, &user.id, db::now_secs());
     let cookie = auth::set_cookie_header(&secret, &session, is_https(&req));
+    // First authenticated login: recorded with the actor, not just the HTTP
+    // status the request layer sees.
+    audit::event(&app, Some(&user.id), None, "auth.login", "session").await?;
     Ok(with_cookie(redirect("/orgs"), &cookie))
 }
 
@@ -152,11 +155,21 @@ pub async fn login_google(mut req: Request, ctx: RouteContext<App>) -> worker::R
     if owner.is_some_and(|user| user.id != uid) {
         return Ok(fail(409,"This email is associated with another account record. Contact a platform administrator."));
     }
-    db::exec(
-        &app.db,
-        "INSERT INTO users (id, email, name, google_sub, is_platform_admin, created_at) VALUES (?1, ?2, ?3, ?4, 0, ?5) ON CONFLICT(id) DO UPDATE SET email = excluded.email, name = excluded.name",
-        vec![db::s(&uid), db::s(&claims.email), db::s(&claims.name), db::s(&claims.sub), db::i(db::now_ms())],
-    )
+    // User upsert and the authenticated login event commit together.
+    app.db.batch(vec![
+        app.db.prepare(
+            "INSERT INTO users (id, email, name, google_sub, is_platform_admin, created_at, picture) VALUES (?1, ?2, ?3, ?4, 0, ?5, ?6) ON CONFLICT(id) DO UPDATE SET email = excluded.email, name = excluded.name, picture = excluded.picture",
+        )
+        .bind(&[
+            db::s(&uid),
+            db::s(&claims.email),
+            db::s(&claims.name),
+            db::s(&claims.sub),
+            db::i(db::now_ms()),
+            db::opt_s(claims.picture.as_deref()),
+        ])?,
+        audit::committed(&app.db, None, &uid, "auth.login", "session")?,
+    ])
     .await?;
     let session = auth::new_session(&secret, &uid, db::now_secs());
     let cookie = auth::set_cookie_header(&secret, &session, is_https(&req));
@@ -165,7 +178,10 @@ pub async fn login_google(mut req: Request, ctx: RouteContext<App>) -> worker::R
 
 pub async fn logout(mut req: Request, ctx: RouteContext<App>) -> worker::Result<Response> {
     let app = ctx.data.clone();
-    // CSRF-protected when a session exists; otherwise just redirect.
+    // CSRF-protected for ANY session, including "preauth:" challenges.
+    // Challenge sessions are just not user identities: their uid would
+    // violate the audit foreign key, so only real ones become the actor.
+    let mut actor = None;
     if let Some(session) = session_from(&req, &app) {
         try_resp!(same_origin(&req));
         let form = try_resp!(req.form_data().await.map_err(werr));
@@ -173,7 +189,9 @@ pub async fn logout(mut req: Request, ctx: RouteContext<App>) -> worker::Result<
         if sent.is_empty() || sent != session.csrf {
             return Ok(fail(403, "CSRF token missing or invalid."));
         }
+        actor = crate::audit_rules::is_real_actor(&session.uid).then_some(session.uid);
     }
+    audit::event(&app, actor.as_deref(), None, "auth.logout", "session").await?;
     Ok(with_cookie(
         redirect("/login"),
         &auth::clear_cookie_header(),

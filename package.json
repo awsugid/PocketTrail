@@ -2,13 +2,13 @@
   "name": "pockettrail",
   "private": true,
   "scripts": {
-    "dev": "wrangler dev --ip 127.0.0.1",
+    "dev": "wrangler dev --ip 127.0.0.1 --infer-origin-from-routes=false",
     "build": "wrangler deploy --dry-run",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:seed:local": "wrangler d1 execute DB --local --file tests/fixtures/seed.sql",
-    "test": "cargo test --workspace && node static/extraction.test.js",
+    "test": "cargo test --workspace && node static/extraction.test.js && python3 scripts/admin-self-check.py && python3 scripts/local-smoke.test.py",
     "check:wasm": "cargo check --target wasm32-unknown-unknown --lib",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler d1 migrations apply DB --remote && wrangler deploy"
   },
   "devDependencies": {
     "wrangler": "^4",

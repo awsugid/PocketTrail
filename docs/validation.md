@@ -105,6 +105,29 @@ User requested replacing long stacked forms with icon-and-label actions opening 
 
 Synthetic transaction overview content now measures 375px at 320px width and 232px at 1440px; previously the editor was a 4436px/3129px stacked page. Dialogs containing long purpose forms still scroll internally; overview no longer requires traversing those forms to reach other information. No new post-change 9.5 review scores are claimed.
 
+## Local fixture database selection fix
+
+`scripts/local-smoke.py` now resolves the seeded local D1 file from the
+`wrangler.toml` database id (the miniflare Durable Object id derivation) instead
+of scanning `.wrangler/state` for the first synthetic-looking database, which
+silently read a stale sibling whenever a second local database existed.
+`scripts/local-import-smoke.py` shares the helper unchanged.
+
+- `python3 scripts/local-smoke.test.py`: passed. A decoy database with identical
+  synthetic content is ignored, and an unseeded configured database fails
+  loudly instead of reading the decoy.
+- `python3 -m py_compile scripts/local-smoke.py scripts/local-import-smoke.py
+  scripts/local-smoke.test.py`: passed.
+- With the package-lock-pinned wrangler 4.158.0 (miniflare 5.20261104.0-beta),
+  `npm run db:migrate:local` plus `npm run db:seed:local` created exactly
+  `.wrangler/state/v3/d1/miniflare-D1DatabaseObject/c39df11d115a63b5a1fb4d4e3d043486bac6b4837d60e71b772a967a59f0bba3.sqlite`,
+  matching `configured_database_path`; the helper then read the seeded
+  `demo-jakarta` fixture (`is_synthetic=1`, `transactions.id=3` bank id
+  `JPXDEMO0003`) and ignored a same-content decoy placed beside it. Local state
+  only; no production database, email, push, or deployment.
+- HTTP smoke and import smoke reruns against a running local app are not
+  included here; the parent thread runs them after merging.
+
 ## Remaining acceptance checks
 
 Real Google sign-in and responsive rendered application workflows still need

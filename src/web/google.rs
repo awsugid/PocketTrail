@@ -16,6 +16,7 @@ pub struct GoogleClaims {
     pub sub: String,
     pub email: String,
     pub name: String,
+    pub picture: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -25,6 +26,7 @@ struct RawClaims {
     #[serde(default)] // absent -> false -> fails closed below
     email_verified: bool,
     name: Option<String>,
+    picture: Option<String>,
     nonce: Option<String>,
 }
 
@@ -66,6 +68,9 @@ async fn verify_inner(token: &str, client_id: &str, nonce: &str) -> Result<Googl
         sub: raw.sub,
         email: raw.email,
         name,
+        picture: raw
+            .picture
+            .and_then(|url| crate::profile::google_picture(&url)),
     })
 }
 

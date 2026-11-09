@@ -2,6 +2,8 @@
 """Exercise the running local app using only explicitly synthetic fixtures."""
 
 import argparse
+import hashlib
+import hmac
 import http.cookiejar
 from html.parser import HTMLParser
 import json
@@ -99,19 +101,50 @@ class Client:
         self.request("/orgs")
 
 
+def configured_database_path(root):
+    """The SQLite file Wrangler uses for the configured local D1 database.
+
+    Wrangler stores each local D1 database as a Durable Object named by the
+    configured database id (preview_database_id wins, as in wrangler dev)
+    under the "miniflare-D1DatabaseObject" unique key; the SQLite file name is
+    the hex of the derived object id. Verified against wrangler 4.158.0 with
+    miniflare 5.20261104.0-beta.
+    """
+    config = (root / "wrangler.toml").read_text()
+    for key in ("preview_database_id", "database_id"):
+        match = re.search(rf'^{key}\s*=\s*"([^"]+)"', config, re.MULTILINE)
+        if match:
+            name = match.group(1).encode()
+            break
+    else:
+        raise AssertionError("wrangler.toml must configure a D1 database_id.")
+    namespace_key = hashlib.sha256(b"miniflare-D1DatabaseObject").digest()
+    name_hmac = hmac.new(namespace_key, name, hashlib.sha256).digest()[:16]
+    object_id = hmac.new(namespace_key, name_hmac, hashlib.sha256).digest()[:16]
+    return (root / ".wrangler/state/v3/d1/miniflare-D1DatabaseObject"
+            / f"{(name_hmac + object_id).hex()}.sqlite")
+
+
+# ponytail: assumes the first D1 binding in wrangler.toml; add per-binding
+# lookup when a second database is configured.
 def fixture_database(root):
-    for path in (root / ".wrangler/state").rglob("*.sqlite"):
-        try:
-            db = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-            row = db.execute(
-                "SELECT is_synthetic FROM organizations WHERE slug='demo-jakarta'"
-            ).fetchone()
-            if row == (1,):
-                return db
-            db.close()
-        except sqlite3.Error:
-            continue
-    raise AssertionError("A locally seeded synthetic database is required.")
+    path = configured_database_path(root)
+    if not path.is_file():
+        raise AssertionError(
+            f"No seeded local D1 database at {path}; "
+            "run npm run db:migrate:local and npm run db:seed:local on a fresh local database."
+        )
+    db = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    row = db.execute(
+        "SELECT is_synthetic FROM organizations WHERE slug='demo-jakarta'"
+    ).fetchone()
+    if row == (1,):
+        return db
+    db.close()
+    raise AssertionError(
+        "The configured local D1 database lacks the seeded synthetic fixtures; "
+        "seed a fresh local database with npm run db:seed:local."
+    )
 
 
 def receipt_pdf():

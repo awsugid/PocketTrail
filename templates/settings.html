@@ -126,7 +126,21 @@
   <details class="accordion">
     <summary>Create role</summary>
     <div class="accordion__body">
-  <form method="post" action="/org/{{ org.slug }}/settings/roles" style="margin-top: 14px;">
+  {% if role_templates %}
+  <form method="post" action="/org/{{ org.slug }}/settings/role-templates">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field">
+      <label for="role-template">Copy role template</label>
+      <select class="select" id="role-template" name="template_id" required>
+        <option value="" selected>Choose a template…</option>
+        {% for t in role_templates %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+      </select>
+      <p class="hint">Copying creates a separate role in this workspace; later template edits never change it.</p>
+    </div>
+    <div class="form-actions"><button class="btn" type="submit">Copy template</button></div>
+  </form>
+  {% endif %}
+  <form method="post" action="/org/{{ org.slug }}/settings/roles"{% if role_templates %} style="margin-top: 14px;"{% endif %}>
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="field">
       <label for="new-role-name">New role name <span class="req" aria-hidden="true">*</span></label>
@@ -153,6 +167,35 @@
 <section class="panel" id="members" data-dialog-panel aria-labelledby="members-heading">
   <header>
   <h2 class="panel__title" id="members-heading">Manage members</h2>
+  <form method="post" action="/org/{{ org.slug }}/settings/invitations">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label for="invite-email">Invite by email</label><input class="input" id="invite-email" name="email" type="email" required maxlength="254"></div>
+    <div class="field"><label for="invite-role">Invitation role</label><select class="select" id="invite-role" name="role_id" required>{% for r in roles %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}</select></div>
+    <p class="hint">Expires after 7 days. Matching Google account must accept. Recipients can accept from Organizations; delivery status appears below once the mail service records an attempt.</p>
+    <button class="btn" type="submit">Create invitation</button>
+  </form>
+  {% for i in invitations %}
+  <div class="list-row">
+    <strong>{{ i.email }}</strong>
+    {% if i.mail_status == "sent" %}<span class="badge badge--approved">Email sent</span>
+    {% elif i.mail_status == "pending" %}<span class="badge badge--pending">Email pending</span>
+    {% elif i.mail_status == "failed" %}<span class="badge badge--error">Email failed</span>
+    {% elif i.mail_status == "superseded" %}<span class="badge badge--neutral">Superseded</span>
+    {% endif %}
+    <span class="list-row__meta">Expires {{ i.expires_at | ts }}{% if i.mail_error %} · Last error: {{ i.mail_error }}{% endif %}</span>
+    <span class="list-row__spacer"></span>
+    {% if i.mail_status == "failed" %}
+    <form method="post" action="/org/{{ org.slug }}/settings/invitations/{{ i.id }}/resend">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="btn btn--small" type="submit" aria-label="Resend invitation email to {{ i.email }}">Resend email</button>
+    </form>
+    {% endif %}
+    <form method="post" action="/org/{{ org.slug }}/settings/invitations/{{ i.id }}/revoke">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="btn btn--danger btn--small" type="submit" aria-label="Revoke invitation for {{ i.email }}">Revoke invitation</button>
+    </form>
+  </div>
+  {% endfor %}
   <p class="panel__sub">Removal revokes access and notifications immediately. History is retained; reassign or suppress unresolved assignments.</p>
   </header>
   <div>
@@ -389,6 +432,27 @@
   </form>
   {% endif %}
 </div>
+</section>
+{% endif %}
+{% if can.members %}
+<section class="panel" aria-labelledby="audit-heading">
+  <h2 class="panel__title" id="audit-heading">Organization audit log</h2>
+  <p class="panel__sub">Platform-scope events stay with platform administrators. Newest first, 50 per page.</p>
+  {% if audit_events %}
+  <div class="table-scroll"><table class="table">
+    <thead><tr><th scope="col">When</th><th scope="col">Actor</th><th scope="col">Action</th><th scope="col">Target</th><th scope="col">Outcome</th></tr></thead>
+    <tbody>
+    {% for e in audit_events %}
+    <tr><td class="cell--nowrap">{{ e.created_at | ts }}</td><td>{{ e.actor_id or "Unauthenticated" }}</td><td class="cell--mono">{{ e.action }}</td><td class="cell--mono">{{ e.target }}</td><td>{{ e.outcome }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  <nav class="pagination" aria-label="Audit log pagination">
+    {% if audit_page and audit_page > 1 %}<a class="btn btn--small" href="/org/{{ org.slug }}/settings?page={{ audit_page - 1 }}">Previous</a>{% endif %}
+    {% if audit_page %}<span>Page {{ audit_page }}</span>{% endif %}
+    {% if audit_has_more or audit_events | length == 50 %}<a class="btn btn--small" href="/org/{{ org.slug }}/settings?page={% if audit_page %}{{ audit_page + 1 }}{% else %}2{% endif %}">Next</a>{% endif %}
+  </nav>
+  {% else %}<p class="hint">No events recorded yet.</p>{% endif %}
 </section>
 {% endif %}
 </div>

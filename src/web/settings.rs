@@ -60,6 +60,29 @@ pub async fn page(req: Request, ctx: RouteContext<App>) -> worker::Result<Respon
         "mappings":g.can(Permission::ImportStatements),
         "notifications":g.can(Permission::ManageNotifications)
     });
+    if g.can(Permission::ManageRoles) {
+        body["role_templates"] = serde_json::json!(
+            db::q_all::<platform::Template>(
+                &g.app.db,
+                "SELECT * FROM role_templates ORDER BY name",
+                vec![]
+            )
+            .await?
+        );
+    }
+    if g.can(Permission::ManageMembers) {
+        body["invitations"] = serde_json::json!(db::q_all::<serde_json::Value>(&g.app.db,"SELECT i.id,i.email,i.expires_at,im.status AS mail_status,im.error AS mail_error,im.attempts AS mail_attempts FROM invitations i LEFT JOIN invitation_mail im ON im.invitation_id=i.id AND im.id=(SELECT MAX(x.id) FROM invitation_mail x WHERE x.invitation_id=i.id) WHERE i.org_id=?1 AND i.accepted_at IS NULL AND i.revoked_at IS NULL ORDER BY i.created_at DESC",vec![db::i(g.org.id)]).await?);
+    }
+    if g.can(Permission::ManageMembers) {
+        body["audit_events"] = serde_json::json!(
+            audit::list_org(
+                &g.app,
+                g.org.id,
+                crate::audit_rules::page_number(query_param(&req, "page").as_deref()),
+            )
+            .await?
+        );
+    }
     if g.can(Permission::ManageNotifications) {
         let preview_org = OrgRow {
             notification_cutoff_date: query_param(&req, "cutoff_date")
@@ -96,7 +119,7 @@ pub async fn page(req: Request, ctx: RouteContext<App>) -> worker::Result<Respon
     Ok(super::page(&g.app, "settings", body))
 }
 
-fn permission_bundle(form: &FormData) -> Result<String, Response> {
+pub(super) fn permission_bundle(form: &FormData) -> Result<String, Response> {
     let allowed: BTreeSet<String> = crate::domain_map::permission_options()
         .into_iter()
         .map(|(id, _)| id)
@@ -144,27 +167,39 @@ async fn save_role(
     {
         return Ok(fail(400, "An organization role already uses that name."));
     }
+    let audit = |action: &str, target: String| {
+        audit::committed(&g.app.db, Some(g.org.id), &g.user.id, action, &target)
+    };
+    // Change-gated audit for the UPDATE: a role deleted by a concurrent
+    // request matches zero rows and must not record a committed event.
+    let audit_changed = |action: &str, target: String| {
+        audit::committed_if_changed(&g.app.db, Some(g.org.id), &g.user.id, action, &target)
+    };
     match id {
         Some(id) => {
-            db::exec(
-                &g.app.db,
-                "UPDATE roles SET name=?1,permissions=?2 WHERE id=?3 AND org_id=?4",
-                vec![
+            g.app.db.batch(vec![
+                g.app.db.prepare(
+                    "UPDATE roles SET name=?1,permissions=?2 WHERE id=?3 AND org_id=?4",
+                )
+                .bind(&[
                     db::s(&name),
                     db::s(&permissions),
                     db::i(id),
                     db::i(g.org.id),
-                ],
-            )
-            .await?
+                ])?,
+                audit_changed("role.updated", format!("role:{id}"))?,
+            ])
+            .await?;
         }
         None => {
-            db::exec(
-                &g.app.db,
-                "INSERT INTO roles(org_id,name,permissions) VALUES(?1,?2,?3)",
-                vec![db::i(g.org.id), db::s(&name), db::s(&permissions)],
-            )
-            .await?
+            g.app.db.batch(vec![
+                g.app.db.prepare(
+                    "INSERT INTO roles(org_id,name,permissions) VALUES(?1,?2,?3)",
+                )
+                .bind(&[db::i(g.org.id), db::s(&name), db::s(&permissions)])?,
+                audit("role.created", format!("role:{name}"))?,
+            ])
+            .await?;
         }
     }
     Ok(back(&g, "Role saved"))
@@ -217,17 +252,25 @@ pub async fn add_member(mut req: Request, ctx: RouteContext<App>) -> worker::Res
             .map(|b| format!("{b:02x}"))
             .collect::<String>()
     );
-    db::exec(
-        &g.app.db,
-        "INSERT INTO memberships(org_id,user_id,role_id,handle,created_at) VALUES(?1,?2,?3,?4,?5)",
-        vec![
+    g.app.db.batch(vec![
+        g.app.db.prepare(
+            "INSERT INTO memberships(org_id,user_id,role_id,handle,created_at) VALUES(?1,?2,?3,?4,?5)",
+        )
+        .bind(&[
             db::i(g.org.id),
             db::s(&user.id),
             db::i(role_id),
             db::s(&handle),
             db::i(db::now_ms()),
-        ],
-    )
+        ])?,
+        audit::committed(
+            &g.app.db,
+            Some(g.org.id),
+            &g.user.id,
+            "member.added",
+            &format!("membership:{handle}"),
+        )?,
+    ])
     .await?;
     Ok(back(&g, "Membership granted"))
 }
@@ -251,11 +294,19 @@ pub async fn set_role(mut req: Request, ctx: RouteContext<App>) -> worker::Resul
     {
         return Ok(fail(400, "Choose a role belonging to this organization."));
     }
-    db::exec(
-        &g.app.db,
-        "UPDATE memberships SET role_id=?1 WHERE id=?2 AND org_id=?3",
-        vec![db::i(role_id), db::i(id), db::i(g.org.id)],
-    )
+    g.app.db.batch(vec![
+        g.app.db.prepare(
+            "UPDATE memberships SET role_id=?1 WHERE id=?2 AND org_id=?3",
+        )
+        .bind(&[db::i(role_id), db::i(id), db::i(g.org.id)])?,
+        audit::committed_if_changed(
+            &g.app.db,
+            Some(g.org.id),
+            &g.user.id,
+            "member.role_changed",
+            &format!("membership:{id}"),
+        )?,
+    ])
     .await?;
     Ok(back(&g, "Member role changed"))
 }
@@ -285,15 +336,23 @@ async fn set_membership_active(
             "Ask another membership manager to remove your membership.",
         ));
     }
-    db::exec(
-        &g.app.db,
-        "UPDATE memberships SET removed_at=?1 WHERE id=?2 AND org_id=?3",
-        vec![
+    g.app.db.batch(vec![
+        g.app.db.prepare(
+            "UPDATE memberships SET removed_at=?1 WHERE id=?2 AND org_id=?3",
+        )
+        .bind(&[
             db::opt_i((!active).then_some(db::now_ms())),
             db::i(id),
             db::i(g.org.id),
-        ],
-    )
+        ])?,
+        audit::committed_if_changed(
+            &g.app.db,
+            Some(g.org.id),
+            &g.user.id,
+            if active { "member.restored" } else { "member.removed" },
+            &format!("membership:{id}"),
+        )?,
+    ])
     .await?;
     if !active {
         db::exec(&g.app.db,"UPDATE notification_outbox SET cancelled_at=?1 WHERE org_id=?2 AND to_membership_id=?3 AND cancelled_at IS NULL",
@@ -337,9 +396,22 @@ pub async fn add_mapping(mut req: Request, ctx: RouteContext<App>) -> worker::Re
             "This label already has a mapping. Remove it before assigning another member.",
         ));
     }
-    db::exec(&g.app.db,
-        "INSERT INTO actor_mappings(org_id,pattern,membership_id,created_by_membership_id,created_at) VALUES(?1,?2,?3,?4,?5)",
-        vec![db::i(g.org.id),db::s(&pattern),db::i(id.unwrap()),db::i(g.me().id),db::i(db::now_ms())]).await?;
+    g.app.db.batch(vec![
+        g.app.db.prepare(
+            "INSERT INTO actor_mappings(org_id,pattern,membership_id,created_by_membership_id,created_at) VALUES(?1,?2,?3,?4,?5)",
+        )
+        .bind(&[db::i(g.org.id),db::s(&pattern),db::i(id.unwrap()),db::i(g.me().id),db::i(db::now_ms())])?,
+        audit::committed(
+            &g.app.db,
+            Some(g.org.id),
+            &g.user.id,
+            "mapping.created",
+            // The pattern is a bank actor label: never enter the audit log.
+            // The mapped membership is the stable, non-sensitive identity.
+            &format!("mapping:member-{}", id.unwrap()),
+        )?,
+    ])
+    .await?;
     Ok(back(
         &g,
         "Mapping saved; existing transaction assignments were not changed",
@@ -352,11 +424,19 @@ pub async fn delete_mapping(mut req: Request, ctx: RouteContext<App>) -> worker:
         require_member(ctx.data.clone(), &req, &slug, Permission::ImportStatements).await
     );
     let _form = try_resp!(form_post(&g, &mut req).await);
-    db::exec(
-        &g.app.db,
-        "DELETE FROM actor_mappings WHERE id=?1 AND org_id=?2",
-        vec![db::i(id), db::i(g.org.id)],
-    )
+    g.app.db.batch(vec![
+        g.app.db.prepare(
+            "DELETE FROM actor_mappings WHERE id=?1 AND org_id=?2",
+        )
+        .bind(&[db::i(id), db::i(g.org.id)])?,
+        audit::committed_if_changed(
+            &g.app.db,
+            Some(g.org.id),
+            &g.user.id,
+            "mapping.deleted",
+            &format!("mapping:{id}"),
+        )?,
+    ])
     .await?;
     Ok(back(&g, "Mapping removed; historical assignments retained"))
 }
@@ -387,11 +467,19 @@ pub async fn add_pocket(mut req: Request, ctx: RouteContext<App>) -> worker::Res
     {
         return Ok(fail(400, "A pocket already uses that name."));
     }
-    db::exec(
-        &g.app.db,
-        "INSERT INTO pockets(org_id,name,opening_balance_minor) VALUES(?1,?2,?3)",
-        vec![db::i(g.org.id), db::s(&name), db::i(opening)],
-    )
+    g.app.db.batch(vec![
+        g.app.db.prepare(
+            "INSERT INTO pockets(org_id,name,opening_balance_minor) VALUES(?1,?2,?3)",
+        )
+        .bind(&[db::i(g.org.id), db::s(&name), db::i(opening)])?,
+        audit::committed(
+            &g.app.db,
+            Some(g.org.id),
+            &g.user.id,
+            "pocket.created",
+            &format!("pocket:{name}"),
+        )?,
+    ])
     .await?;
     Ok(back(&g, "Pocket created"))
 }
@@ -432,15 +520,23 @@ pub async fn save_notifications(
             ));
         }
     }
-    db::exec(
-        &g.app.db,
-        "UPDATE organizations SET notifications_enabled=?1,notification_cutoff_date=?2 WHERE id=?3",
-        vec![
+    g.app.db.batch(vec![
+        g.app.db.prepare(
+            "UPDATE organizations SET notifications_enabled=?1,notification_cutoff_date=?2 WHERE id=?3",
+        )
+        .bind(&[
             db::i(i64::from(enabled)),
             db::opt_s((!cutoff.is_empty()).then_some(cutoff.as_str())),
             db::i(g.org.id),
-        ],
-    )
+        ])?,
+        audit::committed_if_changed(
+            &g.app.db,
+            Some(g.org.id),
+            &g.user.id,
+            "notifications.settings_changed",
+            &format!("organization:{}", g.org.slug),
+        )?,
+    ])
     .await?;
     if !enabled {
         db::exec(&g.app.db,"UPDATE notification_outbox SET cancelled_at=?1 WHERE org_id=?2 AND cancelled_at IS NULL",

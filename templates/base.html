@@ -45,9 +45,10 @@
     {{ organization_switcher("org-switch--mobile") }}
     {% endif %}
     <details class="menu">
-      <summary aria-label="Account menu"><span class="avatar" aria-hidden="true"><svg class="icon" viewBox="0 0 16 16" focusable="false"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-6 6.5c0-2.5 2.7-4 6-4s6 1.5 6 4v.5H2v-.5Z" fill="currentColor"/></svg></span><span class="menu__summary-value">{{ user.name }}</span></summary>
+      <summary aria-label="Account menu"><span class="avatar" aria-hidden="true"><span class="avatar__fallback">{{ user.name | first }}</span>{% if user.picture %}<img src="{{ user.picture }}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">{% endif %}</span><span class="menu__summary-value">{{ user.name }}</span></summary>
       <div class="menu__panel menu__panel--right">
         <p class="menu__label">{{ user.email }}</p>
+        {% if user.is_platform_admin %}<a class="menu__item" href="/platform">Global settings</a>{% endif %}
         <form method="post" action="/logout">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <button class="menu__item menu__item--button" type="submit">Sign out</button>
@@ -72,6 +73,8 @@
   <div class="layout{% if not user %} layout--bare{% endif %}">
     {% if org %}
     <nav class="sidenav" aria-label="Site sections">
+      {% if user.is_platform_admin %}<a class="sidenav__link" href="/platform">Global settings</a>{% endif %}
+      <div class="sidebar-profile"><span class="avatar" aria-hidden="true"><span class="avatar__fallback">{{ user.name | first }}</span>{% if user.picture %}<img src="{{ user.picture }}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">{% endif %}</span><span>{{ user.name }}</span></div>
       {{ organization_switcher("org-switch--desktop") }}
       <a class="sidenav__link{% if active_nav and active_nav == 'transactions' %} sidenav__link--current{% endif %}" href="/org/{{ org.slug }}/transactions"{% if active_nav and active_nav == 'transactions' %} aria-current="page"{% endif %}><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 8h10M7 12h10M7 16h6"/></svg><span>Transactions</span></a>
       <a class="sidenav__link{% if active_nav and active_nav == 'imports' %} sidenav__link--current{% endif %}" href="/org/{{ org.slug }}/imports"{% if active_nav and active_nav == 'imports' %} aria-current="page"{% endif %}><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg><span>Imports</span></a>

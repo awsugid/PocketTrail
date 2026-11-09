@@ -65,6 +65,8 @@ pub struct UserRow {
     pub email: String,
     pub name: String,
     pub google_sub: Option<String>,
+    #[serde(default)]
+    pub picture: Option<String>,
     pub is_platform_admin: i64,
     pub created_at: i64,
 }

@@ -1,11 +1,14 @@
 pub mod aggregate;
+pub mod audit;
 pub mod auth_routes;
 pub mod db;
 pub mod google;
 pub mod imports;
 pub mod inventory;
+pub mod invitations;
 pub mod notify;
 pub mod orgs;
+pub mod platform;
 pub use crate::render;
 pub mod settings;
 pub mod txns;
@@ -97,7 +100,7 @@ impl Ctx {
             .await
             .unwrap_or_default();
         serde_json::json!({
-            "user": {"name": self.user.name, "email": self.user.email},
+            "user": {"name": self.user.name, "email": self.user.email, "picture": self.user.picture.as_deref().and_then(crate::profile::google_picture), "is_platform_admin": self.user.is_platform_admin != 0},
             "org": {"slug": self.org.slug, "name": self.org.name,
                      "notifications_enabled": db_flag(self.org.notifications_enabled)},
             "organizations": orgs.iter().map(|o| serde_json::json!({"slug": o.slug, "name": o.name})).collect::<Vec<_>>(),
@@ -218,7 +221,7 @@ pub async fn require_login(app: App, req: &Request) -> Result<Login, Response> {
     };
     let user: Option<UserRow> = crate::web::db::q_one(
         &app.db,
-        "SELECT id, email, name, google_sub, is_platform_admin, created_at FROM users WHERE id = ?1",
+        "SELECT id, email, name, google_sub, picture, is_platform_admin, created_at FROM users WHERE id = ?1",
         vec![crate::web::db::s(&session.uid)],
     )
     .await
@@ -330,18 +333,51 @@ pub fn path_param<D>(ctx: &RouteContext<D>, name: &str) -> String {
     ctx.param(name).cloned().unwrap_or_default()
 }
 
+/// Liveness plus — behind the exact gates of dev fixture login (LOCAL_DEV
+/// and a loopback host) — the single delivery flag local smoke preflights
+/// before any invitation mutation. Nothing else is reported, and the flag
+/// is absent from every response outside that local fixture context. The
+/// enabled predicate is the complement of the disabled check in
+/// `invitation_mail::deliver`; keep the two in sync.
+async fn healthz(req: Request, ctx: RouteContext<App>) -> worker::Result<Response> {
+    let mut body = "ok".to_string();
+    if ctx.data.local_dev && host_is_loopback(&req) {
+        let enabled = get_var(&ctx.env, "EMAIL_DELIVERY_ENABLED").as_deref() == Some("true");
+        body.push_str(if enabled {
+            "; email_delivery_enabled=true"
+        } else {
+            "; email_delivery_enabled=false"
+        });
+    }
+    Ok(html(200, body))
+}
+
 // ------------------------------------------------------------------ router
 
 fn router(app: App) -> Router<'static, App> {
     Router::with_data(app)
-        .get("/healthz", |_req, _ctx| {
-            Ok::<_, worker::Error>(html(200, "ok".into()))
-        })
+        .get_async("/healthz", healthz)
         .get_async("/", orgs::root)
         .get_async("/login", auth_routes::login_page)
         .post_async("/login/dev", auth_routes::login_dev)
         .post_async("/login/google", auth_routes::login_google)
         .post_async("/logout", auth_routes::logout)
+        .get_async("/platform", platform::page)
+        .post_async("/platform/users/admin", platform::set_admin)
+        .post_async("/platform/role-templates", platform::save_template)
+        .get_async("/invitations/accept", invitations::accept_page)
+        .post_async("/invitations/accept", invitations::accept_link)
+        .post_async("/invitations/:id/accept", invitations::accept)
+        .post_async("/org/:org/settings/invitations/:id/resend", invitations::resend)
+        .post_async("/org/:org/settings/invitations", invitations::create)
+        .post_async(
+            "/org/:org/settings/invitations/:id/revoke",
+            invitations::revoke,
+        )
+        .post_async(
+            "/org/:org/settings/role-templates",
+            platform::apply_template,
+        )
         .get_async("/orgs", orgs::list)
         .post_async("/orgs", orgs::create)
         // Initial release is statement-first; manual bank movements are not exposed.
@@ -409,8 +445,11 @@ async fn main(req: Request, env: Env, _ctx: Context) -> worker::Result<Response>
         return env.assets("ASSETS")?.fetch(url.to_string(), None).await;
     }
     let app = App::from_env(&env);
-    match router(app).run(req, env).await {
-        Ok(response) => Ok(response),
-        Err(error) => Ok(werr(error)),
-    }
+    let attempt = audit::begin(&app, &req).await?;
+    let response = match router(app.clone()).run(req, env).await {
+        Ok(response) => response,
+        Err(error) => werr(error),
+    };
+    audit::finish(&app, attempt, response.status_code()).await?;
+    Ok(response)
 }

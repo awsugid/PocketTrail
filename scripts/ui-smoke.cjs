@@ -10,7 +10,8 @@ const { chromium } = require('playwright');
   });
   try {
     const page = await browser.newPage();
-    await page.goto('http://127.0.0.1:8787/login');
+    const base = process.env.POCKETTRAIL_BASE || 'http://127.0.0.1:8787';
+    await page.goto(`${base}/login`);
     await page.locator('.pt-trigger').click();
     await page.getByRole('option').filter({ hasText: 'Admin (fixture)' }).click();
     await Promise.all([
@@ -19,8 +20,12 @@ const { chromium } = require('playwright');
     ]);
     for (const width of [1440, 390, 320]) {
       await page.setViewportSize({ width, height: 1000 });
-      await page.goto('http://127.0.0.1:8787/orgs');
-      await page.locator('summary').filter({ hasText: 'Create organization' }).click();
+      await page.goto(`${base}/orgs`);
+      // The accordion auto-opens for users with no memberships; only click
+      // the summary when it is still closed, or this toggles it shut.
+      // getAttribute returns "" when present, so compare against null.
+      const create = page.locator('details.accordion').filter({ hasText: 'Create organization' });
+      if ((await create.getAttribute('open')) === null) await create.locator('summary').click();
       const name = await page.locator('#org-name').boundingBox();
       const slug = await page.locator('#org-slug').boundingBox();
       assert(Math.abs(name.x - slug.x) < 1, 'Organization fields must share left edge');
@@ -40,7 +45,7 @@ const { chromium } = require('playwright');
     assert.equal(await page.locator('#org-name').inputValue(), 'Synthetic duplicate test');
     // Separate context avoids changing existing signed-in identity.
     const member = await browser.newPage();
-    await member.goto('http://127.0.0.1:8787/login');
+    await member.goto(`${base}/login`);
     await member.locator('.pt-trigger').click();
     await member.getByRole('option').filter({ hasText: 'Alice (fixture)' }).click();
     await Promise.all([
@@ -50,7 +55,7 @@ const { chromium } = require('playwright');
     for (const width of [1440, 390, 320]) {
       await member.setViewportSize({ width, height: 1000 });
       for (const route of ['transactions', 'transactions/3', 'imports', 'inventory', 'settings']) {
-        await member.goto(`http://127.0.0.1:8787/org/demo-jakarta/${route}`);
+        await member.goto(`${base}/org/demo-jakarta/${route}`);
         assert(await member.locator('h1').count(), `${route}: missing page heading`);
         const overflow = await member.evaluate(() => document.documentElement.scrollWidth > innerWidth);
         assert(!overflow, `${route}: page overflow at ${width}px`);

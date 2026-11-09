@@ -190,12 +190,29 @@ pub async fn add_item(mut req: Request, ctx: RouteContext<App>) -> worker::Resul
     let variant = form_str(&form, "variant").unwrap_or_default();
     let variant = variant.trim();
     // UNIQUE(org_id, name, variant): OR IGNORE makes re-adding a no-op.
-    db::exec(
-        &g.app.db,
-        "INSERT OR IGNORE INTO inventory_items (org_id, name, variant) VALUES (?1, ?2, ?3)",
-        vec![db::i(g.org.id), db::s(name), db::s(variant)],
-    )
-    .await?;
+    g.app
+        .db
+        .batch(vec![
+            g.app
+                .db
+                .prepare(
+                    "INSERT OR IGNORE INTO inventory_items (org_id, name, variant) VALUES (?1, ?2, ?3)",
+                )
+                .bind(&[db::i(g.org.id), db::s(name), db::s(variant)])?,
+            // changes() = 1 only when the insert actually created the row.
+            g.app
+                .db
+                .prepare(
+                    "INSERT INTO audit_events (actor_id, org_id, action, target, outcome, created_at) SELECT ?1, ?2, 'item.added', ?3, 'committed', ?4 WHERE changes() = 1",
+                )
+                .bind(&[
+                    db::s(&g.user.id),
+                    db::i(g.org.id),
+                    db::s(&format!("item:{name}:{variant}")),
+                    db::i(db::now_ms()),
+                ])?,
+        ])
+        .await?;
     Ok(redirect(&format!("/org/{slug}/inventory?msg=Added")))
 }
 
@@ -209,12 +226,29 @@ pub async fn add_location(mut req: Request, ctx: RouteContext<App>) -> worker::R
     if name.is_empty() {
         return Ok(fail(400, "Location name is required."));
     }
-    db::exec(
-        &g.app.db,
-        "INSERT OR IGNORE INTO inventory_locations (org_id, name) VALUES (?1, ?2)",
-        vec![db::i(g.org.id), db::s(name)],
-    )
-    .await?;
+    g.app
+        .db
+        .batch(vec![
+            g.app
+                .db
+                .prepare(
+                    "INSERT OR IGNORE INTO inventory_locations (org_id, name) VALUES (?1, ?2)",
+                )
+                .bind(&[db::i(g.org.id), db::s(name)])?,
+            // changes() = 1 only when the insert actually created the row.
+            g.app
+                .db
+                .prepare(
+                    "INSERT INTO audit_events (actor_id, org_id, action, target, outcome, created_at) SELECT ?1, ?2, 'location.added', ?3, 'committed', ?4 WHERE changes() = 1",
+                )
+                .bind(&[
+                    db::s(&g.user.id),
+                    db::i(g.org.id),
+                    db::s(&format!("location:{name}")),
+                    db::i(db::now_ms()),
+                ])?,
+        ])
+        .await?;
     Ok(redirect(&format!("/org/{slug}/inventory?msg=Added")))
 }
 
@@ -287,6 +321,23 @@ pub async fn update_stock(mut req: Request, ctx: RouteContext<App>) -> worker::R
                     "INSERT INTO stock_movements (org_id, item_id, location_id, delta, from_qty, to_qty, reason, by_membership_id, created_at) SELECT ?1, ?2, ?3, ?4, qty - ?4, qty, ?5, ?6, ?7 FROM inventory_levels WHERE item_id = ?2 AND location_id = ?3 AND changes() = 1",
                 )
                 .bind(&p_movement)?,
+            // Audit row only when the movement was actually recorded: the
+            // changes() count here is the movement statement's own count.
+            g.app
+                .db
+                .prepare(
+                    "INSERT INTO audit_events (actor_id, org_id, action, target, outcome, created_at) SELECT ?1, ?2, 'stock.changed', ?3, 'committed', ?4 FROM inventory_levels WHERE item_id = ?5 AND location_id = ?6 AND changes() = 1",
+                )
+                .bind(&[
+                    db::s(&g.user.id),
+                    db::i(g.org.id),
+                    db::s(&format!(
+                        "item:{item_id} location:{location_id} delta:{delta}"
+                    )),
+                    db::i(now),
+                    db::i(item_id),
+                    db::i(location_id),
+                ])?,
         ])
         .await?;
     let applied = results

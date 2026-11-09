@@ -17,9 +17,10 @@ pub async fn list(req: Request, ctx: RouteContext<App>) -> worker::Result<Respon
     let orgs = orgs_of_user(&login.app.db, &login.user.id).await?;
     let csrf = login.session.csrf.clone();
     let body = serde_json::json!({
-        "user": {"name": login.user.name, "email": login.user.email},
+        "user": {"name": login.user.name, "email": login.user.email, "picture": login.user.picture.as_deref().and_then(crate::profile::google_picture), "is_platform_admin": login.user.is_platform_admin != 0},
         "organizations": [],
         "orgs": orgs.iter().map(|o| serde_json::json!({"slug": o.slug, "name": o.name})).collect::<Vec<_>>(),
+        "invitations": invitations::pending(&login.app.db,&login.user.email).await?.iter().map(|i|serde_json::json!({"id":i.id,"organization":i.org_name,"role":i.role_name,"expires_at":i.expires_at})).collect::<Vec<_>>(),
         "can_create": login.user.is_platform_admin != 0,
         "csrf_token": csrf,
         "local_mode": login.app.local_dev,
@@ -80,44 +81,63 @@ pub async fn create(mut req: Request, ctx: RouteContext<App>) -> worker::Result<
         return Ok(fail(400, "Slug already in use."));
     }
     let now = db::now_ms();
-    db::exec(
-        &login.app.db,
-        "INSERT INTO organizations (slug, name, is_synthetic, notifications_enabled, created_at) VALUES (?1, ?2, 0, 0, ?3)",
-        vec![db::s(&slug), db::s(&name), db::i(now)],
-    )
-    .await?;
-    let org: OrgRow = db::q_one(
-        &login.app.db,
-        "SELECT id, slug, name, is_synthetic, notifications_enabled, notification_cutoff_date, created_at FROM organizations WHERE slug = ?1",
-        vec![db::s(&slug)],
-    )
-    .await?
-    .expect("org just inserted");
     // Admin role with all permissions; creator becomes its first member.
     let all: Vec<String> = crate::domain_map::permission_options()
         .into_iter()
         .map(|(id, _)| id)
         .collect();
-    db::exec(
-        &login.app.db,
-        "INSERT INTO roles (org_id, name, permissions) VALUES (?1, 'Admin', ?2)",
-        vec![
-            db::i(org.id),
-            db::s(&serde_json::to_string(&all).unwrap_or_default()),
-        ],
-    )
-    .await?;
-    db::exec(
-        &login.app.db,
-        "INSERT INTO memberships (org_id, user_id, role_id, handle, created_at) SELECT ?1, ?2, id, ?2, ?3 FROM roles WHERE org_id = ?1 AND name = 'Admin'",
-        vec![db::i(org.id), db::s(&login.user.id), db::i(now)],
-    )
-    .await?;
-    db::exec(
-        &login.app.db,
-        "INSERT INTO pockets (org_id, name, opening_balance_minor) VALUES (?1, 'Main Pocket', 0)",
-        vec![db::i(org.id)],
-    )
-    .await?;
+    // Org, Admin role, first membership, Main Pocket, and the audit row
+    // commit in one batch; the org id is resolved by its unique slug in SQL.
+    let org_id = "(SELECT id FROM organizations WHERE slug = ?1)";
+    login
+        .app
+        .db
+        .batch(vec![
+            login
+                .app
+                .db
+                .prepare(
+                    "INSERT INTO organizations (slug, name, is_synthetic, notifications_enabled, created_at) VALUES (?1, ?2, 0, 0, ?3)",
+                )
+                .bind(&[db::s(&slug), db::s(&name), db::i(now)])?,
+            // Admin role with all permissions; creator becomes its first member.
+            login
+                .app
+                .db
+                .prepare(&format!(
+                    "INSERT INTO roles (org_id, name, permissions) VALUES ({org_id}, 'Admin', ?2)",
+                ))
+                .bind(&[
+                    db::s(&slug),
+                    db::s(&serde_json::to_string(&all).unwrap_or_default()),
+                ])?,
+            login
+                .app
+                .db
+                .prepare(&format!(
+                    "INSERT INTO memberships (org_id, user_id, role_id, handle, created_at) SELECT {org_id}, ?2, id, ?2, ?3 FROM roles WHERE org_id = {org_id} AND name = 'Admin'",
+                ))
+                .bind(&[db::s(&slug), db::s(&login.user.id), db::i(now)])?,
+            login
+                .app
+                .db
+                .prepare(&format!(
+                    "INSERT INTO pockets (org_id, name, opening_balance_minor) VALUES ({org_id}, 'Main Pocket', 0)",
+                ))
+                .bind(&[db::s(&slug)])?,
+            login
+                .app
+                .db
+                .prepare(&format!(
+                    "INSERT INTO audit_events(actor_id,org_id,action,target,outcome,created_at) SELECT ?2, {org_id}, 'org.created', ?3, 'committed', ?4 WHERE EXISTS(SELECT 1 FROM organizations WHERE slug = ?1)",
+                ))
+                .bind(&[
+                    db::s(&slug),
+                    db::s(&login.user.id),
+                    db::s(&format!("organization:{slug}")),
+                    db::i(now),
+                ])?,
+        ])
+        .await?;
     Ok(redirect(&format!("/org/{slug}/transactions")))
 }

@@ -316,6 +316,13 @@ pub async fn create(mut req: Request, ctx: RouteContext<App>) -> worker::Result<
     statements.extend(stage_statements(
         &g, batch.id, pocket_id, "staging", &chunks, false,
     )?);
+    statements.push(audit::committed(
+        &g.app.db,
+        Some(g.org.id),
+        &g.user.id,
+        "import.staged",
+        &format!("import_batch:{}", batch.id),
+    )?);
     g.app.db.batch(statements).await?;
     Ok(redirect(&format!("/org/{slug}/imports/{}", batch.id)))
 }
@@ -418,6 +425,20 @@ pub async fn confirm(mut req: Request, ctx: RouteContext<App>) -> worker::Result
         "UPDATE import_batches SET status=?3 WHERE id=?1 AND org_id=?2 AND status='ready' AND EXISTS(SELECT 1 FROM pockets WHERE id=import_batches.pocket_id AND org_id=?2)"
     ).bind(&[i(id),i(g.org.id),s(&guard)])?;
     let mut statements = vec![cas];
+    // Guarded by the unguessable status token and pushed BEFORE the staged
+    // statements finalize the batch status: after the CAS, status still
+    // equals the guard iff this confirmer won. Same transaction, so the row
+    // vanishes if any later statement aborts the batch.
+    statements.push(g.app.db.prepare(
+        "INSERT INTO audit_events(actor_id,org_id,action,target,outcome,created_at) SELECT ?1,?2,'import.committed',?3,'committed',?4 WHERE EXISTS(SELECT 1 FROM import_batches WHERE id=?5 AND org_id=?2 AND status=?6)",
+    ).bind(&[
+        db::s(&g.user.id),
+        db::i(g.org.id),
+        db::s(&format!("import_batch:{id}")),
+        db::i(db::now_ms()),
+        db::i(id),
+        db::s(&guard),
+    ])?);
     statements.extend(stage_statements(
         &g,
         id,

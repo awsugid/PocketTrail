@@ -24,6 +24,11 @@ pockettrail-jago-parser = { path = "crates/jago-parser" }
 
 # Worker/bindings deps only build for the wasm target, so `cargo test`
 # (native) skips them and tests the pure domain logic directly.
+
+# Native SQLite for audit-trail SQL semantics tests (never compiled for wasm).
+[dev-dependencies]
+rusqlite = { version = "0.32", features = ["bundled"] }
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 worker = { version = "0.8.7", features = ["d1"] }
 wasm-bindgen = "0.2.123"
@@ -31,6 +36,7 @@ js-sys = "0.3"
 console_error_panic_hook = "0.1"
 jsonwebtoken = "9"
 getrandom = { version = "0.2", features = ["js"] }
+tokio = { version = "1", default-features = false }
 
 [profile.release]
 opt-level = "s"

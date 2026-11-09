@@ -88,10 +88,138 @@ mod tests {
             "inventory",
             "inventory_item",
             "settings",
+            "platform",
         ] {
             let body = render(name, context()).unwrap_or_else(|e| panic!("{name}: {e}"));
             assert!(body.contains("<html"), "{name} is a complete page");
         }
+    }
+
+    #[test]
+    fn invitations_profile_and_global_settings_render() {
+        let mut ctx = context();
+        ctx["user"]["picture"] = json!("https://lh3.googleusercontent.com/a/photo");
+        ctx["user"]["is_platform_admin"] = json!(true);
+        ctx["invitations"] = json!([{"id":"synthetic-id","organization":"Synthetic org","role":"Viewer","expires_at":1}]);
+        let body = render("orgs", &ctx).unwrap();
+        assert!(body.contains("/invitations/synthetic-id/accept"));
+        assert!(body.contains("/platform"));
+        assert!(body.contains("referrerpolicy=\"no-referrer\""));
+        ctx["user"]["is_platform_admin"] = json!(false);
+        ctx["user"]["picture"] = json!(null);
+        let body = render("orgs", ctx).unwrap();
+        assert!(!body.contains("href=\"/platform\""));
+        assert!(!body.contains("googleusercontent.com"));
+    }
+
+    #[test]
+    fn avatar_fallback_covers_missing_and_broken_photos() {
+        // With a verified-host photo: layered img removes itself on error.
+        let mut ctx = context();
+        ctx["user"]["picture"] = json!("https://lh3.googleusercontent.com/a/photo");
+        let body = render("orgs", &ctx).unwrap();
+        assert!(body.contains("avatar__fallback"));
+        assert!(body.contains("onerror=\"this.remove()\""));
+        assert!(body.contains("referrerpolicy=\"no-referrer\""));
+        // Without a photo only the initials fallback renders.
+        ctx["user"]["picture"] = json!(null);
+        let body = render("orgs", ctx).unwrap();
+        assert!(body.contains("avatar__fallback"));
+        assert!(!body.contains("onerror"));
+        assert!(!body.contains("googleusercontent.com"));
+    }
+
+    #[test]
+    fn settings_template_copy_form_is_scoped_and_audit_sits_last() {
+        let mut ctx = context();
+        ctx["role_templates"] = json!([{"id":5,"name":"Treasurer","permissions":"[]"}]);
+        let body = render("settings", &ctx).unwrap();
+        // Placeholder + required so an unset template can never submit.
+        assert!(body.contains("name=\"template_id\" required"));
+        let select = body.split("id=\"role-template\"").nth(1).unwrap();
+        assert!(select.contains("value=\"\" selected"));
+        // The copy form lives inside the Create role accordion body.
+        let accordion = body
+            .split("<summary>Create role</summary>")
+            .nth(1)
+            .unwrap()
+            .split("</details>")
+            .next()
+            .unwrap();
+        assert!(accordion.contains("/settings/role-templates"));
+        assert!(accordion.contains("later template edits never change it"));
+        // Audit log renders once, after the configuration sections.
+        let audit = body.find("audit-heading").unwrap();
+        let members_config = body.find("members-config-title").unwrap();
+        assert!(audit > members_config);
+        assert_eq!(body.matches("id=\"audit-heading\"").count(), 1);
+    }
+
+    #[test]
+    fn platform_lists_real_organizations_without_financial_access() {
+        let mut ctx = context();
+        ctx["user"]["is_platform_admin"] = json!(true);
+        ctx["organizations"] = json!([
+            {"slug":"demo","name":"Demo org","members":3,"created_at":1_748_736_000_000_i64},
+            {"slug":"empty","name":"Empty org","members":0,"created_at":1_748_736_000_000_i64}
+        ]);
+        let body = render("platform", &ctx).unwrap();
+        let orgs = body.split("id=\"orgs-title\"").nth(1).unwrap();
+        let orgs = orgs.split("id=\"users-title\"").next().unwrap();
+        assert!(orgs.contains("Demo org") && orgs.contains("/demo"));
+        assert!(orgs.contains("cell--num\">3"));
+        // Informational listing only: no workspace links, no financial access.
+        assert!(!orgs.contains("href=\"/org/"));
+    }
+
+    #[test]
+    fn platform_user_rows_block_self_and_label_actions() {
+        let mut ctx = context();
+        ctx["user"]["is_platform_admin"] = json!(true);
+        ctx["users"] = json!([
+            {"id":"a","name":"Alice","email":"a@example.test","admin":true,"is_self":true},
+            {"id":"b","name":"Bob","email":"b@example.test","admin":false,"is_self":false},
+            {"id":"c","name":"Cara","email":"c@example.test","admin":true,"is_self":false}
+        ]);
+        let body = render("platform", &ctx).unwrap();
+        assert!(body.contains("Ask another platform administrator."));
+        assert!(body.contains("aria-label=\"Grant platform admin to Bob\""));
+        assert!(body.contains("aria-label=\"Revoke platform admin from Cara\""));
+        assert_eq!(body.matches("/platform/users/admin").count(), 2);
+        assert!(body.contains("badge--info\">Platform admin"));
+    }
+
+    #[test]
+    fn platform_pagination_and_template_labels_render() {
+        let mut ctx = context();
+        ctx["user"]["is_platform_admin"] = json!(true);
+        ctx["users"] =
+            json!([{"id":"a","name":"A","email":"a@e.test","admin":false,"is_self":false}]);
+        ctx["users_page"] = json!(2);
+        ctx["users_pages"] = json!(2);
+        ctx["users_from"] = json!(51);
+        ctx["users_to"] = json!(60);
+        ctx["users_total"] = json!(60);
+        ctx["users_prev"] = json!(null);
+        ctx["users_next"] = json!("/platform?events=3&users=3");
+        ctx["events"] = json!([]);
+        ctx["events_total"] = json!(0);
+        ctx["role_templates"] =
+            json!([{"id":1,"name":"Treasurer","labels":["View transactions","Update stock"]}]);
+        let body = render("platform", &ctx).unwrap();
+        assert!(body.contains("aria-label=\"Users pagination\""));
+        assert!(body.contains("aria-disabled=\"true\">Previous"));
+        // Server-built pager URLs render verbatim via |safe; user data stays
+        // escaped everywhere else.
+        assert!(body.contains("href=\"/platform?events=3&users=3\""));
+        assert!(body.contains("Page 2 of 2"));
+        assert!(body.contains("51–60 of 60"));
+        assert!(body.contains("\">Next</a>"));
+        // Human labels in template rows, never a raw permissions JSON dump.
+        assert!(body.contains("View transactions"));
+        assert!(body.contains("Update stock"));
+        assert!(!body.contains("[&quot;ViewTransactions&quot;"));
+        assert!(!body.contains("[\"ViewTransactions\""));
     }
 
     #[test]

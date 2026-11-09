@@ -8,6 +8,18 @@
   <p class="page-head__sub">Choose the workspace you want to work in.</p>
 </div>
 
+{% if invitations %}
+<section class="panel" aria-labelledby="invitations-heading">
+<h2 id="invitations-heading">Pending invitations</h2>
+{% for i in invitations %}
+<form method="post" action="/invitations/{{ i.id }}/accept">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<p><strong>{{ i.organization }}</strong> · {{ i.role }} · Expires {{ i.expires_at | ts }}</p>
+<button class="btn btn--primary" type="submit" aria-label="Accept invitation to {{ i.organization }} as {{ i.role }}">Accept invitation</button>
+</form>
+{% endfor %}
+</section>
+{% endif %}
 {% if orgs %}
 <div class="panel">
   <h2 class="panel__title">Your organizations</h2>

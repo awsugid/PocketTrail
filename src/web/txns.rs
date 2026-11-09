@@ -550,18 +550,46 @@ fn audit_statement(
     ])
 }
 
-async fn commit_mutation(g:&Ctx,id:i64,token:&str,mut statements:Vec<D1PreparedStatement>)->worker::Result<bool>{
+async fn commit_mutation(
+    g: &Ctx,
+    id: i64,
+    token: &str,
+    mut statements: Vec<D1PreparedStatement>,
+) -> worker::Result<bool> {
     // D1 meta.changes includes trigger writes. Read the operation token inside
     // the same atomic batch instead of interpreting that aggregate count.
     #[derive(serde::Deserialize)]
-    struct Winner { won:i64 }
-    statements.push(g.app.db.prepare(
-        "SELECT mutation_token=?1 AS won FROM transactions WHERE id=?2 AND org_id=?3"
-    ).bind(&[db::s(token),db::i(id),db::i(g.org.id)])?);
-    let results=g.app.db.batch(statements).await?;
-    let rows=results.last().ok_or_else(||worker::Error::RustError("Mutation result missing".into()))?
+    struct Winner {
+        won: i64,
+    }
+    statements.push(
+        g.app
+            .db
+            .prepare("SELECT mutation_token=?1 AS won FROM transactions WHERE id=?2 AND org_id=?3")
+            .bind(&[db::s(token), db::i(id), db::i(g.org.id)])?,
+    );
+    let results = g.app.db.batch(statements).await?;
+    let rows = results
+        .last()
+        .ok_or_else(|| worker::Error::RustError("Mutation result missing".into()))?
         .results::<Winner>()?;
-    Ok(rows.first().is_some_and(|r|r.won==1))
+    Ok(rows.first().is_some_and(|r| r.won == 1))
+}
+
+/// Transactional audit_events row: committed in the same D1 batch as the
+/// mutation, gated by the operation token so a losing run records nothing.
+fn audit_event(g: &Ctx, id: i64, action: &str, token: &str) -> worker::Result<D1PreparedStatement> {
+    g.app.db.prepare(
+        "INSERT INTO audit_events(actor_id,org_id,action,target,outcome,created_at) SELECT ?1,?2,?3,?4,'committed',?5 WHERE EXISTS(SELECT 1 FROM transactions WHERE id=?6 AND org_id=?2 AND mutation_token=?7)",
+    ).bind(&[
+        db::s(&g.user.id),
+        db::i(g.org.id),
+        db::s(action),
+        db::s(&format!("transaction:{id}")),
+        db::i(db::now_ms()),
+        db::i(id),
+        db::s(token),
+    ])
 }
 
 pub async fn save_details(mut req: Request, ctx: RouteContext<App>) -> worker::Result<Response> {
@@ -667,7 +695,8 @@ pub async fn save_details(mut req: Request, ctx: RouteContext<App>) -> worker::R
         serde_json::json!({"before":snapshot(&t,&old_splits),"after":snapshot(&next,&splits)}),
         &token,
     )?);
-    if !commit_mutation(&g,id,&token,statements).await? {
+    statements.push(audit_event(&g, id, "transaction.details_updated", &token)?);
+    if !commit_mutation(&g, id, &token, statements).await? {
         return Ok(fail(409,"This transaction changed while you were editing it. Reload and review the latest details."));
     }
     let _ = evidence;
@@ -728,7 +757,7 @@ pub async fn submit(mut req: Request, ctx: RouteContext<App>) -> worker::Result<
         serde_json::json!({}),
         &token,
     )?;
-    if !commit_mutation(&g,id,&token,vec![update,audit]).await? {
+    if !commit_mutation(&g, id, &token, vec![update, audit, audit_event(&g, id, "transaction.submitted", &token)?]).await? {
         return Ok(fail(
             409,
             "The transaction changed during submission. Reload and try again.",
@@ -813,7 +842,7 @@ async fn review(
         serde_json::json!({"note":note}),
         &token,
     )?;
-    if !commit_mutation(&g,id,&token,vec![update,audit]).await? {
+    if !commit_mutation(&g, id, &token, vec![update, audit, audit_event(&g, id, &format!("transaction.{status}"), &token)?]).await? {
         return Ok(fail(
             409,
             "The transaction changed during review. Reload before deciding.",
@@ -858,9 +887,14 @@ pub async fn add_comment(mut req: Request, ctx: RouteContext<App>) -> worker::Re
     if body.is_empty() || body.len() > 16000 {
         return Ok(fail(400, "Write a comment of up to 16,000 characters."));
     }
-    db::exec(&g.app.db,
-        "INSERT INTO comments(org_id,transaction_id,author_membership_id,body,created_at) VALUES(?1,?2,?3,?4,?5)",
-        vec![db::i(g.org.id),db::i(id),db::i(g.me().id),db::s(&body),db::i(db::now_ms())]).await?;
+    // Comment and its audit row commit atomically. Comments do not bump the
+    // transaction revision, so there is no operation token to gate on.
+    g.app.db.batch(vec![
+        g.app.db.prepare(
+            "INSERT INTO comments(org_id,transaction_id,author_membership_id,body,created_at) VALUES(?1,?2,?3,?4,?5)",
+        ).bind(&[db::i(g.org.id),db::i(id),db::i(g.me().id),db::s(&body),db::i(db::now_ms())])?,
+        audit::committed(&g.app.db, Some(g.org.id), &g.user.id, "transaction.commented", &format!("transaction:{id}"))?,
+    ]).await?;
     // Comments do not modify the transaction revision or approval.
     notify::enqueue_mentions(&g, &t, &body).await?;
     Ok(destination(&g, id, "Comment added"))
@@ -925,13 +959,13 @@ async fn set_suppression(
         serde_json::json!({"reason":reason}),
         &token,
     )?;
-    let mut statements = vec![update, audit];
+    let mut statements = vec![update, audit, audit_event(&g, id, &format!("transaction.{action}"), &token)?];
     if suppress {
         statements.push(g.app.db.prepare(
             "UPDATE notification_outbox SET cancelled_at=?1 WHERE org_id=?2 AND cancelled_at IS NULL AND (transaction_id=?3 OR kind='digest') AND EXISTS(SELECT 1 FROM transactions WHERE id=?3 AND mutation_token=?4)"
         ).bind(&[db::i(now),db::i(g.org.id),db::i(id),db::s(&token)])?);
     }
-    if !commit_mutation(&g,id,&token,statements).await? {
+    if !commit_mutation(&g, id, &token, statements).await? {
         return Ok(fail(
             409,
             "The transaction changed. Reload before changing notification settings.",
@@ -1010,7 +1044,7 @@ pub async fn upload_document(mut req: Request, ctx: RouteContext<App>) -> worker
         serde_json::json!({"filename":file.name(),"note":note}),
         &token,
     )?;
-    if !commit_mutation(&g,id,&token,vec![update,insert,audit]).await? {
+    if !commit_mutation(&g, id, &token, vec![update, insert, audit, audit_event(&g, id, "transaction.evidence_attached", &token)?]).await? {
         // Retain the unattached private object for recovery rather than delete evidence.
         return Ok(fail(
             409,

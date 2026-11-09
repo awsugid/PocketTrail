@@ -1,5 +1,27 @@
 # Cloudflare deployment preparation
 
+## Current rollout boundary
+
+The sections below record the initial deployment and its historical checks;
+they are not current production-state assertions or permission to redeploy.
+Local configuration now targets `https://pocket.awscommunity.id`. The operator
+reported connecting Cloudflare Workers Builds to GitHub `awsugid/PocketTrail`,
+branch `main`; current rollout/version has not been rechecked here. Ship future
+code through that Git/CI/CD connection, not manual `wrangler deploy`.
+
+Administration/invitation changes require migrations `0006`–`0009` before the
+new Worker serves requests. Those migrations have been tested locally only.
+Do not push to the auto-deploy branch until review and an explicitly approved
+production migration/recovery plan are complete. Old Worker rollback does not
+undo migrations. See [administration rollout](admin-rollout.md).
+
+Keep `EMAIL_DELIVERY_ENABLED=false`. SMTP secrets were configured separately;
+rotated credentials have not been authenticated from a Worker and no real
+email has been sent. Existing Google origin and first administrator setup were
+subsequently completed by authorized operators; do not repeat bootstrap SQL.
+
+## Historical initial deployment record
+
 **Status: production deployed with explicit user approval.**
 Live origin: https://pockettrail.awscommunity.id. Dedicated D1 `pockettrail` and
 private R2 `pockettrail-documents` are bound to Worker `pockettrail`. Migrations

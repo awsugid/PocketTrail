@@ -1,4 +1,12 @@
 /* PocketTrail workspace. Component widgets live in components.css. */
+/* Avatars layer the photo over an initials fallback; a broken photo is
+   removed on error, revealing the fallback without layout shift. */
+.avatar { position:relative; overflow:hidden; }
+.avatar__fallback { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600; color:var(--text-secondary); }
+.avatar img { position:absolute; inset:0; z-index:1; width:100%; height:100%; object-fit:cover; border-radius:inherit; }
+.sidebar-profile .avatar { flex-shrink:0; color:var(--text); }
+.sidebar-profile { display:flex; align-items:center; gap:10px; padding:12px; min-width:0; }
+.sidebar-profile > span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 :root {
   color-scheme: light;
   --bg:#fafafa; --surface:#fff; --surface-2:#f4f4f5;
@@ -113,6 +121,7 @@ legend { padding:0 6px; font-size:13px; font-weight:600; }
 .form-grid > .field { margin-bottom:0; }
 .form-grid > form + form { border-top:1px solid var(--border); padding-top:24px; }
 .form-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:12px; }
+.pagination { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; margin-top:12px; font-size:13px; color:var(--text-secondary); }
 .form-grid > .form-actions { margin-top:0; }
 .row-grid { display:grid; grid-template-columns:minmax(120px,1fr) 120px minmax(120px,1fr) auto; gap:10px; align-items:center; margin-bottom:12px; }
 .row-grid .btn--small { justify-self:end; }
