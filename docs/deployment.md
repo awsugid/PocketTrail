@@ -9,11 +9,25 @@ reported connecting Cloudflare Workers Builds to GitHub `awsugid/PocketTrail`,
 branch `main`; current rollout/version has not been rechecked here. Ship future
 code through that Git/CI/CD connection, not manual `wrangler deploy`.
 
-Administration/invitation changes require migrations `0006`–`0009` before the
-new Worker serves requests. Those migrations have been tested locally only.
-Do not push to the auto-deploy branch until review and an explicitly approved
-production migration/recovery plan are complete. Old Worker rollback does not
-undo migrations. See [administration rollout](admin-rollout.md).
+Administration/invitation migrations `0006`–`0009` were applied to production
+with explicit approval; remote listing confirmed none pending. Old Worker
+rollback does not undo migrations. See [administration rollout](admin-rollout.md).
+
+### Cloudflare Builds commands
+
+- Build command: `npm run ci:build`
+- Deploy command: `npm run ci:deploy`
+- Root: `/`; production branch: `main`; nonproduction builds disabled.
+- Build token needs Worker deployment and D1 write access.
+
+`scripts/cloudflare-ci.sh` installs Rust stable and portable WASI SDK 25 Clang
+under `$HOME`, without root or sudo, then installs worker-build 0.8.7, runs tests,
+and performs a dry-run WASM build. Deploy reloads both toolchain paths in its
+separate shell and runs migration-first `npm run deploy`. The Rust target stays
+`wasm32-unknown-unknown`; WASI SDK supplies only its C compiler. Cached toolchains
+are reused. Bootstrap needs outbound HTTPS to GitHub and Rust distribution hosts.
+Shell regression uses mocked commands; fresh bootstrap on Cloudflare remains
+unverified until its first successful hosted build.
 
 Keep `EMAIL_DELIVERY_ENABLED=false`. SMTP secrets were configured separately;
 rotated credentials have not been authenticated from a Worker and no real
