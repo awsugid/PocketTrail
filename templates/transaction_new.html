@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}New transaction · {{ org.name }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>Record transaction</h1>
+  <div class="page-head__actions">
+    <a class="btn btn--small" href="/org/{{ org.slug }}/transactions">Back to transactions</a>
+  </div>
+  <p class="page-head__sub">Manual entry for movements that did not come from a statement import, such as opening balances. Bank movements should be imported so their Jago transaction ID is retained.</p>
+</div>
+
+<div class="panel">
+  <form method="post" action="/org/{{ org.slug }}/transactions/new">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <fieldset class="form-section">
+      <legend class="form-section__title">Movement details</legend>
+      <p class="panel__sub">Record the pocket, date, and counterparty before adding financial amounts.</p>
+    <div class="form-grid">
+      <div class="field">
+        <label for="pocket">Pocket <span class="req" aria-hidden="true">*</span></label>
+        <select class="select" id="pocket" name="pocket_id" required>
+          {% if pockets %}{% for p in pockets %}
+          <option value="{{ p.id }}">{{ p.name }}</option>
+          {% endfor %}{% endif %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="date">Date <span class="req" aria-hidden="true">*</span></label>
+        <input class="input" type="date" id="date" name="date" required>
+      </div>
+      <div class="field">
+        <label for="time">Time</label>
+        <input class="input" type="time" id="time" name="time">
+      </div>
+      <div class="field">
+        <label for="counterparty">Counterparty <span class="req" aria-hidden="true">*</span></label>
+        <input class="input" id="counterparty" name="counterparty" required>
+      </div>
+      <div class="field">
+        <label for="type">Transaction type</label>
+        <input class="input" id="type" name="transaction_type" placeholder="e.g. transfer">
+      </div>
+    </div>
+    </fieldset>
+    <fieldset class="form-section">
+      <legend class="form-section__title">Amounts &amp; responsibility</legend>
+      <div class="form-grid">
+      <div class="field">
+        <label for="amount">Amount (minor units) <span class="req" aria-hidden="true">*</span></label>
+        <input class="input" type="number" id="amount" name="amount_minor" min="0" step="1" inputmode="numeric" required>
+        <p class="hint">Rp&nbsp;1 = 100 minor units (Rp&nbsp;15.000.000 = 1500000000).</p>
+      </div>
+      <div class="field">
+        <label for="balance">Balance after (minor units)</label>
+        <input class="input" type="number" id="balance" name="balance_minor" step="1" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label for="responsible">Responsible member <span class="req" aria-hidden="true">*</span></label>
+        <select class="select" id="responsible" name="responsible_member_id" required>
+          <option value="">Unassigned</option>
+          {% if members %}{% for m in members %}
+          <option value="{{ m.id }}">{{ m.name }}</option>
+          {% endfor %}{% endif %}
+        </select>
+      </div>
+    </div>
+    </fieldset>
+    <fieldset class="form-section">
+      <legend class="form-section__title">Context</legend>
+    <div class="field">
+      <label for="notes">Bank note</label>
+      <input class="input" id="notes" name="notes">
+    </div>
+    <div class="field">
+      <label for="explanation">Explanation <span class="req" aria-hidden="true">*</span></label>
+      <textarea class="textarea" id="explanation" name="explanation" required placeholder="Why was this money moved? What does it cover?"></textarea>
+    </div>
+    </fieldset>
+    <div class="form-actions">
+      <button class="btn btn--primary" type="submit">Save transaction</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

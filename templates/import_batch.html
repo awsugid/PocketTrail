@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Import batch · {{ org.name }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>Import batch</h1>
+  <div class="page-head__actions">
+    <a class="btn btn--small" href="/org/{{ org.slug }}/imports">Back to imports</a>
+  </div>
+  <p class="page-head__sub">{% if batch %}{{ batch.created_at }}{% if batch.by_name %} · by {{ batch.by_name }}{% endif %}{% endif %} — each row shows what happened to that statement entry.</p>
+</div>
+
+{% if batch and batch.counts %}
+<div class="notice notice--info">
+  {{ batch.counts.imported or 0 }} imported · {{ batch.counts.duplicate_unchanged or 0 }} unchanged · {{ batch.counts.conflict or 0 }} conflicts · {{ batch.counts.needs_review or 0 }} need review. Conflicts and unassigned rows are listed for review, never replaced silently.
+</div>
+{% endif %}
+
+{% if items %}
+<div class="panel panel--flush">
+  <h2 class="panel__title">Statement entries</h2>
+  <div class="table-scroll">
+    <table class="table">
+      <thead>
+        <tr>
+          <th scope="col">Counterparty / bank reference</th>
+          <th scope="col" class="cell--num">Amount</th>
+          <th scope="col">Result</th>
+          <th scope="col">Message</th>
+          <th scope="col">Transaction</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in items %}
+        <tr>
+          <td><strong>{{ it.counterparty_display.name if it.counterparty_display else it.counterparty }}</strong>{% if it.counterparty_display and it.counterparty_display.bank_account %}<span class="cell__sub">{{ it.counterparty_display.bank_account }}</span>{% endif %}<span class="cell__sub cell--mono">{{ it.bank_id }}</span></td>
+          <td class="cell--num cell--nowrap">{{ it.amount_minor | money }}</td>
+          <td class="cell--nowrap">
+            {% if it.status == 'imported' %}<span class="badge badge--approved">Imported</span>
+            {% elif it.status == 'duplicate_unchanged' %}<span class="badge badge--neutral">Unchanged</span>
+            {% elif it.status == 'conflict' %}<span class="badge badge--error">Conflict</span>
+            {% elif it.status == 'needs_review' %}<span class="badge badge--pending">Needs review</span>
+            {% else %}<span class="badge badge--neutral">{{ it.status }}</span>{% endif %}
+          </td>
+          <td>{{ it.message or "—" }}</td>
+          <td>{% if it.transaction_id %}<a href="/org/{{ org.slug }}/transactions/{{ it.transaction_id }}">Open</a>{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="hint" style="margin-top: 12px;">Rows needing review still require a responsible member; actor mappings in Settings assign them automatically next time.</p>
+</div>
+{% else %}
+<div class="empty">
+  <h2 class="empty__title">Nothing in this batch</h2>
+  <p class="empty__body">The statement text produced no importable rows. Check the pocket and the extracted text.</p>
+</div>
+{% endif %}
+{% endblock %}

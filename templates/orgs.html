@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Organizations{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>Organizations</h1>
+  <p class="page-head__sub">Choose the workspace you want to work in.</p>
+</div>
+
+{% if orgs %}
+<div class="panel">
+  <h2 class="panel__title">Your organizations</h2>
+  <p class="panel__sub">Each organization keeps separate financial records, events, assets, and roles.</p>
+  <div class="workspace-list">
+  {% for o in orgs %}
+  <a class="workspace-link" href="/org/{{ o.slug }}/transactions">
+    <span><strong>{{ o.name }}</strong><span class="cell__sub">/{{ o.slug }}</span></span>
+    <span class="btn btn--small" aria-hidden="true">Open workspace</span>
+  </a>
+  {% endfor %}
+  </div>
+</div>
+{% else %}
+<div class="empty">
+  <h2 class="empty__title">No organizations yet</h2>
+  <p class="empty__body">Google sign-in alone grants no organization access. Ask a platform administrator for an invitation, or create the first organization below if you are authorized.</p>
+</div>
+{% endif %}
+
+{% if can_create %}
+<details class="accordion"{% if not orgs %} open{% endif %}>
+  <summary>Create organization</summary>
+  <div class="accordion__body">
+  <p class="panel__sub">Platform administrators only. Creating an organization does not add members; membership is invite-based.</p>
+  <form method="post" action="/orgs">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-grid">
+      <div class="field">
+        <label for="org-name">Name <span class="req" aria-hidden="true">*</span></label>
+        <input class="input" id="org-name" name="name" required placeholder="AWS User Group Jakarta">
+      </div>
+      <div class="field">
+        <label for="org-slug">URL identifier <span class="req" aria-hidden="true">*</span></label>
+        <input class="input" id="org-slug" name="slug" aria-describedby="org-slug-hint" required pattern="[a-z0-9-]+" title="Lowercase letters, digits, hyphens" placeholder="jakarta">
+        <p class="hint" id="org-slug-hint">Lowercase letters, digits, and hyphens. Example: jakarta gives /org/jakarta/transactions.</p>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn--primary" type="submit">Create organization</button>
+    </div>
+  </form>
+</div>
+</details>
+{% endif %}
+{% endblock %}

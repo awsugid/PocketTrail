@@ -1,0 +1,13 @@
+# Copy to .dev.vars (git-ignored). scripts/configure-local.py writes the real
+# one; these are example values for local development only.
+# Never set LOCAL_DEV in wrangler.toml vars — it must only exist locally.
+LOCAL_DEV=true
+
+# HMAC key for session cookies: at least 32 random characters.
+# Run scripts/configure-local.py to generate it without printing it.
+SECRET_SESSION_KEY=
+
+# Public Google OAuth client ID from the existing Jakarta site configuration.
+# No client secret needed (ID-token verification only). Leave empty to fail
+# closed: /login then shows Google sign-in as not configured.
+GOOGLE_CLIENT_ID=

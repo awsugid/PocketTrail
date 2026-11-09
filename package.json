@@ -1,0 +1,17 @@
+{
+  "name": "pockettrail",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev --ip 127.0.0.1",
+    "build": "wrangler deploy --dry-run",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:seed:local": "wrangler d1 execute DB --local --file tests/fixtures/seed.sql",
+    "test": "cargo test --workspace && node static/extraction.test.js",
+    "check:wasm": "cargo check --target wasm32-unknown-unknown --lib",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4",
+    "playwright": "^1.61.1"
+  }
+}

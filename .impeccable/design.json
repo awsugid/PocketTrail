@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-07T13:28:16.030358+00:00",
+  "title": "PocketTrail Design System",
+  "extensions": {
+    "shadows": [
+      {
+        "name": "floating-menu",
+        "value": "0 6px 20px #18181b14,0 2px 4px #18181b08",
+        "purpose": "Floating organization/account and mobile menus."
+      },
+      {
+        "name": "widget-popover",
+        "value": "0 4px 8px rgba(0,0,0,.06), 0 12px 28px rgba(0,0,0,.10)",
+        "purpose": "Native top-layer custom select and date popovers."
+      }
+    ],
+    "motion": [
+      {
+        "name": "menu-enter",
+        "value": "160ms cubic-bezier(.16,1,.3,1)",
+        "purpose": "Short translate/scale entrance for disclosure panels."
+      },
+      {
+        "name": "control-state",
+        "value": "120ms ease",
+        "purpose": "Button color and border feedback."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "prefers-reduced-motion: reduce",
+        "purpose": "Disable animations and transitions while retaining feedback."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact-desktop",
+        "value": "1100px"
+      },
+      {
+        "name": "mobile-navigation",
+        "value": "800px"
+      },
+      {
+        "name": "phone",
+        "value": "480px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "description": "Primary button extracted from shipped workspace.",
+      "html": "<button class=\"ds-primary\">Save changes</button>",
+      "css": ".ds-primary{background:var(--primary);color:var(--surface);border:1px solid var(--primary);border-radius:6px;padding:8px 14px;font:550 13px/1.4 system-ui;min-height:38px;cursor:pointer}.ds-primary:hover{background:var(--primary-hover)}.ds-primary:active{background:var(--primary-active)}.ds-primary:focus-visible{outline:2px solid var(--focus);outline-offset:3px}"
+    },
+    {
+      "name": "Text field",
+      "kind": "input",
+      "description": "Text field extracted from shipped workspace.",
+      "html": "<label for=\"ds-name\">Name</label><input id=\"ds-name\" class=\"ds-input\">",
+      "css": ".ds-input{display:block;background:var(--surface);color:var(--text);border:1px solid var(--control-border);border-radius:6px;padding:9px 11px;font:13px system-ui;min-height:40px}.ds-input:hover{border-color:var(--border-strong)}.ds-input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "description": "Panel extracted from shipped workspace.",
+      "html": "<section class=\"ds-panel\"><h2>Supporting documents</h2><p>Evidence stays with each transaction.</p></section>",
+      "css": ".ds-panel{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:24px;font:14px/1.6 system-ui}.ds-panel h2{font-size:18px;font-weight:650;margin:0 0 6px}.ds-panel p{margin:0;color:var(--text-secondary)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "A clear organizer workspace",
+    "overview": "Shadcn-inspired visual language, not React or a component-library migration. Light zinc/white work areas, charcoal navigation and primary actions, restrained warm community accent.",
+    "keyCharacteristics": [
+      "Strong page hierarchy and quiet, precise table typography.",
+      "Bounded, linear forms rather than wide multi-column input grids.",
+      "Flat surfaces; floating menus carry depth.",
+      "Functional feedback, never invented metrics or decorative dashboards."
+    ]
+  }
+}

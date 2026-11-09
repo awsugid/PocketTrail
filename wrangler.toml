@@ -1,0 +1,28 @@
+name = "pockettrail"
+account_id = "26422c9ad224a7618c8670b6c7037bf6"
+main = "build/worker/shim.mjs"
+compatibility_date = "2025-09-01"
+
+[[routes]]
+pattern = "pocket.awscommunity.id"
+custom_domain = true
+
+[build]
+command = "worker-build --release"
+
+[assets]
+directory = "./static"
+binding = "ASSETS"
+run_worker_first = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "pockettrail"
+database_id = "c0192e27-2795-4f65-94f9-56166b239aa0"
+
+[[r2_buckets]]
+binding = "DOCUMENTS"
+bucket_name = "pockettrail-documents"
+
+# No LOCAL_DEV, no GOOGLE_CLIENT_ID here on purpose: local flags/secrets come
+# from .dev.vars only, so they can never leak into deployed vars.

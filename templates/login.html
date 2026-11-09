@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Sign in{% endblock %}
+
+{% block content %}
+<div class="panel auth-card">
+  <h1>Sign in to PocketTrail</h1>
+  <p class="panel__sub">Community finances for organizers. Access is limited to organization members.</p>
+
+  {% if google_configured and google_client_id %}
+  <div class="field">
+    <div id="google-btn" aria-label="Sign in with Google"></div>
+    <noscript><p class="hint">Google sign-in needs JavaScript. Ask an organizer for a local invite if you cannot use it.</p></noscript>
+  </div>
+  {% elif google_configured %}
+  <div class="notice notice--info">Google sign-in is configured but no client ID was provided — contact a platform administrator.</div>
+  {% else %}
+  <div class="notice notice--warning">Google sign-in is not configured on this deployment.</div>
+  {% endif %}
+
+  {% if dev_login_enabled and users %}
+  <details class="accordion" open>
+  <summary>Local fixture identities</summary>
+  <div class="accordion__body">
+  <p class="hint">Development only. Pick an identity to sign in as; never enabled in production.</p>
+  <form method="post" action="/login/dev">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field">
+      <label for="dev-user">Sign in as <span class="req" aria-hidden="true">*</span></label>
+      <select class="select" id="dev-user" name="user_id" required>
+        {% for u in users %}
+        <option value="{{ u.id }}">{{ u.name }} ({{ u.email }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn--primary" type="submit">Sign in with fixture identity</button>
+    </div>
+  </form>
+  </div>
+  </details>
+  {% endif %}
+</div>
+
+{% if google_configured and google_client_id %}
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+  window.addEventListener("load", function () {
+    if (!window.google || !google.accounts || !google.accounts.id) return;
+    google.accounts.id.initialize({
+      client_id: {{ google_client_id | tojson }},
+      nonce: {{ csrf_token | tojson }},
+      callback: function (response) {
+        var form = document.createElement("form");
+        form.method = "post";
+        form.action = "/login/google";
+        var csrf = document.createElement("input");
+        csrf.type = "hidden";
+        csrf.name = "csrf_token";
+        csrf.value = {{ csrf_token | tojson }};
+        var cred = document.createElement("input");
+        cred.type = "hidden";
+        cred.name = "credential";
+        cred.value = response.credential;
+        form.appendChild(csrf);
+        form.appendChild(cred);
+        document.body.appendChild(form);
+        form.submit();
+      }
+    });
+    google.accounts.id.renderButton(document.getElementById("google-btn"), {
+      theme: "outline", size: "large", text: "signin_with", shape: "rectangular", locale: "en"
+    });
+  });
+</script>
+{% endif %}
+{% endblock %}
