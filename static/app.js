@@ -145,9 +145,10 @@
     var links = Array.from(nav.querySelectorAll("a[href^='#']"));
     var targets = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); }).filter(Boolean);
     if (!targets.length) return;
-    function setCurrent(id) {
+    function setCurrent(ids) {
+      if (!Array.isArray(ids)) ids = [ids];
       links.forEach(function (a) {
-        if (a.getAttribute("href") === "#" + id) a.setAttribute("aria-current", "true");
+        if (ids.indexOf(a.getAttribute("href").slice(1)) >= 0) a.setAttribute("aria-current", "true");
         else a.removeAttribute("aria-current");
       });
     }
@@ -159,11 +160,15 @@
       if (pinned) { if (visible.has(pinned)) setCurrent(pinned.id); return; }
       // Nearest section heading to the reading line (40% down the viewport):
       // works for one column and for side-by-side panels at different heights.
+      // Side-by-side panels that start on the same grid row are read together,
+      // so both are current.
       var line = innerHeight * 0.4;
-      var best = Array.from(visible).sort(function (a, b) {
+      var ranked = Array.from(visible).sort(function (a, b) {
         return Math.abs(a.getBoundingClientRect().top - line) - Math.abs(b.getBoundingClientRect().top - line);
-      })[0];
-      if (best) setCurrent(best.id);
+      });
+      if (!ranked.length) return;
+      var bestTop = ranked[0].getBoundingClientRect().top;
+      setCurrent(ranked.filter(function (t) { return Math.abs(t.getBoundingClientRect().top - bestTop) < 8; }).map(function (t) { return t.id; }));
     }, { rootMargin: "-40% 0px -55% 0px" });
     window.addEventListener("wheel", function () { pinned = null; }, { passive: true });
     window.addEventListener("touchmove", function () { pinned = null; }, { passive: true });

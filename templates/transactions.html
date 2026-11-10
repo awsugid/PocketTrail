@@ -75,9 +75,9 @@
   </div>
   {% if page_number and (page_number > 1 or has_next) %}
   <nav class="pagination" aria-label="Transaction pages">
-    {% if page_number > 1 %}<a class="btn btn--small" href="?page={{ page_number - 1 }}&status={{ filters.status }}">Previous page</a>{% endif %}
+    {% if page_number > 1 %}<a class="btn btn--small" href="?page={{ page_number - 1 }}{% if filters and filters.status and filters.status != 'all' %}&status={{ filters.status }}{% endif %}">Previous page</a>{% endif %}
     <span>Page {{ page_number }}</span>
-    {% if has_next %}<a class="btn btn--small" href="?page={{ page_number + 1 }}&status={{ filters.status }}">Next page</a>{% endif %}
+    {% if has_next %}<a class="btn btn--small" href="?page={{ page_number + 1 }}{% if filters and filters.status and filters.status != 'all' %}&status={{ filters.status }}{% endif %}">Next page</a>{% endif %}
   </nav>
   {% endif %}
 </div>
