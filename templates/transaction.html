@@ -84,13 +84,13 @@
     </div>
     <div class="field">
       <label for="responsible">Responsible member <span class="req" aria-hidden="true">*</span></label>
-      <select class="select" id="responsible" name="responsible_member_id" required>
+      <select class="select" id="responsible" name="responsible_member_id" required aria-describedby="responsible-hint">
         <option value="">Choose a member…</option>
         {% if members %}{% for m in members %}
         <option value="{{ m.id }}"{% if txn.responsible_member_id and txn.responsible_member_id == m.id %} selected{% endif %}>{{ m.name }}</option>
         {% endfor %}{% endif %}
       </select>
-      <p class="hint">The member accountable for this explanation and its evidence. Actor mappings may have suggested this assignment.</p>
+      <p class="hint" id="responsible-hint">The member accountable for this explanation and its evidence. Actor mappings may have suggested this assignment.</p>
     </div>
     <fieldset>
       <legend>Purpose allocation</legend>
@@ -98,7 +98,7 @@
         {% if splits %}{% for s in splits %}
         <div class="row-grid" data-row>
           <input class="input" name="split_label[]" value="{{ s.label }}" aria-label="Purpose label">
-          <input class="input" type="number" name="split_amount[]" value="{{ s.amount_rupiah }}" min="0.01" step="0.01" inputmode="decimal" aria-label="Amount in IDR" data-amount-input>
+          <input class="input" type="number" name="split_amount[]" value="{{ s.amount_rupiah }}" min="0.01" step="0.01" inputmode="decimal" aria-label="Amount in IDR" aria-describedby="split-hint" data-amount-input>
           <select class="select" name="split_member[]" aria-label="Responsible member for this purpose">
             <option value="">Unassigned</option>
             {% if members %}{% for m in members %}
@@ -110,7 +110,7 @@
         {% endfor %}{% else %}
         <div class="row-grid" data-row>
           <input class="input" name="split_label[]" placeholder="e.g. Monthly meetup food" aria-label="Purpose label">
-          <input class="input" type="number" name="split_amount[]" min="0.01" step="0.01" inputmode="decimal" placeholder="Amount in IDR" aria-label="Amount in IDR" data-amount-input>
+          <input class="input" type="number" name="split_amount[]" min="0.01" step="0.01" inputmode="decimal" placeholder="Amount in IDR" aria-label="Amount in IDR" aria-describedby="split-hint" data-amount-input>
           <select class="select" name="split_member[]" aria-label="Responsible member for this purpose">
             <option value="">Unassigned</option>
             {% if members %}{% for m in members %}
@@ -124,7 +124,7 @@
       <template id="split-template">
         <div class="row-grid" data-row>
           <input class="input" name="split_label[]" placeholder="Purpose label" aria-label="Purpose label">
-          <input class="input" type="number" name="split_amount[]" min="0.01" step="0.01" inputmode="decimal" placeholder="Amount in IDR" aria-label="Amount in IDR" data-amount-input>
+          <input class="input" type="number" name="split_amount[]" min="0.01" step="0.01" inputmode="decimal" placeholder="Amount in IDR" aria-label="Amount in IDR" aria-describedby="split-hint" data-amount-input>
           <select class="select" name="split_member[]" aria-label="Responsible member for this purpose">
             <option value="">Unassigned</option>
             {% if members %}{% for m in members %}
@@ -135,15 +135,15 @@
         </div>
       </template>
       <p class="alloc-total" id="alloc-total" aria-live="polite"></p>
-      <p class="hint">Enter IDR without thousands separators: 15000000 means Rp 15.000.000. Allocations must add up to the transaction amount.</p>
+      <p class="hint" id="split-hint">Enter IDR without thousands separators: 15000000 means Rp 15.000.000. Allocations must add up to the transaction amount.</p>
       <div class="form-actions">
         <button class="btn" type="button" data-add-row="#split-template" data-row-list="#split-rows">Add purpose</button>
       </div>
     </fieldset>
     <div class="field">
       <label for="evidence-unavailable">Document-unavailable reason</label>
-      <input class="input" id="evidence-unavailable" name="evidence_unavailable_reason" value="{{ txn.evidence_unavailable_reason }}" placeholder="e.g. Cash purchase, no receipt issued">
-      <p class="hint">Required when spending has no supporting documents: explains why evidence is missing. The server validates this.</p>
+      <input class="input" id="evidence-unavailable" name="evidence_unavailable_reason" value="{{ txn.evidence_unavailable_reason }}" placeholder="e.g. Cash purchase, no receipt issued" aria-describedby="evidence-unavailable-hint">
+      <p class="hint" id="evidence-unavailable-hint">Required when spending has no supporting documents: explains why evidence is missing. The server validates this.</p>
     </div>
     <div class="form-actions">
       <button class="btn btn--primary" type="submit">Save details</button>
@@ -341,8 +341,8 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="field">
       <label for="comment-body">Comment <span class="req" aria-hidden="true">*</span></label>
-      <textarea class="textarea" id="comment-body" name="body" required></textarea>
-      <p class="hint">Type @ to mention a member. Mentions notify them unless notifications are suppressed for this transaction.</p>
+      <textarea class="textarea" id="comment-body" name="body" required aria-describedby="comment-body-hint"></textarea>
+      <p class="hint" id="comment-body-hint">Type @ to mention a member. Mentions notify them unless notifications are suppressed for this transaction.</p>
     </div>
     {% if members %}
     <div class="chips" aria-label="Mention a member">

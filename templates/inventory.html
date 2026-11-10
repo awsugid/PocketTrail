@@ -33,7 +33,7 @@
           {% if item.levels %}
           {% for lv in item.levels %}
           <tr role="row">
-            <td role="cell"><a href="/org/{{ org.slug }}/inventory/items/{{ item.id }}">{{ item.name }}</a><span class="cell__sub">{{ item.variant or "No variant" }} · <span class="inventory-table__total">Total {{ item.total_qty }}</span></span></td>
+            <td role="cell"><a href="/org/{{ org.slug }}/inventory/items/{{ item.id }}">{{ item.name }}</a><span class="cell__sub">{{ item.variant or "No variant" }} · <span class="inventory-table__total">{{ item.total_qty }} across {{ item.levels | length }} location{% if item.levels | length != 1 %}s{% endif %}</span></span></td>
             <td role="cell" data-label="Location">{{ lv.location_name }}</td>
             <td role="cell" data-label="Quantity" class="cell--num">{{ lv.qty }}</td>
           </tr>
@@ -96,7 +96,7 @@
       </div>
       <div class="field">
         <label for="stock-quantity">Quantity <span class="req" aria-hidden="true">*</span></label>
-        <input class="input" type="number" id="stock-quantity" name="quantity" min="1" step="1" inputmode="numeric" required placeholder="e.g. 2">
+        <input class="input" type="number" id="stock-quantity" name="quantity" min="1" step="1" inputmode="numeric" required placeholder="e.g. 2" aria-describedby="stock-preview">
         <p class="hint" id="stock-preview" aria-live="polite" data-stock-preview>Pick an item and location to see the current quantity.</p>
       </div>
       <div class="field">

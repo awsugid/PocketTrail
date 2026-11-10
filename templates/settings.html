@@ -9,8 +9,8 @@
 </div>
 <nav class="section-nav" aria-label="Settings sections">
   <a href="#roles-config">Roles</a>
-  <a href="#members-config">Memberships</a>
   <a href="#pockets-config">Pockets</a>
+  <a href="#members-config">Memberships</a>
   <a href="#mappings-config">Actor mappings</a>
   <a href="#notifications-config">Notifications</a>
   {% if can.members %}<a href="#audit">Audit log</a>{% endif %}
@@ -150,11 +150,11 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="field">
       <label for="role-template">Copy role template</label>
-      <select class="select" id="role-template" name="template_id" required>
+      <select class="select" id="role-template" name="template_id" required aria-describedby="role-template-hint">
         <option value="" selected>Choose a template…</option>
         {% for t in role_templates %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
       </select>
-      <p class="hint">Copying creates a separate role in this workspace; later template edits never change it.</p>
+      <p class="hint" id="role-template-hint">Copying creates a separate role in this workspace; later template edits never change it.</p>
     </div>
     <div class="form-actions"><button class="btn" type="submit">Copy template</button></div>
   </form>
@@ -295,8 +295,8 @@
           {% endfor %}
         </select>
         {% else %}
-        <input class="input" id="member-user" name="user_id" required placeholder="Email or user ID">
-        <p class="hint">The person must first sign in with Google. Membership is granted explicitly; sign-in alone gives no organization access.</p>
+        <input class="input" id="member-user" name="user_id" required placeholder="Email or user ID" aria-describedby="member-user-hint">
+        <p class="hint" id="member-user-hint">The person must first sign in with Google. Membership is granted explicitly; sign-in alone gives no organization access.</p>
         {% endif %}
       </div>
       <div class="field">

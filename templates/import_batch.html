@@ -36,7 +36,7 @@
           <td role="cell"><strong>{{ it.counterparty_display.name if it.counterparty_display else it.counterparty }}</strong>{% if it.counterparty_display and it.counterparty_display.bank_account %}<span class="cell__sub">{{ it.counterparty_display.bank_account }}</span>{% endif %}<span class="cell__sub cell--mono">{{ it.bank_id }}</span></td>
           <td role="cell" class="cell--num cell--nowrap" data-label="Amount">{{ it.amount_minor | money }}</td>
           <td role="cell" class="cell--nowrap" data-label="Result">
-            {% if it.status == 'imported' %}<span class="badge badge--approved">Imported</span>
+            {% if it.status == 'imported' %}<span class="badge badge--info">Imported</span>
             {% elif it.status == 'duplicate_unchanged' %}<span class="badge badge--neutral">Unchanged</span>
             {% elif it.status == 'conflict' %}<span class="badge badge--error">Conflict</span>
             {% elif it.status == 'needs_review' %}<span class="badge badge--pending">Needs review</span>

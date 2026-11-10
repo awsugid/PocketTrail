@@ -27,16 +27,16 @@
       <legend class="form-section__title">Source statement</legend>
     <div class="field">
       <label for="pocket">Pocket <span class="req" aria-hidden="true">*</span></label>
-      <select class="select" id="pocket" name="pocket_id" required style="max-width: 340px;">
+      <select class="select" id="pocket" name="pocket_id" required aria-describedby="pocket-hint">
         {% if pockets %}{% for p in pockets %}
         <option value="{{ p.id }}">{{ p.name }}</option>
         {% endfor %}{% endif %}
       </select>
-      <p class="hint">The pocket this statement belongs to.</p>
+      <p class="hint" id="pocket-hint">The pocket this statement belongs to.</p>
     </div>
     <div class="field">
       <label for="pdf-input">Statement PDF <span class="req" aria-hidden="true">*</span></label>
-      <input class="input" type="file" id="pdf-input" name="file" accept="application/pdf,.pdf" required data-pdf-input data-pdf-target="#statement-text" data-pdf-status="#pdf-status">
+      <input class="input" type="file" id="pdf-input" name="file" accept="application/pdf,.pdf" required data-pdf-input data-pdf-target="#statement-text" data-pdf-status="#pdf-status" aria-describedby="pdf-status">
       <p class="hint" id="pdf-status" aria-live="polite">Select one Jago statement. Its text is extracted locally and the original is retained privately. Password-protected statements prompt for the password.</p>
     </div>
     </fieldset>
