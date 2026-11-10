@@ -60,14 +60,15 @@
     }
     if (!invalidBatch) {
       invalidBatch = [];
-      setTimeout(function () {
+      // All invalid events for one submit fire synchronously; decide right after.
+      queueMicrotask(function () {
         var fields = invalidBatch; invalidBatch = null;
         var first = fields.sort(function (a, b) { return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1; })[0];
         if (!first) return;
         if (first.closest(".pt-control")) { first.dispatchEvent(new CustomEvent("pt:surface-invalid")); return; }
         first.scrollIntoView({ block: "center" });
         first.focus({ preventScroll: true });
-      }, 0);
+      });
     }
     invalidBatch.push(field);
   }, true);
