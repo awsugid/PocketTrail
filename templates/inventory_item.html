@@ -14,24 +14,25 @@
   <p class="panel__sub">Each change preserves its author, location, and resulting quantity.</p>
   {% if movements %}
   <div class="table-scroll">
-    <table class="table">
-      <thead>
-        <tr>
-          <th scope="col">When</th>
-          <th scope="col">Location</th>
-          <th scope="col" class="cell--num">Change</th>
-          <th scope="col" class="cell--num">Result</th>
-          <th scope="col">Reason</th>
+    <table class="table card-table" role="table">
+      <caption class="visually-hidden">Stock changes for {{ item.name }}</caption>
+      <thead role="rowgroup">
+        <tr role="row">
+          <th role="columnheader" scope="col">When</th>
+          <th role="columnheader" scope="col">Location</th>
+          <th role="columnheader" scope="col" class="cell--num">Change</th>
+          <th role="columnheader" scope="col" class="cell--num">Result</th>
+          <th role="columnheader" scope="col">Reason</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody role="rowgroup">
         {% for mv in movements %}
-        <tr>
-          <td>{{ mv.created_at }}<span class="cell__sub">{{ mv.member_name }}</span></td>
-          <td>{{ mv.location_name }}</td>
-          <td class="cell--num{% if mv.delta > 0 %} amount--in{% endif %}">{% if mv.delta > 0 %}+{% endif %}{{ mv.delta }}</td>
-          <td class="cell--num">{{ mv.result_qty }}</td>
-          <td>{{ mv.reason or "—" }}</td>
+        <tr role="row">
+          <td role="cell">{{ mv.created_at }}<span class="cell__sub">{{ mv.member_name }}</span></td>
+          <td role="cell" data-label="Location">{{ mv.location_name }}</td>
+          <td role="cell" data-label="Change" class="cell--num{% if mv.delta > 0 %} amount--in{% endif %}">{% if mv.delta > 0 %}+{% endif %}{{ mv.delta }}</td>
+          <td role="cell" data-label="Result" class="cell--num">{{ mv.result_qty }}</td>
+          <td role="cell" data-label="Reason">{{ mv.reason or "—" }}</td>
         </tr>
         {% endfor %}
       </tbody>

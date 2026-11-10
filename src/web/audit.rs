@@ -163,7 +163,8 @@ pub async fn list_org(app: &App, org: i64, page: u32) -> worker::Result<Vec<plat
         "SELECT a.*, u.name AS actor_name FROM audit_events a LEFT JOIN users u ON u.id=a.actor_id WHERE a.org_id=?1 ORDER BY a.id DESC LIMIT ?2 OFFSET ?3",
         vec![
             db::i(org),
-            db::i(rules::PAGE_SIZE),
+            // One extra row tells the caller whether a next page exists.
+            db::i(rules::PAGE_SIZE + 1),
             db::i(rules::page_offset(page)),
         ],
     )

@@ -55,7 +55,7 @@ Context: `orgs [{slug, name}]`, `can_create` (bool).
 
 ### transactions.html — GET /org/{org}/transactions
 
-Query: `status` ∈ `all|pending|approved|changes_requested`.
+Query: `status` ∈ `all|needs_details|pending|approved|changes_requested`.
 Context: `txns [{id, date, time, counterparty, transaction_type, amount_minor,
 balance_minor, status, responsible_name, needs_details, suppressed}]`,
 `filters {status}`.
@@ -64,8 +64,9 @@ balance_minor, status, responsible_name, needs_details, suppressed}]`,
 
 Context: `pockets [{id, name}]`, `members [{id, name}]`.
 POST **/org/{org}/transactions/new**: `pocket_id`, `date`, `time`,
-`counterparty`, `transaction_type`, `notes`, `amount_minor`, `balance_minor`,
-`explanation`, `responsible_member_id`.
+`counterparty`, `transaction_type`, `notes`, `direction` (`in|out`), `amount`
+(IDR, positive), `balance` (IDR, optional), `explanation`,
+`responsible_member_id`. The server converts IDR to signed minor units.
 
 ### transaction.html — GET /org/{org}/transactions/{id}
 
@@ -124,7 +125,7 @@ Context: `items [{id, name, variant?, levels [{location_name, qty}],
 total_qty}]`, `locations [{id, name}]`.
 
 POST endpoints:
-- **/org/{org}/inventory/stock**: `item_id`, `location_id`, `delta` (signed), `reason`.
+- **/org/{org}/inventory/stock**: `item_id`, `location_id`, `direction` (`add|remove`) + `quantity` (positive) — or legacy signed `delta` — and `reason`.
 - **/org/{org}/inventory/items**: `name`, `variant`.
 - **/org/{org}/inventory/locations**: `name`.
 

@@ -78,7 +78,11 @@
     var topbar = document.querySelector(".topbar");
     var nav = document.querySelector(".section-nav");
     var offset = 16;
-    if (topbar && getComputedStyle(topbar).position === "sticky") offset += topbar.getBoundingClientRect().height;
+    if (topbar && getComputedStyle(topbar).position === "sticky") {
+      var topbarHeight = topbar.getBoundingClientRect().height;
+      offset += topbarHeight;
+      document.documentElement.style.setProperty("--topbar-height", Math.round(topbarHeight) + "px");
+    }
     if (nav && getComputedStyle(nav).position === "sticky") offset += nav.getBoundingClientRect().height;
     document.documentElement.style.setProperty("--sticky-offset", Math.round(offset) + "px");
   }

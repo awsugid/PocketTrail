@@ -473,6 +473,7 @@ pub async fn detail(req: Request, ctx: RouteContext<App>) -> worker::Result<Resp
             serde_json::from_str(&decision.details).unwrap_or_default();
         body["review_decision"] = serde_json::json!({
             "status": decision.new_status,
+            "status_label": crate::domain_map::status_label(&decision.new_status),
             "author_name": decision.author_name,
             "created_at": crate::fmt::fmt_ts(decision.created_at),
             "note": details.get("note").and_then(|v| v.as_str()).unwrap_or_default(),
@@ -480,7 +481,8 @@ pub async fn detail(req: Request, ctx: RouteContext<App>) -> worker::Result<Resp
     }
     let member_name = |id: i64| g.mem_name(Some(id));
     body["audit"]=serde_json::json!(audit.iter().map(|a|serde_json::json!({
-        "action":a.action,"previous_status":a.previous_status,"new_status":a.new_status,
+        "action":a.action,"action_label":crate::audit_rules::action_label(&a.action),
+        "previous_status":a.previous_status,"new_status":a.new_status,
         "previous_label":crate::domain_map::status_label(&a.previous_status),
         "new_label":crate::domain_map::status_label(&a.new_status),
         "facts":crate::domain_map::history_facts(&a.details, &member_name),

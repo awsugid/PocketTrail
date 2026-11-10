@@ -222,7 +222,7 @@
   <div>
   {% if members %}
   <div class="table-scroll">
-    <table class="table members-table" role="table">
+    <table class="table card-table members-table" role="table">
       <caption class="visually-hidden">Members and roles</caption>
       <thead role="rowgroup">
         <tr role="row">
@@ -353,21 +353,22 @@
   <div>
   {% if mappings %}
   <div class="table-scroll">
-    <table class="table">
-      <thead>
-        <tr>
-          <th scope="col">Statement label</th>
-          <th scope="col">Responsible member</th>
-          {% if can.mappings %}<th scope="col"><span class="visually-hidden">Actions</span></th>{% endif %}
+    <table class="table card-table mappings-table" role="table">
+      <caption class="visually-hidden">Actor mappings from statement labels to responsible members</caption>
+      <thead role="rowgroup">
+        <tr role="row">
+          <th role="columnheader" scope="col">Statement label</th>
+          <th role="columnheader" scope="col">Responsible member</th>
+          {% if can.mappings %}<th role="columnheader" scope="col"><span class="visually-hidden">Actions</span></th>{% endif %}
         </tr>
       </thead>
-      <tbody>
+      <tbody role="rowgroup">
         {% for mp in mappings %}
-        <tr>
-          <td class="cell--mono">{{ mp.pattern }}</td>
-          <td>{{ mp.member_name or "—" }}</td>
+        <tr role="row">
+          <td role="cell" class="cell--mono">{{ mp.pattern }}</td>
+          <td role="cell" data-label="Responsible member">{{ mp.member_name or "—" }}</td>
           {% if can.mappings %}
-          <td>
+          <td role="cell">
             <form method="post" action="/org/{{ org.slug }}/settings/mappings/{{ mp.id }}/delete" hx-confirm="Delete the mapping for “{{ mp.pattern }}”? Future imports with this label will stay unassigned. This cannot be undone.">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <button class="btn btn--danger btn--small" type="submit" aria-label="Delete actor mapping {{ mp.pattern }}">Delete mapping</button>
@@ -477,7 +478,7 @@
   <nav class="pagination" aria-label="Audit log pagination">
     {% if audit_page and audit_page > 1 %}<a class="btn btn--small" href="/org/{{ org.slug }}/settings?page={{ audit_page - 1 }}#audit">Previous</a>{% endif %}
     {% if audit_page %}<span>Page {{ audit_page }}</span>{% endif %}
-    {% if audit_has_more or audit_events | length == 50 %}<a class="btn btn--small" href="/org/{{ org.slug }}/settings?page={% if audit_page %}{{ audit_page + 1 }}{% else %}2{% endif %}#audit">Next</a>{% endif %}
+    {% if audit_has_more %}<a class="btn btn--small" href="/org/{{ org.slug }}/settings?page={% if audit_page %}{{ audit_page + 1 }}{% else %}2{% endif %}#audit">Next</a>{% endif %}
   </nav>
   {% else %}<p class="hint">No events recorded yet.</p>{% endif %}
 </section>

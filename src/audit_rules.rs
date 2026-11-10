@@ -133,7 +133,16 @@ pub fn normalize_target(path: &str) -> String {
 /// Organizer-facing label for an audit action code. Codes are the stored
 /// truth; this is presentation only, so unknown codes fall back to themselves.
 pub fn action_label(action: &str) -> String {
+    // Transaction history stores bare codes; the audit log stores dotted ones.
     let label = match action {
+        "details_updated" => "Details saved",
+        "documentation_submitted" => "Submitted for review",
+        "approved" => "Approved",
+        "changes_requested" => "Changes requested",
+        "evidence_attached" => "Document attached",
+        "notifications_suppressed" => "Notifications suppressed",
+        "notifications_resumed" => "Notifications resumed",
+        "commented" => "Comment posted",
         "auth.login" => "Signed in",
         "auth.logout" => "Signed out",
         "http.post" => "Form submission",
@@ -185,6 +194,8 @@ pub fn target_label(target: &str) -> String {
             .split(' ')
             .map(|piece| match piece.split_once(':') {
                 Some(("transaction", id)) => format!("Transaction #{id}"),
+                Some(("import_batch", id)) => format!("Import batch #{id}"),
+                Some(("document", id)) => format!("Document #{id}"),
                 Some(("membership", id)) => format!("Member {}", if id.bytes().all(|b| b.is_ascii_digit()) { format!("#{id}") } else { format!("@{id}") }),
                 Some(("organization", slug)) => format!("Organization /{slug}"),
                 Some(("item", rest)) => format!("Item {}", rest.replace(':', " · ")),
@@ -359,6 +370,8 @@ mod tests {
         assert_eq!(target_label("/org/:org/settings/members/3/remove"), "Member #3 · remove");
         assert_eq!(target_label("Treasurer"), "Treasurer");
         assert_eq!(target_label("transaction:3"), "Transaction #3");
+        assert_eq!(target_label("import_batch:3"), "Import batch #3");
+        assert_eq!(action_label("documentation_submitted"), "Submitted for review");
         assert_eq!(target_label("item:1 location:1 delta:-2"), "Item 1 · Location 1 · change -2");
         assert_eq!(target_label("membership:bob"), "Member @bob");
         assert_eq!(outcome_label("attempt"), "Attempted");

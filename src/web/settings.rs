@@ -74,14 +74,13 @@ pub async fn page(req: Request, ctx: RouteContext<App>) -> worker::Result<Respon
         body["invitations"] = serde_json::json!(db::q_all::<serde_json::Value>(&g.app.db,"SELECT i.id,i.email,i.expires_at,im.status AS mail_status,im.error AS mail_error,im.attempts AS mail_attempts FROM invitations i LEFT JOIN invitation_mail im ON im.invitation_id=i.id AND im.id=(SELECT MAX(x.id) FROM invitation_mail x WHERE x.invitation_id=i.id) WHERE i.org_id=?1 AND i.accepted_at IS NULL AND i.revoked_at IS NULL ORDER BY i.created_at DESC",vec![db::i(g.org.id)]).await?);
     }
     if g.can(Permission::ManageMembers) {
-        body["audit_events"] = serde_json::json!(
-            audit::list_org(
-                &g.app,
-                g.org.id,
-                crate::audit_rules::page_number(query_param(&req, "page").as_deref()),
-            )
-            .await?
-        );
+        let page = crate::audit_rules::page_number(query_param(&req, "page").as_deref());
+        let mut events = audit::list_org(&g.app, g.org.id, page).await?;
+        let has_more = events.len() as i64 > crate::audit_rules::PAGE_SIZE;
+        events.truncate(crate::audit_rules::PAGE_SIZE as usize);
+        body["audit_events"] = serde_json::json!(events);
+        body["audit_page"] = serde_json::json!(page);
+        body["audit_has_more"] = serde_json::json!(has_more);
     }
     if g.can(Permission::ManageNotifications) {
         let preview_org = OrgRow {

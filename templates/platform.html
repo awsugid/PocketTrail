@@ -11,6 +11,7 @@
   <p class="panel__sub">Listing is informational. Platform administrators hold no membership and gain no financial access; records stay in each workspace.</p>
   {% if organizations %}
   <div class="table-scroll"><table class="table">
+    <caption class="visually-hidden">Organizations on this platform</caption>
     <thead><tr><th scope="col">Organization</th><th scope="col">Active members</th><th scope="col">Created</th></tr></thead>
     <tbody>
     {% for o in organizations %}
@@ -26,6 +27,7 @@
   <p class="panel__sub">Organization access stays managed in each workspace. You cannot change your own platform access.</p>
   {% if users %}
   <div class="table-scroll"><table class="table">
+    <caption class="visually-hidden">Users and platform access</caption>
     <thead><tr><th scope="col">User</th><th scope="col">Platform access</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
     <tbody>
     {% for u in users %}

@@ -218,7 +218,7 @@
   {% endif %}
   {% if approval and approval.ineligible_reason and can.approve %}<p class="hint">You cannot approve this transaction: {{ approval.ineligible_reason }}.</p>{% endif %}
   {% if review_decision %}
-  <p class="hint">{% if txn.status == 'pending' %}Previous decision{% else %}Last decision{% endif %}: {{ review_decision.status | replace("_", " ") }} · {{ review_decision.author_name }} · {{ review_decision.created_at }}</p>
+  <p class="hint">{% if txn.status == 'pending' %}Previous decision{% else %}Last decision{% endif %}: {{ review_decision.status_label }} · {{ review_decision.author_name }} · {{ review_decision.created_at }}</p>
   {% if review_decision.note %}<p class="comment__body">{{ review_decision.note }}</p>{% endif %}
   {% endif %}
   {% if txn.suppressed %}<p class="notice notice--muted"><strong>Notifications suppressed.</strong> {{ txn.suppressed_reason }}. No reminders, summaries, or mentions are sent for this transaction. Suppression is not approval and does not mean evidence exists.</p>{% endif %}
@@ -361,9 +361,9 @@
   {% if audit %}
   {% for entry in audit %}
   <details class="accordion">
-    <summary>{{ entry.action | replace("_", " ") | capitalize }} · {{ entry.author_name }} · {{ entry.created_at }}</summary>
+    <summary>{{ entry.action_label }} · {{ entry.author_name }} · {{ entry.created_at }}</summary>
     <div class="accordion__body">
-      {% if entry.previous_status != entry.new_status %}<p>Status: {{ entry.previous_label }} → {{ entry.new_label }}</p>{% endif %}
+      {% if entry.previous_status != entry.new_status %}<p>Status: {{ entry.previous_label }} <span aria-hidden="true">→</span><span class="visually-hidden">to</span> {{ entry.new_label }}</p>{% endif %}
       {% if entry.facts %}<dl class="facts history-facts">{% for f in entry.facts %}<dt>{{ f[0] }}</dt><dd>{{ f[1] }}</dd>{% endfor %}</dl>{% elif entry.details %}<pre class="history-details">{{ entry.details }}</pre>{% else %}<p class="hint">No further detail recorded.</p>{% endif %}
     </div>
   </details>
