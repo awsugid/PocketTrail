@@ -173,7 +173,9 @@ fn build_dom_from_rows(
 pub async fn list(req: Request, ctx: RouteContext<App>) -> worker::Result<Response> {
     let app = ctx.data.clone();
     let slug = path_param(&ctx, "org");
-    let status = query_param(&req, "status").filter(|s| !s.is_empty() && s != "all");
+    // Only the filter options the UI offers; anything else means "all".
+    let status = query_param(&req, "status")
+        .filter(|s| matches!(s.as_str(), "needs_details" | "pending" | "approved" | "changes_requested"));
     let g = try_resp!(require_member(app, &req, &slug, Permission::ViewTransactions).await);
     let page_number = query_param(&req, "page")
         .and_then(|n| n.parse::<i64>().ok())

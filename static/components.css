@@ -49,7 +49,7 @@
 .pt-calendar .pt-date-manual{width:100%;font-variant-numeric:tabular-nums}
 .pt-date-error{margin:5px 0;color:var(--danger,#b42318);font-size:12px}
 .pt-date-error:empty{display:none}
-.pt-date-actions{display:flex;gap:6px;margin-top:12px}
+.pt-date-actions{display:flex;gap:6px;margin-top:12px;position:sticky;bottom:0;padding:8px 0 2px;background:var(--surface,#fff);box-shadow:0 -8px 8px -8px rgb(0 0 0 / .12)}
 .pt-date-actions .pt-button:last-child{margin-left:auto;background:var(--primary,#27272a);border-color:var(--primary,#27272a);color:var(--surface,#fff)}
 @media(max-width:480px){.pt-control .pt-trigger{min-height:44px;font-size:16px}.pt-popover{font-size:14px}.pt-option{min-height:44px;padding-top:12px;padding-bottom:12px}.pt-calendar .pt-date-manual,.pt-calendar .pt-month-number,.pt-calendar .pt-year-number{font-size:16px;min-height:40px}.pt-popover .pt-button{min-height:40px}.pt-calendar .pt-day{min-height:38px}}
 @media(prefers-reduced-motion:reduce){.pt-control *,.pt-popover,.pt-popover *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}

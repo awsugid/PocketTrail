@@ -150,9 +150,18 @@
         else a.removeAttribute("aria-current");
       });
     }
+    // Two-column layouts put several sections in the band at once: the topmost wins.
+    var visible = new Set();
+    var pinned = null; // the clicked target stays current until the user scrolls again
     var observer = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) { if (entry.isIntersecting) setCurrent(entry.target.id); });
+      entries.forEach(function (entry) { if (entry.isIntersecting) visible.add(entry.target); else visible.delete(entry.target); });
+      if (pinned) { if (visible.has(pinned)) setCurrent(pinned.id); return; }
+      var top = Array.from(visible).sort(function (a, b) { return a.getBoundingClientRect().top - b.getBoundingClientRect().top; })[0];
+      if (top) setCurrent(top.id);
     }, { rootMargin: "-40% 0px -55% 0px" });
+    window.addEventListener("wheel", function () { pinned = null; }, { passive: true });
+    window.addEventListener("touchmove", function () { pinned = null; }, { passive: true });
+    window.addEventListener("keydown", function (e) { if (/^(Arrow|Page|Home|End| )/.test(e.key)) pinned = null; });
     targets.forEach(function (t) { observer.observe(t); });
     // Initial state: the hash target, else the first section.
     var initial = location.hash && document.getElementById(location.hash.slice(1));
@@ -172,7 +181,9 @@
     });
     nav.addEventListener("click", function (event) {
       var a = event.target.closest("a[href^='#']");
-      if (a) setCurrent(a.getAttribute("href").slice(1));
+      if (!a) return;
+      pinned = document.getElementById(a.getAttribute("href").slice(1));
+      setCurrent(a.getAttribute("href").slice(1));
     });
   }
   document.addEventListener("DOMContentLoaded", trackSectionNav);

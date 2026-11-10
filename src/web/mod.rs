@@ -445,6 +445,10 @@ fn router(app: App) -> Router<'static, App> {
         .post_async("/org/:org/inventory/locations", inventory::add_location)
         .post_async("/org/:org/inventory/stock", inventory::update_stock)
         .get_async("/org/:org/inventory/items/:id", inventory::item_page)
+        // Unknown paths get the same styled page as in-app 404s, not bare text.
+        .or_else_any_method("/*path", |_req, _ctx| {
+            Ok(fail(404, "That page does not exist. Check the address or go back to your organizations."))
+        })
 }
 
 #[event(fetch)]

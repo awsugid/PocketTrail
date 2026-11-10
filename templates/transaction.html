@@ -174,7 +174,11 @@
     </table>
   </div>
   {% else %}
+  {% if txn.evidence_unavailable_reason %}
+  <p class="hint">No supporting documents; a document-unavailable reason is recorded below.</p>
+  {% else %}
   <div class="notice notice--warning">No supporting documents. Spending requires evidence, or a document-unavailable reason saved with the explanation.</div>
+  {% endif %}
   {% endif %}
   {% if txn.evidence_unavailable_reason %}
   <dl class="facts"><dt>Document-unavailable reason</dt><dd>{{ txn.evidence_unavailable_reason }}</dd></dl>

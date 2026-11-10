@@ -52,7 +52,7 @@
     });
     const name = source.getAttribute('aria-label');
     if (labelIds.length) {
-      trigger.setAttribute('aria-labelledby', labelIds.join(' ') + (date ? '' : ` ${popup.id}-value`));
+      trigger.setAttribute('aria-labelledby', `${labelIds.join(' ')} ${popup.id}-value`);
       popup.setAttribute('aria-labelledby', labelIds.join(' '));
     } else {
       trigger.setAttribute('aria-label', name || (date ? 'Date' : 'Choose option'));
