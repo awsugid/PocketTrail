@@ -157,8 +157,13 @@
     var observer = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) { if (entry.isIntersecting) visible.add(entry.target); else visible.delete(entry.target); });
       if (pinned) { if (visible.has(pinned)) setCurrent(pinned.id); return; }
-      var top = Array.from(visible).sort(function (a, b) { return a.getBoundingClientRect().top - b.getBoundingClientRect().top; })[0];
-      if (top) setCurrent(top.id);
+      // Nearest section heading to the reading line (40% down the viewport):
+      // works for one column and for side-by-side panels at different heights.
+      var line = innerHeight * 0.4;
+      var best = Array.from(visible).sort(function (a, b) {
+        return Math.abs(a.getBoundingClientRect().top - line) - Math.abs(b.getBoundingClientRect().top - line);
+      })[0];
+      if (best) setCurrent(best.id);
     }, { rootMargin: "-40% 0px -55% 0px" });
     window.addEventListener("wheel", function () { pinned = null; }, { passive: true });
     window.addEventListener("touchmove", function () { pinned = null; }, { passive: true });
