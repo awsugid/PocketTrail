@@ -88,10 +88,12 @@
     state.open = () => {
       if (source.matches(':disabled')) return;
       state.sync();
+      popup.dataset.settling = 'true';
       popup.showPopover();
       trigger.setAttribute('aria-expanded', 'true');
       position();
       state.focus();
+      requestAnimationFrame(() => requestAnimationFrame(() => { delete popup.dataset.settling; }));
     };
     trigger.addEventListener('click', () => popup.matches(':popover-open') ? close() : state.open());
     popup.addEventListener('toggle', () => {
@@ -121,11 +123,12 @@
       trigger.setAttribute('aria-invalid', 'true');
       // preventDefault suppresses the browser's own scroll-to-first-invalid, so
       // bring the trigger into view and focus it before opening the popup.
-      if (!document.querySelector('.pt-control .pt-trigger[aria-invalid="true"]:focus')) {
+      const first = !document.querySelector('.pt-control .pt-trigger[aria-invalid="true"]:focus');
+      if (first) {
         trigger.scrollIntoView({ block: 'center' });
         trigger.focus({ preventScroll: true });
+        state.open();
       }
-      state.open();
     });
     state.commit = newValue => {
       source.value = newValue;
@@ -156,7 +159,10 @@
       if (!items.length) return;
       active = Math.max(0, Math.min(items.length - 1, index));
       items.forEach((el, i) => { el.tabIndex = i === active ? 0 : -1; });
-      items[active].focus();
+      // Fixed-position popup: focusing must never scroll the document, or the
+      // scroll listener below would close the menu it just opened.
+      items[active].focus({ preventScroll: true });
+      items[active].scrollIntoView?.({ block: 'nearest' });
     };
     state.sync = () => {
       value.textContent = source.selectedOptions[0]?.textContent || 'Choose option';
@@ -279,7 +285,7 @@
         grid.append(row);
       }
     };
-    const focusDay = () => grid.querySelector('[tabindex="0"]')?.focus();
+    const focusDay = () => { const day = grid.querySelector('[tabindex="0"]'); if (!day) return; day.focus({ preventScroll: true }); day.scrollIntoView?.({ block: 'nearest' }); };
     const navigate = amount => {
       const date = new Date(cursor); date.setUTCDate(1); date.setUTCMonth(date.getUTCMonth() + amount);
       if (date.getUTCFullYear() < 1 || date.getUTCFullYear() > 9999) return;
@@ -326,7 +332,13 @@
   }))).observe(document.documentElement, { childList: true, subtree: true });
   addEventListener('resize', () => document.querySelectorAll('.pt-popover:popover-open').forEach(el => el.hidePopover()));
   document.addEventListener('scroll', event => {
-    if (!event.target.closest?.('.pt-popover')) document.querySelectorAll('.pt-popover:popover-open').forEach(el => el.hidePopover());
+    if (event.target.closest?.('.pt-popover')) return;
+    // A scroll the popup itself caused while opening (e.g. an invalid trigger
+    // brought into view) must not dismiss it.
+    document.querySelectorAll('.pt-popover:popover-open').forEach(el => {
+      if (el.dataset.settling) return;
+      el.hidePopover();
+    });
   }, true);
   if (document.readyState !== 'loading') initialize();
 })();

@@ -337,7 +337,7 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="field">
       <label for="comment-body">Comment <span class="req" aria-hidden="true">*</span></label>
-      <textarea class="textarea" id="comment-body" name="body" required style="scroll-margin-top: 88px;"></textarea>
+      <textarea class="textarea" id="comment-body" name="body" required></textarea>
       <p class="hint">Type @ to mention a member. Mentions notify them unless notifications are suppressed for this transaction.</p>
     </div>
     {% if members %}
