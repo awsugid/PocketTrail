@@ -170,10 +170,16 @@ pub fn fail(status: u16, msg: &str) -> Response {
         409 => "Out of date",
         _ => "Something went wrong",
     };
+    // Form rejections keep the "entries not saved" hint; navigations do not.
+    let recovery = if matches!(status, 400 | 409) {
+        "<p class=\"hint\">Your entries were not saved. Use your browser's Back button to return to the form.</p>"
+    } else {
+        ""
+    };
     html(
         status,
         format!(
-            "<!doctype html><html lang=\"en\"><title>{title} · PocketTrail</title><link rel=\"stylesheet\" href=\"/static/app.css\"><body class=\"layout--bare\"><main class=\"main\"><div class=\"panel auth-card\"><h1>{title}</h1><p>{}</p><p class=\"hint\">Your entries were not saved. Use your browser's Back button to return to the form.</p><p><a class=\"btn\" href=\"/orgs\">Organizations</a></p></div></main></body></html>",
+            "<!doctype html><html lang=\"en\"><title>{title} · PocketTrail</title><link rel=\"stylesheet\" href=\"/static/app.css\"><body class=\"layout--bare\"><main class=\"main\"><div class=\"panel auth-card\"><h1>{title}</h1><p>{}</p>{recovery}<p><a class=\"btn\" href=\"/orgs\">Organizations</a></p></div></main></body></html>",
             render::html_escape(msg)
         ),
     )
