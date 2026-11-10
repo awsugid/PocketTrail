@@ -481,6 +481,8 @@ pub async fn detail(req: Request, ctx: RouteContext<App>) -> worker::Result<Resp
     let member_name = |id: i64| g.mem_name(Some(id));
     body["audit"]=serde_json::json!(audit.iter().map(|a|serde_json::json!({
         "action":a.action,"previous_status":a.previous_status,"new_status":a.new_status,
+        "previous_label":crate::domain_map::status_label(&a.previous_status),
+        "new_label":crate::domain_map::status_label(&a.new_status),
         "facts":crate::domain_map::history_facts(&a.details, &member_name),
         "author_name":a.author_name,"created_at":crate::fmt::fmt_ts(a.created_at)
     })).collect::<Vec<_>>());

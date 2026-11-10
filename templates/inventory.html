@@ -19,29 +19,29 @@
 <div class="panel">
   <h2 class="panel__title">Stock by location</h2>
   <div class="table-scroll">
-    <table class="table inventory-table" role="table">
-      <thead role="rowgroup">
-        <tr role="row">
+    <table class="table inventory-table">
+      <thead>
+        <tr>
           <th scope="col">Item</th>
           <th scope="col">Location</th>
           <th scope="col" class="cell--num">Quantity</th>
         </tr>
       </thead>
-      <tbody role="rowgroup">
+      <tbody>
         {% for item in items %}
           {% if item.levels %}
           {% for lv in item.levels %}
-          <tr role="row">
-            <td role="cell"><a href="/org/{{ org.slug }}/inventory/items/{{ item.id }}">{{ item.name }}</a><span class="cell__sub">{{ item.variant or "No variant" }} · <span class="inventory-table__total">Total {{ item.total_qty }}</span></span></td>
-            <td role="cell" data-label="Location">{{ lv.location_name }}</td>
-            <td role="cell" data-label="Quantity" class="cell--num">{{ lv.qty }}</td>
+          <tr>
+            <td><a href="/org/{{ org.slug }}/inventory/items/{{ item.id }}">{{ item.name }}</a><span class="cell__sub">{{ item.variant or "No variant" }} · <span class="inventory-table__total">Total {{ item.total_qty }}</span></span></td>
+            <td data-label="Location">{{ lv.location_name }}</td>
+            <td data-label="Quantity" class="cell--num">{{ lv.qty }}</td>
           </tr>
           {% endfor %}
           {% else %}
-          <tr role="row">
-            <td role="cell"><a href="/org/{{ org.slug }}/inventory/items/{{ item.id }}">{{ item.name }}</a><span class="cell__sub">{{ item.variant or "No variant" }}</span></td>
-            <td role="cell" data-label="Location">—</td>
-            <td role="cell" data-label="Quantity" class="cell--num">0</td>
+          <tr>
+            <td><a href="/org/{{ org.slug }}/inventory/items/{{ item.id }}">{{ item.name }}</a><span class="cell__sub">{{ item.variant or "No variant" }}</span></td>
+            <td data-label="Location">—</td>
+            <td data-label="Quantity" class="cell--num">0</td>
           </tr>
           {% endif %}
         {% endfor %}

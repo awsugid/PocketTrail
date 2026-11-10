@@ -35,6 +35,16 @@ pub fn runtime_status(status_row: &str, complete: bool) -> DocumentationStatus {
     }
 }
 
+/// Badge wording for a persisted status string.
+pub fn status_label(status_row: &str) -> &'static str {
+    match status_row {
+        "approved" => "Approved",
+        "changes_requested" => "Changes requested",
+        "pending" | "submitted" => "Pending review",
+        _ => "Unknown",
+    }
+}
+
 /// Transactions still owing documentation (reminders/digest chase these);
 /// `Submitted` items await review by somebody else and are not chased.
 pub fn documentation_owed(status_row: &str, complete: bool) -> bool {

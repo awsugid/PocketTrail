@@ -136,7 +136,7 @@ pub fn action_label(action: &str) -> String {
     let label = match action {
         "auth.login" => "Signed in",
         "auth.logout" => "Signed out",
-        "http.post" => "Form submitted",
+        "http.post" => "Form submission",
         "http.get" => "Page viewed",
         "document.download" => "Document downloaded",
         "import.staged" => "Import previewed",
@@ -213,7 +213,7 @@ pub fn target_label(target: &str) -> String {
         ["platform", "users", "admin"] => "Platform access".to_string(),
         ["platform", "role-templates"] => "Role templates".to_string(),
         ["invitations", "accept"] => "Invitation acceptance".to_string(),
-        ["unrecognized"] => "Unrecognized request".to_string(),
+        ["unrecognized"] => "Unrecognized address".to_string(),
         _ => return target.to_string(),
     };
     text
