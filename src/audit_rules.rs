@@ -130,6 +130,58 @@ pub fn normalize_target(path: &str) -> String {
     }
 }
 
+/// Organizer-facing label for an audit action code. Codes are the stored
+/// truth; this is presentation only, so unknown codes fall back to themselves.
+pub fn action_label(action: &str) -> String {
+    let label = match action {
+        "auth.login" => "Signed in",
+        "auth.logout" => "Signed out",
+        "http.post" => "Form submitted",
+        "http.get" => "Page viewed",
+        "document.download" => "Document downloaded",
+        "import.staged" => "Import previewed",
+        "import.committed" => "Import confirmed",
+        "invitation.created" => "Invitation created",
+        "invitation.resent" => "Invitation email resent",
+        "invitation.revoked" => "Invitation revoked",
+        "invitation.accepted" => "Invitation accepted",
+        "mapping.created" => "Actor mapping added",
+        "mapping.deleted" => "Actor mapping deleted",
+        "member.added" => "Member added",
+        "member.removed" => "Member removed",
+        "member.restored" => "Member restored",
+        "member.role_changed" => "Member role changed",
+        "notifications.settings_changed" => "Notification settings changed",
+        "org.created" => "Organization created",
+        "org.roles" => "Roles changed",
+        "role.created" => "Role created",
+        "role.updated" => "Role updated",
+        "pocket.created" => "Pocket added",
+        "item.added" => "Inventory item added",
+        "location.added" => "Inventory location added",
+        "stock.changed" => "Stock changed",
+        "transaction.commented" => "Comment posted",
+        "transaction.details_updated" => "Transaction details saved",
+        "transaction.evidence_attached" => "Document attached",
+        "transaction.submitted" => "Submitted for review",
+        "platform.admin" => "Platform access changed",
+        "platform.template" => "Role template saved",
+        _ => return action.to_string(),
+    };
+    label.to_string()
+}
+
+/// Plain-English outcome for the audit table.
+pub fn outcome_label(outcome: &str) -> &str {
+    match outcome {
+        "committed" => "Done",
+        "denied" => "Denied",
+        "failed" => "Failed",
+        "attempted" => "Attempted",
+        other => other,
+    }
+}
+
 /// Outcome for a finished request, or `None` to record nothing.
 ///
 /// Success on an instrumented mutation returns `None`: the transaction that

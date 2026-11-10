@@ -1,12 +1,12 @@
 {% macro organization_switcher(class_name) %}
 <details class="menu menu--org {{ class_name }}">
-  <summary aria-label="Switch organization"><span class="menu__summary-value">{{ org.name }}</span><svg class="icon icon--caret" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+  <summary aria-label="Organization: {{ org.name }}. Switch organization"><span class="menu__summary-text"><span class="menu__summary-label">Organization</span><span class="menu__summary-value">{{ org.name }}</span></span><svg class="icon icon--caret" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
   <div class="menu__panel">
     <p class="menu__label">Switch organization</p>
     {% for o in organizations %}
-    <a class="menu__item{% if o.slug == org.slug %} menu__item--current{% endif %}" href="/org/{{ o.slug }}/transactions"{% if o.slug == org.slug %} aria-current="page"{% endif %}>{{ o.name }}</a>
+    <a class="menu__item{% if o.slug == org.slug %} menu__item--current{% endif %}" href="/org/{{ o.slug }}/transactions"{% if o.slug == org.slug %} aria-current="true"{% endif %}>{{ o.name }}{% if o.slug == org.slug %} <span class="menu__item-note">Current</span>{% endif %}</a>
     {% else %}
-    <a class="menu__item menu__item--current" href="/org/{{ org.slug }}/transactions" aria-current="page">{{ org.name }}</a>
+    <a class="menu__item menu__item--current" href="/org/{{ org.slug }}/transactions" aria-current="true">{{ org.name }} <span class="menu__item-note">Current</span></a>
     {% endfor %}
     <hr class="menu__rule">
     <a class="menu__item" href="/orgs">All organizations</a>
@@ -19,7 +19,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}PocketTrail{% endblock %} · PocketTrail</title>
-  <meta name="theme-color" content="#1b1827">
+  <meta name="theme-color" content="#202023">
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="stylesheet" href="/static/app.css">
   <link rel="stylesheet" href="/static/components.css">
@@ -31,11 +31,15 @@
 <body hx-boost="true">
   {% block shell %}
   <a class="skip-link" href="#main">Skip to main content</a>
+  {% if is_synthetic or local_mode %}
+  <div role="region" aria-label="Environment notices">
   {% if is_synthetic %}
   <div class="banner banner--synthetic"><strong>Synthetic demo data.</strong> This organization uses fixtures, not real records.</div>
   {% endif %}
   {% if local_mode %}
   <div class="banner banner--local"><strong>Local testing.</strong> Email is captured to a local outbox; notifications are disabled.</div>
+  {% endif %}
+  </div>
   {% endif %}
   {% if user %}
   <header class="topbar">
@@ -73,7 +77,6 @@
   <div class="layout{% if not user %} layout--bare{% endif %}">
     {% if org %}
     <nav class="sidenav" aria-label="Site sections">
-      {% if user.is_platform_admin %}<a class="sidenav__link" href="/platform">Global settings</a>{% endif %}
       <div class="sidebar-profile"><span class="avatar" aria-hidden="true"><span class="avatar__fallback">{{ user.name | first }}</span>{% if user.picture %}<img src="{{ user.picture }}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">{% endif %}</span><span>{{ user.name }}</span></div>
       {{ organization_switcher("org-switch--desktop") }}
       <a class="sidenav__link{% if active_nav and active_nav == 'transactions' %} sidenav__link--current{% endif %}" href="/org/{{ org.slug }}/transactions"{% if active_nav and active_nav == 'transactions' %} aria-current="page"{% endif %}><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 8h10M7 12h10M7 16h6"/></svg><span>Transactions</span></a>

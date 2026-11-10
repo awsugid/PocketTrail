@@ -20,6 +20,7 @@ struct ItemRow {
 #[derive(Debug, Deserialize)]
 struct LevelRow {
     item_id: i64,
+    location_id: i64,
     location_name: String,
     qty: i64,
 }
@@ -56,7 +57,7 @@ fn stock_update_input(
     let delta = delta_raw
         .and_then(crate::fmt::parse_minor)
         .filter(|d| *d != 0 && d.abs() <= MAX_DELTA)
-        .ok_or("Change must be a nonzero integer with magnitude at most 1,000,000,000,000,000.")?;
+        .ok_or("Quantity must be a whole number of at least 1 (and at most 1,000,000,000,000,000).")?;
     let reason = reason_raw.unwrap_or_default().trim();
     if reason.is_empty() {
         return Err("Reason is required for stock changes.");
@@ -91,7 +92,7 @@ pub async fn list_page(req: Request, ctx: RouteContext<App>) -> worker::Result<R
     // Org scope rides the joins: inventory_levels has no org_id column.
     let levels: Vec<LevelRow> = db::q_all(
         &g.app.db,
-        "SELECT lv.item_id, loc.name AS location_name, lv.qty FROM inventory_levels lv JOIN inventory_locations loc ON loc.id = lv.location_id AND loc.org_id = ?1 JOIN inventory_items i ON i.id = lv.item_id AND i.org_id = ?1 ORDER BY lv.item_id, loc.name",
+        "SELECT lv.item_id, lv.location_id, loc.name AS location_name, lv.qty FROM inventory_levels lv JOIN inventory_locations loc ON loc.id = lv.location_id AND loc.org_id = ?1 JOIN inventory_items i ON i.id = lv.item_id AND i.org_id = ?1 ORDER BY lv.item_id, loc.name",
         vec![db::i(g.org.id)],
     )
     .await?;
@@ -109,7 +110,7 @@ pub async fn list_page(req: Request, ctx: RouteContext<App>) -> worker::Result<R
         by_item
             .entry(lv.item_id)
             .or_default()
-            .push(serde_json::json!({"location_name": lv.location_name, "qty": lv.qty}));
+            .push(serde_json::json!({"location_id": lv.location_id, "location_name": lv.location_name, "qty": lv.qty}));
     }
     let items_json: Vec<serde_json::Value> = items
         .iter()
@@ -263,10 +264,16 @@ pub async fn update_stock(mut req: Request, ctx: RouteContext<App>) -> worker::R
     let location_id: i64 = form_str(&form, "location_id")
         .and_then(|s| s.trim().parse().ok())
         .unwrap_or(0);
-    let (delta, reason) = match stock_update_input(
-        form_str(&form, "delta").as_deref(),
-        form_str(&form, "reason").as_deref(),
-    ) {
+    // The form posts direction + positive quantity; `delta` is the signed
+    // internal value (still accepted directly for scripted clients).
+    let signed = match (form_str(&form, "direction"), form_str(&form, "quantity")) {
+        (Some(direction), Some(quantity)) => {
+            let sign = if direction == "remove" { "-" } else { "" };
+            Some(format!("{sign}{}", quantity.trim()))
+        }
+        _ => form_str(&form, "delta"),
+    };
+    let (delta, reason) = match stock_update_input(signed.as_deref(), form_str(&form, "reason").as_deref()) {
         Ok(v) => v,
         Err(msg) => return Ok(fail(400, msg)),
     };

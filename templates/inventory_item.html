@@ -3,15 +3,13 @@
 {% block title %}{{ item.name }} · Inventory · {{ org.name }}{% endblock %}
 
 {% block content %}
+<a class="back-link" href="/org/{{ org.slug }}/inventory">Back to inventory</a>
 <div class="page-head">
   <h1>{{ item.name }}{% if item.variant %} — {{ item.variant }}{% endif %}</h1>
-  <div class="page-head__actions">
-    <a class="btn btn--small" href="/org/{{ org.slug }}/inventory">Back to inventory</a>
-  </div>
-  <p class="page-head__sub">Basic change history: who updated what, when.</p>
+  <p class="page-head__sub">Stock change history: who updated what, when, and why.</p>
 </div>
 
-<div class="panel panel--flush">
+<div class="panel">
   <h2 class="panel__title">Stock history</h2>
   <p class="panel__sub">Each change preserves its author, location, and resulting quantity.</p>
   {% if movements %}
@@ -31,7 +29,7 @@
         <tr>
           <td>{{ mv.created_at }}<span class="cell__sub">{{ mv.member_name }}</span></td>
           <td>{{ mv.location_name }}</td>
-          <td class="cell--num">{% if mv.delta > 0 %}<span class="amount--in">+{{ mv.delta }}</span>{% else %}{{ mv.delta }}{% endif %}</td>
+          <td class="cell--num{% if mv.delta > 0 %} amount--in{% endif %}">{% if mv.delta > 0 %}+{% endif %}{{ mv.delta }}</td>
           <td class="cell--num">{{ mv.result_qty }}</td>
           <td>{{ mv.reason or "—" }}</td>
         </tr>

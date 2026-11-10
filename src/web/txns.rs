@@ -217,6 +217,7 @@ pub async fn list(req: Request, ctx: RouteContext<App>) -> worker::Result<Respon
     body["page_number"] = serde_json::json!(page_number);
     body["has_next"] = serde_json::json!(has_next);
     body["can_import"] = serde_json::json!(g.can(Permission::ImportStatements));
+    body["can_record"] = serde_json::json!(g.can(Permission::DocumentTransactions));
     Ok(page(&g.app, "transactions", body))
 }
 
@@ -275,21 +276,26 @@ pub async fn create(mut req: Request, ctx: RouteContext<App>) -> worker::Result<
     if counterparty.is_empty() {
         return Ok(fail(400, "Counterparty is required."));
     }
-    let amount = match form_str(&form, "amount_minor")
+    // Forms speak IDR; minor units stay internal.
+    let amount = match form_str(&form, "amount")
         .as_deref()
-        .and_then(crate::fmt::parse_minor)
+        .and_then(crate::fmt::parse_rupiah)
     {
         Some(v) if v != 0 => v,
         _ => {
             return Ok(fail(
                 400,
-                "Amount (minor units) must be a nonzero integer; negative = outflow.",
+                "Amount must be a nonzero IDR value such as 150000 or -150000 (negative = money out).",
             ))
         }
     };
-    let balance = form_str(&form, "balance_minor")
-        .as_deref()
-        .and_then(crate::fmt::parse_minor);
+    let balance = match form_str(&form, "balance").as_deref().map(str::trim) {
+        None | Some("") => None,
+        Some(raw) => match crate::fmt::parse_rupiah(raw) {
+            Some(v) => Some(v),
+            None => return Ok(fail(400, "Balance after must be an IDR value such as 8500000.")),
+        },
+    };
     let responsible: Option<i64> =
         form_str(&form, "responsible_member_id").and_then(|s| s.parse().ok());
     if let Some(id) = responsible {
@@ -360,7 +366,7 @@ pub async fn detail(req: Request, ctx: RouteContext<App>) -> worker::Result<Resp
     let mut probe = dom.clone();
     let approval = match approve_transaction(&g.dom_org, &mut probe, &g.uid()) {
         Ok(()) => serde_json::json!({"eligible": true}),
-        Err(e) => serde_json::json!({"eligible": false, "ineligible_reason": e.to_string()}),
+        Err(e) => serde_json::json!({"eligible": false, "ineligible_reason": crate::domain_map::user_message(&e)}),
     };
 
     let split_total = splits.iter().map(|s| s.amount_minor as i128).sum::<i128>();
@@ -744,7 +750,7 @@ pub async fn submit(mut req: Request, ctx: RouteContext<App>) -> worker::Result<
         return Ok(destination(&g, id, "Documentation is ready for review"));
     }
     if let Err(error) = submit_transaction(&g.dom_org, &mut dom, &g.uid()) {
-        return Ok(fail(400, &error.to_string()));
+        return Ok(fail(400, &format!("This transaction cannot be submitted: {}.", crate::domain_map::user_message(&error))));
     }
     let token = random_token()?;
     let update=g.app.db.prepare("UPDATE transactions SET status='pending',revision=revision+1,updated_at=?1,mutation_token=?2 WHERE id=?3 AND org_id=?4 AND revision=?5")
@@ -820,7 +826,7 @@ async fn review(
         } else {
             400
         };
-        return Ok(fail(status, &error.to_string()));
+        return Ok(fail(status, &format!("This decision cannot be recorded: {}.", crate::domain_map::user_message(&error))));
     }
     let token = random_token()?;
     let status = if changes {

@@ -162,12 +162,18 @@ pub fn page(_app: &App, name: &str, ctx: serde_json::Value) -> Response {
 
 /// Fail-closed error page. `msg` is HTML-escaped.
 pub fn fail(status: u16, msg: &str) -> Response {
+    // The first <p> is what static/app.js shows beside the form on HTMX errors.
+    let title = match status {
+        400 => "Could not save",
+        403 => "Not allowed",
+        404 => "Not found",
+        409 => "Out of date",
+        _ => "Something went wrong",
+    };
     html(
         status,
         format!(
-            "<!doctype html><title>{}</title><h1>{}</h1><p>{}</p><p><a href=\"/orgs\">Back</a></p>",
-            status,
-            status,
+            "<!doctype html><html lang=\"en\"><title>{title} · PocketTrail</title><link rel=\"stylesheet\" href=\"/static/app.css\"><body class=\"layout--bare\"><main class=\"main\"><div class=\"panel auth-card\"><h1>{title}</h1><p>{}</p><p class=\"hint\">Your entries were not saved. Use your browser's Back button to return to the form.</p><p><a class=\"btn\" href=\"/orgs\">Organizations</a></p></div></main></body></html>",
             render::html_escape(msg)
         ),
     )
@@ -247,7 +253,10 @@ pub async fn require_member(
     let dom_org = build_dom_org(&org, &roles, &mems);
     let uid = UserId::new(login.user.id.clone());
     if let Err(e) = authorize(&dom_org, &uid, perm) {
-        return Err(fail(403, &e.to_string()));
+        return Err(fail(
+            403,
+            &format!("Access denied: {}.", crate::domain_map::user_message(&e)),
+        ));
     }
     Ok(Ctx {
         session: login.session,
@@ -382,6 +391,8 @@ fn router(app: App) -> Router<'static, App> {
         .post_async("/orgs", orgs::create)
         // Initial release is statement-first; manual bank movements are not exposed.
         .get_async("/org/:org/transactions", txns::list)
+        .get_async("/org/:org/transactions/new", txns::new_page)
+        .post_async("/org/:org/transactions/new", txns::create)
         .get_async("/org/:org/transactions/:id", txns::detail)
         .post_async("/org/:org/transactions/:id/details", txns::save_details)
         .post_async("/org/:org/transactions/:id/submit", txns::submit)

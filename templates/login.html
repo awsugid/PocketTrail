@@ -43,7 +43,7 @@
 </div>
 
 {% if google_configured and google_client_id %}
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://accounts.google.com/gsi/client?hl=en" async defer></script>
 <script>
   window.addEventListener("load", function () {
     if (!window.google || !google.accounts || !google.accounts.id) return;

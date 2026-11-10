@@ -27,15 +27,35 @@ pub struct Template {
     pub name: String,
     pub permissions: String,
 }
-#[derive(Deserialize, serde::Serialize)]
+#[derive(Deserialize)]
 pub struct Event {
     pub id: i64,
     pub actor_id: Option<String>,
+    pub actor_name: Option<String>,
     pub org_id: Option<i64>,
     pub action: String,
     pub target: String,
     pub outcome: String,
     pub created_at: i64,
+}
+
+impl serde::Serialize for Event {
+    /// Templates get the stored codes plus organizer-facing labels.
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut st = s.serialize_struct("Event", 10)?;
+        st.serialize_field("id", &self.id)?;
+        st.serialize_field("actor_id", &self.actor_id)?;
+        st.serialize_field("actor_name", &self.actor_name)?;
+        st.serialize_field("org_id", &self.org_id)?;
+        st.serialize_field("action", &self.action)?;
+        st.serialize_field("action_label", &crate::audit_rules::action_label(&self.action))?;
+        st.serialize_field("target", &self.target)?;
+        st.serialize_field("outcome", &self.outcome)?;
+        st.serialize_field("outcome_label", crate::audit_rules::outcome_label(&self.outcome))?;
+        st.serialize_field("created_at", &self.created_at)?;
+        st.end()
+    }
 }
 
 #[derive(Deserialize)]

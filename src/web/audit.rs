@@ -160,7 +160,7 @@ pub async fn event(
 pub async fn list_org(app: &App, org: i64, page: u32) -> worker::Result<Vec<platform::Event>> {
     db::q_all(
         &app.db,
-        "SELECT * FROM audit_events WHERE org_id=?1 ORDER BY id DESC LIMIT ?2 OFFSET ?3",
+        "SELECT a.*, u.name AS actor_name FROM audit_events a LEFT JOIN users u ON u.id=a.actor_id WHERE a.org_id=?1 ORDER BY a.id DESC LIMIT ?2 OFFSET ?3",
         vec![
             db::i(org),
             db::i(rules::PAGE_SIZE),
@@ -174,7 +174,7 @@ pub async fn list_org(app: &App, org: i64, page: u32) -> worker::Result<Vec<plat
 pub async fn list_platform(app: &App, page: u32) -> worker::Result<Vec<platform::Event>> {
     db::q_all(
         &app.db,
-        "SELECT * FROM audit_events WHERE org_id IS NULL ORDER BY id DESC LIMIT ?1 OFFSET ?2",
+        "SELECT a.*, u.name AS actor_name FROM audit_events a LEFT JOIN users u ON u.id=a.actor_id WHERE a.org_id IS NULL ORDER BY a.id DESC LIMIT ?1 OFFSET ?2",
         vec![db::i(rules::PAGE_SIZE), db::i(rules::page_offset(page))],
     )
     .await

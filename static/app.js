@@ -12,16 +12,42 @@
   if (window.PocketTrailUIReady) return;
   window.PocketTrailUIReady = true;
 
-  // Keep native disclosure toggling and Tab order; Escape is only a dismissal.
+  // One dismissal rule for every shell disclosure (nav drawer, account and
+  // organization menus): Escape, outside click, or focus leaving closes it.
+  var shellMenus = ".navdrawer[open], .menu[open]";
   document.addEventListener("keydown", function (event) {
     if (event.key !== "Escape" || event.defaultPrevented) return;
     if (document.querySelector("dialog[open]")) return;
-    var drawer = document.querySelector(".navdrawer[open]");
-    if (!drawer) return;
-    drawer.open = false;
-    drawer.querySelector("summary").focus();
+    var menu = document.querySelector(shellMenus);
+    if (!menu) return;
+    menu.open = false;
+    menu.querySelector("summary").focus();
     event.preventDefault();
   });
+  document.addEventListener("pointerdown", function (event) {
+    document.querySelectorAll(shellMenus).forEach(function (menu) {
+      if (!menu.contains(event.target)) menu.open = false;
+    });
+  });
+  document.addEventListener("focusin", function (event) {
+    document.querySelectorAll(shellMenus).forEach(function (menu) {
+      if (!menu.contains(event.target)) menu.open = false;
+    });
+  });
+
+  // Destructive forms carry hx-confirm; htmx owns that prompt.
+
+  // Filter toolbars submit on change; the button stays as the no-JS fallback.
+  document.addEventListener("change", function (event) {
+    var form = event.target.closest("form[data-autosubmit]");
+    if (form) form.requestSubmit();
+  });
+  function hideAutosubmitButtons() {
+    document.querySelectorAll("[data-autosubmit-fallback]").forEach(function (button) { button.hidden = true; });
+  }
+  document.addEventListener("DOMContentLoaded", hideAutosubmitButtons);
+  document.addEventListener("htmx:load", hideAutosubmitButtons);
+  if (document.readyState !== "loading") hideAutosubmitButtons();
 
   // One overflow rule for every table, including HTMX-loaded and resized content.
   var tableCueId = 0;
@@ -404,6 +430,47 @@
   document.addEventListener("DOMContentLoaded", initializeTotals);
   document.addEventListener("htmx:load", initializeTotals);
   if (document.readyState !== "loading") initializeTotals();
+
+  /* Stock change preview: "Current N → Result M" from option data-levels. */
+  function updateStockPreview(form) {
+    var out = form.querySelector("[data-stock-preview]");
+    var item = form.querySelector('[name="item_id"]');
+    var location = form.querySelector('[name="location_id"]');
+    var direction = form.querySelector('[name="direction"]');
+    var quantity = form.querySelector('[name="quantity"]');
+    if (!out || !item || !location || !direction || !quantity) return;
+    var option = item.options[item.selectedIndex];
+    var current = 0;
+    ((option && option.dataset.levels) || "").split(",").forEach(function (pair) {
+      var parts = pair.split(":");
+      if (parts[0] === location.value) current = parseInt(parts[1], 10) || 0;
+    });
+    var qty = parseInt(quantity.value, 10);
+    var text = "Current at this location: " + current;
+    if (qty > 0) {
+      var result = direction.value === "remove" ? current - qty : current + qty;
+      text += " \u2192 after change: " + result;
+      if (result < 0) text += " (not enough stock)";
+      quantity.setCustomValidity(result < 0 ? "Only " + current + " in stock at this location." : "");
+    } else {
+      quantity.setCustomValidity("");
+    }
+    out.textContent = text;
+  }
+  document.addEventListener("input", function (e) {
+    var form = e.target.closest("form[data-stock-form]");
+    if (form) updateStockPreview(form);
+  });
+  document.addEventListener("change", function (e) {
+    var form = e.target.closest("form[data-stock-form]");
+    if (form) updateStockPreview(form);
+  });
+  function initializeStockPreviews() {
+    document.querySelectorAll("form[data-stock-form]").forEach(updateStockPreview);
+  }
+  document.addEventListener("DOMContentLoaded", initializeStockPreviews);
+  document.addEventListener("htmx:load", initializeStockPreviews);
+  if (document.readyState !== "loading") initializeStockPreviews();
 
   /* Mention chips insert @Name at the cursor of the linked textarea. */
   document.addEventListener("click", function (e) {

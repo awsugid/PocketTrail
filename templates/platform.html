@@ -36,7 +36,7 @@
         {% if u.is_self %}
         <span class="cell__sub">Ask another platform administrator.</span>
         {% else %}
-        <form method="post" action="/platform/users/admin">
+        <form method="post" action="/platform/users/admin" hx-confirm="{% if u.admin %}Revoke platform administration from {{ u.name }}? They can no longer create organizations or manage platform access.{% else %}Grant platform administration to {{ u.name }}? They can create organizations and change other users' platform access, but gain no financial access.{% endif %}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <input type="hidden" name="user_id" value="{{ u.id }}">
           <input type="hidden" name="admin" value="{{ 'false' if u.admin else 'true' }}">
@@ -95,10 +95,11 @@
   <p class="panel__sub">Platform-scope events, newest first. Organization events stay in each workspace.</p>
   {% if events %}
   <div class="table-scroll"><table class="table">
-    <thead><tr><th scope="col">When</th><th scope="col">Actor</th><th scope="col">Action</th><th scope="col">Target</th><th scope="col">Outcome</th></tr></thead>
+    <caption class="visually-hidden">Platform audit events</caption>
+    <thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">What</th><th scope="col">Outcome</th></tr></thead>
     <tbody>
     {% for e in events %}
-    <tr><td class="cell--nowrap">{{ e.created_at | ts }}</td><td>{{ e.actor_id or "Unauthenticated" }}</td><td class="cell--mono">{{ e.action }}</td><td class="cell--mono">{{ e.target }}</td><td>{{ e.outcome }}</td></tr>
+    <tr><td class="cell--nowrap">{{ e.created_at | ts }}</td><td>{{ e.actor_name or e.actor_id or "Not signed in" }}</td><td>{{ e.action_label }}<span class="cell__sub cell--mono">{{ e.target }}</span></td><td>{% if e.outcome == 'denied' or e.outcome == 'failed' %}<span class="badge badge--error">{{ e.outcome_label }}</span>{% else %}{{ e.outcome_label }}{% endif %}</td></tr>
     {% endfor %}
     </tbody>
   </table></div>

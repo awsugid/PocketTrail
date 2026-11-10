@@ -54,9 +54,9 @@ rounded:
   control: "6px"
   badge: "5px"
 spacing:
-  field-gap: "20px"
-  panel: "24px"
-  section: "32px"
+  field-gap: "14px"
+  panel: "20px"
+  section: "16px"
 components:
   button-primary:
     backgroundColor: "{colors.primary}"
@@ -68,7 +68,7 @@ components:
   panel:
     backgroundColor: "{colors.surface}"
     rounded: "{rounded.panel}"
-    padding: "24px"
+    padding: "20px"
 ---
 
 # PocketTrail Design System
@@ -113,7 +113,7 @@ at roughly 76ch; financial tables may use the full work area.
 ## Layout
 
 Desktop shell uses a white sticky 64px topbar and charcoal 224px sidebar. Main
-work area has 36px vertical / 40px horizontal inset and a 1440px maximum width.
+work area has 24px vertical / 32px horizontal inset and a 1440px maximum width.
 At 1100px the sidebar contracts and section intro/body columns become linear.
 At 800px the sidebar becomes a native disclosure menu; organization selection
 moves to its own visible full-width header row. At 480px the main inset reduces,
@@ -165,6 +165,11 @@ are small authored inline SVG with consistent stroke treatment, never emoji.
 - **Feedback:** status/alert regions, extraction and allocation live updates,
   local/synthetic banners, explicit empty-state actions. HTMX request styling
   identifies busy submissions; existing JavaScript owns lifecycle behavior.
+  Destructive forms (remove member, revoke invitation, delete mapping, suppress
+  notifications, platform access) carry `hx-confirm` naming the consequence.
+  Domain rejections and audit codes are translated to organizer wording on the
+  server (`domain_map::user_message`, `audit_rules::action_label`); internal
+  state names such as Draft/Submitted never render.
 - **Motion:** menus enter over 160ms with a short upward offset and slight scale;
   disclosure carets rotate, button states transition over 120ms, request feedback
   pulses while busy. No staged page entrances. Reduced-motion preference removes

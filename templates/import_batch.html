@@ -3,16 +3,14 @@
 {% block title %}Import batch · {{ org.name }}{% endblock %}
 
 {% block content %}
+<a class="back-link" href="/org/{{ org.slug }}/imports">Back to imports</a>
 <div class="page-head">
-  <h1>Import batch</h1>
-  <div class="page-head__actions">
-    <a class="btn btn--small" href="/org/{{ org.slug }}/imports">Back to imports</a>
-  </div>
-  <p class="page-head__sub">{% if batch %}{{ batch.created_at }}{% if batch.by_name %} · by {{ batch.by_name }}{% endif %}{% endif %} — each row shows what happened to that statement entry.</p>
+  <h1>Import batch{% if batch %} · {{ batch.created_at }}{% endif %}</h1>
+  <p class="page-head__sub">{% if batch and batch.by_name %}Imported by {{ batch.by_name }}. {% endif %}Each row shows what happened to that statement entry.</p>
 </div>
 
 {% if batch and batch.counts %}
-<div class="notice notice--info">
+<div class="notice {% if (batch.counts.conflict or 0) > 0 or (batch.counts.needs_review or 0) > 0 %}notice--warning{% else %}notice--info{% endif %}">
   {{ batch.counts.imported or 0 }} imported · {{ batch.counts.duplicate_unchanged or 0 }} unchanged · {{ batch.counts.conflict or 0 }} conflicts · {{ batch.counts.needs_review or 0 }} need review. Conflicts and unassigned rows are listed for review, never replaced silently.
 </div>
 {% endif %}

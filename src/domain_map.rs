@@ -44,6 +44,34 @@ pub fn documentation_owed(status_row: &str, complete: bool) -> bool {
     )
 }
 
+/// Organizer-facing explanation of a domain rejection. `DomainError`'s
+/// `Display` is for logs; it names internal states (Draft/Submitted) that the
+/// UI never shows.
+pub fn user_message(e: &pockettrail_domain::DomainError) -> String {
+    use pockettrail_domain::DomainError::*;
+    use DocumentationStatus as S;
+    match e {
+        NoMembership | InactiveMembership => "you are not an active member of this organization".into(),
+        NotAuthorized { required } => format!(
+            "your role does not include “{}”",
+            perm_label(*required)
+        ),
+        WrongOrganization => "this record belongs to a different organization".into(),
+        IncompleteDocumentation(what) => format!("documentation is incomplete: {what}"),
+        PurposeTotalMismatch { .. } => "purpose allocations must add up to the bank amount".into(),
+        InvalidStatus { actual: S::Draft, .. } => "the explanation, purposes, and evidence must be completed before it can be reviewed".into(),
+        InvalidStatus { actual: S::Approved, .. } => "it is already approved; edit details or evidence to reopen review".into(),
+        InvalidStatus { actual: S::ChangesRequested, .. } => "changes were requested; the responsible member must save details before review".into(),
+        InvalidStatus { actual: S::Submitted, .. } => "it is already awaiting review".into(),
+        SelfApprovalDenied => "a member responsible for any part of a transaction cannot approve it".into(),
+        ResponsibleMemberInactive { .. } => "a responsible member is no longer active; reassign first".into(),
+        InvalidAmount { .. } => "amount must be a positive IDR value".into(),
+        InvalidPurpose { reason, .. } => format!("a purpose is invalid: {reason}"),
+        InvalidQuantity { .. } => "stock cannot go below zero".into(),
+        MissingReason => "a reason is required".into(),
+    }
+}
+
 pub fn perm_variant(p: Permission) -> &'static str {
     match p {
         Permission::ViewTransactions => "ViewTransactions",
@@ -102,6 +130,18 @@ pub fn parse_role_permissions(json: &str) -> BTreeSet<Permission> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn user_messages_hide_internal_states() {
+        use pockettrail_domain::DomainError;
+        let m = user_message(&DomainError::InvalidStatus {
+            expected: DocumentationStatus::Submitted,
+            actual: DocumentationStatus::Draft,
+        });
+        assert!(!m.contains("Draft") && !m.contains("Submitted"), "{m}");
+        assert!(m.contains("completed"));
+        assert!(user_message(&DomainError::SelfApprovalDenied).contains("cannot approve"));
+    }
 
     #[test]
     fn status_mapping() {

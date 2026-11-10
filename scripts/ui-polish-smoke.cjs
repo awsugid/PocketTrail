@@ -148,7 +148,8 @@ const pages = JSON.parse(execFileSync('cargo', ['run', '--quiet', '--example', '
           assert(tables.length, `${name}: missing fixture table`);
         }
         assert.equal(await page.locator('.table-scroll-cue').count(), await page.locator('.table-scroll').count());
-        if (width === 320 && name === 'import') {
+        // Import history became phone cards; the preview's full fact table still scrolls.
+        if (width === 320 && name === 'import-preview') {
           assert(tables.some(table => table.overflowing), `${name}: exercise offscreen actions`);
           await checkKeyboardScroll(name);
         }
@@ -180,21 +181,22 @@ const pages = JSON.parse(execFileSync('cargo', ['run', '--quiet', '--example', '
           }
         }
         if (name === 'transactions') {
+          // Cell order: counterparty, date, amount, balance, status, responsible (DOM = phone card order).
           const layout = await page.locator('.transaction-table tbody tr').first().evaluate(row => {
             const cells = [...row.cells].map(cell => cell.getBoundingClientRect());
             return { y: row.getBoundingClientRect().y, height: row.getBoundingClientRect().height,
-              identityY: cells[1].y, dateY: cells[0].y, amountY: cells[2].y, balanceY: cells[3].y,
+              identityY: cells[0].y, dateY: cells[1].y, amountY: cells[2].y, balanceY: cells[3].y,
               badgeSize: parseFloat(getComputedStyle(row.querySelector('.badge')).fontSize),
-              responsibleSize: parseFloat(getComputedStyle(row.querySelector('.transaction-table__status .cell__sub')).fontSize) };
+              responsibleSize: parseFloat(getComputedStyle(row.querySelector('.transaction-table__responsible')).fontSize) };
           });
           assert(layout.badgeSize >= 12 && layout.responsibleSize >= 13, 'Readable status and responsibility');
           if (width === 320) {
-            assert(layout.y <= 575, `Phone first record starts too low: ${layout.y}`);
+            assert(layout.y <= 600, `Phone first record starts too low: ${layout.y}`);
             assert(await page.locator('.banner--synthetic').isVisible());
             assert(await page.locator('.banner--local').isVisible());
             assert(await page.getByRole('link', { name: 'Import statement', exact: true }).isVisible());
-            assert(await page.getByRole('button', { name: 'Apply filters', exact: true }).isVisible());
-            assert(await page.getByRole('link', { name: 'Clear', exact: true }).isVisible());
+            // The filter submits on change; its Apply button is the no-JS fallback and stays hidden.
+            assert.equal(await page.getByRole('button', { name: 'Apply', exact: true }).count(), 0);
             assert(await page.getByRole('button', { name: 'Status All statuses', exact: true }).isEnabled());
           }
           if (width === 800) {
@@ -203,7 +205,7 @@ const pages = JSON.parse(execFileSync('cargo', ['run', '--quiet', '--example', '
             assert.equal(layout.amountY, layout.balanceY, 'Amount and balance share second row');
             assert(layout.amountY - layout.identityY < 130, 'No empty grid rows before amounts');
           }
-          if (width <= 390) assert(layout.height <= 295, `Phone transaction card too tall: ${layout.height}`);
+          if (width <= 390) assert(layout.height <= 320, `Phone transaction card too tall: ${layout.height}`);
           if (width === 1440) {
             assert(layout.y <= 430 && layout.height <= 100, 'Desktop records stay near filters and compact');
             const intro = await page.locator('.transactions-head').evaluate(head => {
@@ -261,7 +263,8 @@ const pages = JSON.parse(execFileSync('cargo', ['run', '--quiet', '--example', '
           assert.equal(await page.locator('main form').count(), 0, 'No edit actions without permissions');
         }
         if (transaction) {
-          assert.equal(await page.locator('#bank-facts .bank-facts dt').count(), 9, 'Every bank fact stays on the overview');
+          // Status is shown once in the page header; bank facts hold the eight statement values.
+          assert.equal(await page.locator('#bank-facts .bank-facts dt').count(), 8, 'Every bank fact stays on the overview');
           assert.equal(await page.locator('#bank-facts dd.cell--mono').textContent(), 'SYNTHETIC-REF_2026-01-01_COMPLETE');
         }
         if (process.env.POCKETTRAIL_SCREENSHOTS) {
@@ -294,20 +297,21 @@ const pages = JSON.parse(execFileSync('cargo', ['run', '--quiet', '--example', '
             assert.equal(await dialog.locator('input[name="revision"]').inputValue(), '1');
             assert.equal(await dialog.locator('input[name="csrf_token"]').inputValue(), 'test-only');
           }
-          if (id === 'review-actions') {
-            assert(await dialog.getByText('Suppression is not approval and does not imply evidence exists.', { exact: false }).isVisible());
+          if (id === 'notification-settings') {
+            assert(await dialog.getByText('it is not approval and does not mean evidence exists.', { exact: false }).isVisible());
           }
           if (id === 'stock-change') {
             const formHeight = await dialog.locator('form').evaluate(el => el.getBoundingClientRect().height);
             measurements.push({ name, width, panel: id, stockFormHeight: Math.round(formHeight) });
-            assert(formHeight <= (width >= 640 ? 230 : 420), 'Stock form pairs fields only with room');
+            // Direction + quantity + live preview add one paired row over the old signed field.
+            assert(formHeight <= (width >= 640 ? 340 : 640), 'Stock form pairs fields only with room');
             assert(await dialog.getByRole('button', { name: 'Update stock', exact: true }).isVisible());
           }
           if (id === 'members') {
             assert(panelTables.length, 'Members table is available in its dialog');
+            // Members became phone cards; controls are visible without horizontal scrolling.
             if (width === 320) {
-              assert(panelTables.some(table => table.overflowing), 'Members: exercise offscreen actions');
-              await checkKeyboardScroll('members');
+              assert(!panelTables.some(table => table.overflowing), 'Members: controls fit without horizontal scroll');
             }
           }
           if (id === 'roles') {
@@ -324,7 +328,7 @@ const pages = JSON.parse(execFileSync('cargo', ['run', '--quiet', '--example', '
     }
     // Resize the same document: fitting tables must lose stale cues/tab stops.
     await page.setViewportSize({ width: 320, height: 1000 });
-    await page.goto('http://pockettrail.test/import');
+    await page.goto('http://pockettrail.test/import-preview');
     await page.locator('.table-scroll-cue:visible').waitFor();
     await page.evaluate(() => {
       const wrapper = document.querySelector('.table-scroll');

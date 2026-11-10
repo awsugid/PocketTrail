@@ -3,11 +3,9 @@
 {% block title %}Import preview · {{ org.name }}{% endblock %}
 
 {% block content %}
+<a class="back-link" href="/org/{{ org.slug }}/imports">Back to imports</a>
 <div class="page-head">
   <h1>Import preview</h1>
-  <div class="page-head__actions">
-    <a class="btn btn--small" href="/org/{{ org.slug }}/imports">Back to imports</a>
-  </div>
   <p class="page-head__sub">Nothing is recorded yet. {% if batch %}Batch {{ batch.id }} · {{ batch.created_at }}{% if batch.by_name %} · by {{ batch.by_name }}{% endif %}{% endif %} — confirm to create the new transactions listed below.</p>
 </div>
 
@@ -81,8 +79,8 @@
     {% if ready %}
     <form method="post" action="/org/{{ org.slug }}/imports/{{ batch.id }}/confirm">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <button class="btn btn--primary" type="submit">Confirm import</button>
-      <p class="hint" style="margin-top: 8px;">Creates the {{ batch.counts.imported or 0 }} new transactions above and links them to this batch. Until then nothing is recorded. Notifications are only sent after a confirmed import, and never while this organization has notifications disabled.</p>
+      <p>This creates the {{ batch.counts.imported or 0 }} new transaction{% if (batch.counts.imported or 0) != 1 %}s{% endif %} above and links them to this batch. Unchanged rows are skipped. Notifications are only sent after a confirmed import, and never while this organization has notifications disabled.</p>
+      <div class="form-actions"><button class="btn btn--primary" type="submit">Confirm import of {{ batch.counts.imported or 0 }} transaction{% if (batch.counts.imported or 0) != 1 %}s{% endif %}</button></div>
     </form>
     {% else %}
     <p class="hint">This preview cannot be confirmed yet. Resolve the flagged rows above — fix the extraction and re-run the import, add missing actor mappings in Settings, or leave conflicts for review — then import again. A re-import classifies every row against the pocket's current transactions.</p>
