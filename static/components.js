@@ -121,14 +121,12 @@
       event.preventDefault();
       validation.textContent = source.validationMessage;
       trigger.setAttribute('aria-invalid', 'true');
-      // preventDefault suppresses the browser's own scroll-to-first-invalid, so
-      // bring the trigger into view and focus it before opening the popup.
-      const first = !document.querySelector('.pt-control .pt-trigger[aria-invalid="true"]:focus');
-      if (first) {
-        trigger.scrollIntoView({ block: 'center' });
-        trigger.focus({ preventScroll: true });
-        state.open();
-      }
+    });
+    // app.js decides which invalid control gets focus (first in DOM order,
+    // native or enhanced); it asks us to surface this one.
+    source.addEventListener('pt:surface-invalid', () => {
+      trigger.scrollIntoView({ block: 'center' });
+      trigger.focus({ preventScroll: true });
     });
     state.commit = newValue => {
       source.value = newValue;

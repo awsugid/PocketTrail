@@ -63,10 +63,10 @@
   {% if txn.explanation %}<p class="comment__body">{{ txn.explanation }}</p>{% else %}<p class="hint">No explanation recorded yet. The responsible member must supply one.</p>{% endif %}
   {% if splits %}
   <div class="table-scroll">
-    <table class="table">
+    <table class="table card-table" role="table">
       <caption class="visually-hidden">Purpose allocation</caption>
-      <thead><tr><th scope="col">Purpose</th><th scope="col" class="cell--num">Amount</th><th scope="col">Responsible</th></tr></thead>
-      <tbody>{% for s in splits %}<tr><td>{{ s.label }}</td><td class="cell--num">{{ s.amount_minor | money }}</td><td>{{ s.responsible_name or "Unassigned" }}</td></tr>{% endfor %}</tbody>
+      <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Purpose</th><th role="columnheader" scope="col" class="cell--num">Amount</th><th role="columnheader" scope="col">Responsible</th></tr></thead>
+      <tbody role="rowgroup">{% for s in splits %}<tr role="row"><td role="cell">{{ s.label }}</td><td role="cell" data-label="Amount" class="cell--num">{{ s.amount_minor | money }}</td><td role="cell" data-label="Responsible">{{ s.responsible_name or "Unassigned" }}</td></tr>{% endfor %}</tbody>
     </table>
   </div>
   {% if totals %}<p class="hint">Allocated {{ totals.split_total_minor | money }} of {{ totals.amount_minor | money }} · {% if totals.balanced %}Balanced{% else %}Not fully allocated{% endif %}</p>{% endif %}
@@ -159,15 +159,15 @@
   <p class="panel__sub">Invoices, receipts, and other evidence. Files are retained; superseded evidence is never deleted.</p>
   {% if evidence %}
   <div class="table-scroll">
-    <table class="table">
+    <table class="table card-table" role="table">
       <caption class="visually-hidden">Supporting documents</caption>
-      <thead><tr><th scope="col">File</th><th scope="col">Size</th><th scope="col">Note</th></tr></thead>
-      <tbody>
+      <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">File</th><th role="columnheader" scope="col">Size</th><th role="columnheader" scope="col">Note</th></tr></thead>
+      <tbody role="rowgroup">
       {% for e in evidence %}
-      <tr>
-        <td class="cell--mono">{% if e.url %}<a href="{{ e.url }}">{{ e.filename }}</a>{% else %}{{ e.filename }}{% endif %}</td>
-        <td class="cell--nowrap cell__muted">{% if e.size_display %}{{ e.size_display }}{% elif e.size %}{{ e.size }} bytes{% endif %}</td>
-        <td>{{ e.note }}</td>
+      <tr role="row">
+        <td role="cell" class="cell--mono">{% if e.url %}<a href="{{ e.url }}">{{ e.filename }}</a>{% else %}{{ e.filename }}{% endif %}</td>
+        <td role="cell" data-label="Size" class="cell--nowrap cell__muted">{% if e.size_display %}{{ e.size_display }}{% elif e.size %}{{ e.size }} bytes{% endif %}</td>
+        <td role="cell" data-label="Note">{{ e.note }}</td>
       </tr>
       {% endfor %}
       </tbody>

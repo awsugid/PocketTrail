@@ -255,7 +255,7 @@
             {% endif %}
           </td>
           {% if can.members %}
-          <td role="cell">
+          <td role="cell" data-label="Actions">
             {% if m.active %}
             <form method="post" action="/org/{{ org.slug }}/settings/members/{{ m.id }}/remove" hx-confirm="Remove {{ m.name }} from {{ org.name }}? They lose access and stop receiving notifications immediately. Their history stays, and you can restore them later.">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -368,7 +368,7 @@
           <td role="cell" class="cell--mono">{{ mp.pattern }}</td>
           <td role="cell" data-label="Responsible member">{{ mp.member_name or "—" }}</td>
           {% if can.mappings %}
-          <td role="cell">
+          <td role="cell" data-label="Actions">
             <form method="post" action="/org/{{ org.slug }}/settings/mappings/{{ mp.id }}/delete" hx-confirm="Delete the mapping for “{{ mp.pattern }}”? Future imports with this label will stay unassigned. This cannot be undone.">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <button class="btn btn--danger btn--small" type="submit" aria-label="Delete actor mapping {{ mp.pattern }}">Delete mapping</button>

@@ -81,6 +81,12 @@
   </nav>
   {% endif %}
 </div>
+{% elif page_number and page_number > 1 %}
+<div class="empty">
+  <h2 class="empty__title">No more transactions on this page</h2>
+  <p class="empty__body">You have gone past the last page of results.</p>
+  <a class="btn" href="/org/{{ org.slug }}/transactions{% if filters and filters.status and filters.status != 'all' %}?status={{ filters.status }}{% endif %}">Back to the first page</a>
+</div>
 {% elif filters and filters.status and filters.status != 'all' %}
 <div class="empty">
   <h2 class="empty__title">No transactions match these filters</h2>

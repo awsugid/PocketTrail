@@ -34,7 +34,7 @@
     <tr role="row">
       <td role="cell">{{ u.name }}<span class="cell__sub">{{ u.email }}</span></td>
       <td role="cell" data-label="Platform access">{% if u.admin %}<span class="badge badge--info">Platform admin</span>{% else %}<span class="badge badge--neutral">User</span>{% endif %}</td>
-      <td role="cell">
+      <td role="cell" data-label="Actions">
         {% if u.is_self %}
         <span class="cell__sub">Ask another platform administrator.</span>
         {% else %}

@@ -35,6 +35,51 @@
     });
   });
 
+  // One rule for invalid submissions: every invalid field (native or enhanced)
+  // shows a persistent inline message with aria-invalid, and focus goes to the
+  // first invalid control in DOM order. Enhanced controls hide their native
+  // field, so the browser's own first-invalid focus cannot be trusted.
+  var invalidBatch = null;
+  document.addEventListener("invalid", function (event) {
+    var field = event.target;
+    if (!field.form) return;
+    if (!field.closest(".pt-control")) {
+      field.setAttribute("aria-invalid", "true");
+      var id = field.id ? field.id + "-validation" : null;
+      var note = id && document.getElementById(id);
+      if (!note) {
+        note = document.createElement("p");
+        note.className = "field-validation";
+        note.setAttribute("role", "alert");
+        if (id) note.id = id;
+        field.after(note);
+        if (id) field.setAttribute("aria-describedby", [field.getAttribute("aria-describedby"), id].filter(Boolean).join(" "));
+      }
+      note.textContent = field.validationMessage;
+      event.preventDefault();
+    }
+    if (!invalidBatch) {
+      invalidBatch = [];
+      setTimeout(function () {
+        var fields = invalidBatch; invalidBatch = null;
+        var first = fields.sort(function (a, b) { return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1; })[0];
+        if (!first) return;
+        if (first.closest(".pt-control")) { first.dispatchEvent(new CustomEvent("pt:surface-invalid")); return; }
+        first.scrollIntoView({ block: "center" });
+        first.focus({ preventScroll: true });
+      }, 0);
+    }
+    invalidBatch.push(field);
+  }, true);
+  document.addEventListener("input", function (event) {
+    var field = event.target;
+    if (field.getAttribute && field.getAttribute("aria-invalid") === "true" && field.checkValidity && field.checkValidity() && !field.closest(".pt-control")) {
+      field.removeAttribute("aria-invalid");
+      var note = field.id && document.getElementById(field.id + "-validation");
+      if (note) note.textContent = "";
+    }
+  });
+
   // Destructive forms carry hx-confirm; htmx owns that prompt.
 
   // Filter toolbars submit on change; the button stays as the no-JS fallback.
@@ -109,6 +154,22 @@
       entries.forEach(function (entry) { if (entry.isIntersecting) setCurrent(entry.target.id); });
     }, { rootMargin: "-40% 0px -55% 0px" });
     targets.forEach(function (t) { observer.observe(t); });
+    // Initial state: the hash target, else the first section.
+    var initial = location.hash && document.getElementById(location.hash.slice(1));
+    setCurrent((targets.indexOf(initial) >= 0 ? initial : targets[0]).id);
+    // Overflow cue mirrors the table rule: show a fade while more links hide to the right.
+    function updateNavCue() {
+      var more = nav.scrollWidth - nav.clientWidth - nav.scrollLeft > 2;
+      nav.classList.toggle("section-nav--more", more);
+    }
+    nav.addEventListener("scroll", updateNavCue, { passive: true });
+    new ResizeObserver(updateNavCue).observe(nav);
+    updateNavCue();
+    // Keep the current link in view when it changes.
+    nav.addEventListener("click", function (event) {
+      var a = event.target.closest("a[href^='#']");
+      if (a) a.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
     nav.addEventListener("click", function (event) {
       var a = event.target.closest("a[href^='#']");
       if (a) setCurrent(a.getAttribute("href").slice(1));
