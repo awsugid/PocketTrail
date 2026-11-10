@@ -55,7 +55,7 @@
   <h2 class="panel__title" id="purposes-title">Explanation &amp; purposes</h2>
   <p class="panel__sub">One movement can cover several purposes. Bank notes are context, not a substitute for the spender's explanation.</p>
   {% if txn.needs_details %}
-  <div class="notice notice--warning">Still needed: an explanation, a responsible member, purposes, and either supporting documents or a document-unavailable reason.</div>
+  <div class="notice notice--warning">Still needed: {% for m in txn.missing %}{{ m }}{% if not loop.last %}{% if loop.revindex == 2 %} and {% else %}, {% endif %}{% endif %}{% else %}nothing else; resubmit for review{% endfor %}.</div>
   {% endif %}
   {% if txn.responsible_inactive %}
   <div class="notice notice--warning">The responsible member has left this organization. Historical attribution is retained. Reassign the documentation task or use authorized notification suppression in <a href="#review">Review &amp; approval</a>.</div>

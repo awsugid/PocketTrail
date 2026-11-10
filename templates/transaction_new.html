@@ -59,8 +59,8 @@
       </div>
       <div class="field">
         <label for="balance">Pocket balance after (IDR)</label>
-        <input class="input" type="number" id="balance" name="balance" step="0.01" inputmode="decimal" placeholder="e.g. 8500000" data-money-preview="#balance-preview">
-        <p class="hint">Pocket balance after this movement, if known. <output id="balance-preview" for="balance" aria-live="polite"></output></p>
+        <input class="input" type="number" id="balance" name="balance" step="0.01" inputmode="decimal" placeholder="e.g. 8500000" data-money-preview="#balance-preview" aria-describedby="balance-hint">
+        <p class="hint" id="balance-hint">Pocket balance after this movement, if known. <output id="balance-preview" for="balance" aria-live="polite"></output></p>
       </div>
       <div class="field">
         <label for="responsible">Responsible member <span class="req" aria-hidden="true">*</span></label>

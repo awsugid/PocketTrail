@@ -54,7 +54,7 @@
       <tbody role="rowgroup">
         {% for t in txns %}
         <tr role="row">
-          <td role="cell" class="transaction-table__identity"><a href="/org/{{ org.slug }}/transactions/{{ t.id }}">{{ t.counterparty_display.name if t.counterparty_display else t.counterparty }}</a>{% if t.counterparty_display and t.counterparty_display.bank_account %}<span class="cell__sub">{{ t.counterparty_display.bank_account }}</span>{% endif %}<span class="cell__sub">{{ t.transaction_type }}{% if t.pocket_name and t.pocket_name != t.counterparty %} · {{ t.pocket_name }}{% endif %}</span></td>
+          <td role="cell" class="transaction-table__identity"><a href="/org/{{ org.slug }}/transactions/{{ t.id }}">{{ t.counterparty_display.name if t.counterparty_display else t.counterparty }}</a>{% if t.counterparty_display and t.counterparty_display.bank_account %}<span class="cell__sub">{{ t.counterparty_display.bank_account }}</span>{% endif %}<span class="cell__sub">{{ t.transaction_type }}{% if t.pocket_name and t.pocket_name != t.counterparty %}{% if t.transaction_type %} · {% endif %}{{ t.pocket_name }}{% endif %}</span></td>
           <td role="cell" class="cell--nowrap" data-label="Date">{{ t.date }}{% if t.time %} <span class="cell__muted">{{ t.time }}</span>{% endif %}</td>
           <td role="cell" class="cell--num cell--nowrap{% if t.amount_minor > 0 %} amount--in{% endif %}" data-label="Amount">{{ t.amount_minor | money }}</td>
           <td role="cell" class="cell--num cell--nowrap" data-label="Balance after">{{ t.balance_minor | money }}</td>

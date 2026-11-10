@@ -119,6 +119,12 @@
       event.preventDefault();
       validation.textContent = source.validationMessage;
       trigger.setAttribute('aria-invalid', 'true');
+      // preventDefault suppresses the browser's own scroll-to-first-invalid, so
+      // bring the trigger into view and focus it before opening the popup.
+      if (!document.querySelector('.pt-control .pt-trigger[aria-invalid="true"]:focus')) {
+        trigger.scrollIntoView({ block: 'center' });
+        trigger.focus({ preventScroll: true });
+      }
       state.open();
     });
     state.commit = newValue => {

@@ -390,7 +390,15 @@ pub async fn detail(req: Request, ctx: RouteContext<App>) -> worker::Result<Resp
         && validate_responsibles_active(&t, &splits, &g.mems).is_ok()
         && active_mem(&g.mems, t.responsible_membership_id).is_some();
     let needs_details = crate::domain_map::documentation_owed(&t.status, docs_complete);
+    // What the "Still needed" notice should actually list.
+    let mut missing: Vec<&str> = Vec::new();
+    if t.explanation.trim().is_empty() { missing.push("an explanation"); }
+    if active_mem(&g.mems, t.responsible_membership_id).is_none() { missing.push("an active responsible member"); }
+    if splits.is_empty() { missing.push("at least one purpose"); }
+    else if splits.iter().map(|s| s.amount_minor as i128).sum::<i128>() != bank_abs as i128 { missing.push("purposes that add up to the bank amount"); }
+    if evidence.is_empty() && t.evidence_unavailable_reason.trim().is_empty() { missing.push("supporting documents or a document-unavailable reason"); }
     let txn_json = serde_json::json!({
+        "missing": missing,
         "id": t.id,
         "revision": t.revision,
         "date": t.txn_date,

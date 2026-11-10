@@ -87,7 +87,7 @@
   </dl>
   {% if notification_preview %}
   {% for recipient in notification_preview.recipients %}
-  <div class="settings-config__row">{{ recipient.name }} <span class="cell__sub">{{ recipient.pending }} pending items</span></div>
+  <div class="settings-config__row">{{ recipient.name }} <span class="cell__sub">{{ recipient.pending }} pending item{% if recipient.pending != 1 %}s{% endif %}</span></div>
   {% else %}<p class="hint">No assigned items need reminders for this cutoff.</p>{% endfor %}
   {% if notification_preview.limited %}<p class="notice notice--warning">This preview is limited to the latest 500 transactions.</p>{% endif %}
   {% endif %}
@@ -466,12 +466,12 @@
   <h2 class="panel__title" id="audit-heading">Organization audit log</h2>
   <p class="panel__sub">Who changed what in this workspace, newest first. Platform-scope events stay with platform administrators.</p>
   {% if audit_events %}
-  <div class="table-scroll"><table class="table audit-table">
+  <div class="table-scroll"><table class="table card-table audit-table" role="table">
     <caption class="visually-hidden">Organization audit events</caption>
-    <thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">What</th><th scope="col">Outcome</th></tr></thead>
-    <tbody>
+    <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">When</th><th role="columnheader" scope="col">Who</th><th role="columnheader" scope="col">What</th><th role="columnheader" scope="col">Outcome</th></tr></thead>
+    <tbody role="rowgroup">
     {% for e in audit_events %}
-    <tr><td class="cell--nowrap">{{ e.created_at | ts }}</td><td>{{ e.actor_name or e.actor_id or "Not signed in" }}</td><td>{{ e.action_label }}<span class="cell__sub">{{ e.target_label }}</span></td><td>{% if e.outcome == 'denied' or e.outcome == 'failed' %}<span class="badge badge--error">{{ e.outcome_label }}</span>{% else %}{{ e.outcome_label }}{% endif %}</td></tr>
+    <tr role="row"><td role="cell" class="cell--nowrap">{{ e.created_at | ts }}</td><td role="cell" data-label="Who">{{ e.actor_name or e.actor_id or "Not signed in" }}</td><td role="cell" data-label="What">{{ e.action_label }}<span class="cell__sub">{{ e.target_label }}</span></td><td role="cell" data-label="Outcome">{% if e.outcome == 'denied' or e.outcome == 'failed' %}<span class="badge badge--error">{{ e.outcome_label }}</span>{% else %}{{ e.outcome_label }}{% endif %}</td></tr>
     {% endfor %}
     </tbody>
   </table></div>
@@ -480,6 +480,9 @@
     {% if audit_page %}<span>Page {{ audit_page }}</span>{% endif %}
     {% if audit_has_more %}<a class="btn btn--small" href="/org/{{ org.slug }}/settings?page={% if audit_page %}{{ audit_page + 1 }}{% else %}2{% endif %}#audit">Next</a>{% endif %}
   </nav>
+  {% elif audit_page and audit_page > 1 %}
+  <p class="hint">No more events on this page.</p>
+  <nav class="pagination" aria-label="Audit log pagination"><a class="btn btn--small" href="/org/{{ org.slug }}/settings#audit">Back to the first page</a></nav>
   {% else %}<p class="hint">No events recorded yet.</p>{% endif %}
 </section>
 {% endif %}
