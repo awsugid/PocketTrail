@@ -65,7 +65,7 @@
       <div class="field">
         <label for="responsible">Responsible member <span class="req" aria-hidden="true">*</span></label>
         <select class="select" id="responsible" name="responsible_member_id" required>
-          <option value="">Unassigned</option>
+          <option value="">Choose a member…</option>
           {% if members %}{% for m in members %}
           <option value="{{ m.id }}">{{ m.name }}</option>
           {% endfor %}{% endif %}

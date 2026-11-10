@@ -222,20 +222,20 @@
   <div>
   {% if members %}
   <div class="table-scroll">
-    <table class="table members-table">
+    <table class="table members-table" role="table">
       <caption class="visually-hidden">Members and roles</caption>
-      <thead>
-        <tr>
-          <th scope="col">Member</th>
-          <th scope="col">Role</th>
-          {% if can.members %}<th scope="col"><span class="visually-hidden">Actions</span></th>{% endif %}
+      <thead role="rowgroup">
+        <tr role="row">
+          <th role="columnheader" scope="col">Member</th>
+          <th role="columnheader" scope="col">Role</th>
+          {% if can.members %}<th role="columnheader" scope="col"><span class="visually-hidden">Actions</span></th>{% endif %}
         </tr>
       </thead>
-      <tbody>
+      <tbody role="rowgroup">
         {% for m in members %}
-        <tr>
-          <td>{{ m.name }}{% if not m.active %} <span class="badge badge--suppressed">Former member</span>{% endif %}<span class="cell__sub">{{ m.email }} · @{{ m.handle }}</span></td>
-          <td data-label="Role">
+        <tr role="row">
+          <td role="cell">{{ m.name }}{% if not m.active %} <span class="badge badge--suppressed">Former member</span>{% endif %}<span class="cell__sub">{{ m.email }} · @{{ m.handle }}</span></td>
+          <td role="cell" data-label="Role">
             {% if can.members %}
             <form method="post" action="/org/{{ org.slug }}/settings/members/{{ m.id }}/role">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -255,7 +255,7 @@
             {% endif %}
           </td>
           {% if can.members %}
-          <td>
+          <td role="cell">
             {% if m.active %}
             <form method="post" action="/org/{{ org.slug }}/settings/members/{{ m.id }}/remove" hx-confirm="Remove {{ m.name }} from {{ org.name }}? They lose access and stop receiving notifications immediately. Their history stays, and you can restore them later.">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

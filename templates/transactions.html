@@ -39,34 +39,35 @@
 {% if txns %}
 <div class="panel">
   <div class="table-scroll">
-    <table class="table transaction-table">
+    <table class="table transaction-table" role="table">
       <caption class="visually-hidden">Bank movements with amounts, pocket balances, and review responsibility</caption>
-      <thead>
-        <tr>
-          <th scope="col">Counterparty</th>
-          <th scope="col">Date</th>
-          <th scope="col" class="cell--num">Amount</th>
-          <th scope="col" class="cell--num">Balance after</th>
-          <th scope="col">Status</th>
-          <th scope="col">Responsible</th>
+      <thead role="rowgroup">
+        <tr role="row">
+          <th role="columnheader" scope="col">Counterparty</th>
+          <th role="columnheader" scope="col">Date</th>
+          <th role="columnheader" scope="col" class="cell--num">Amount</th>
+          <th role="columnheader" scope="col" class="cell--num">Balance after</th>
+          <th role="columnheader" scope="col">Status</th>
+          <th role="columnheader" scope="col">Responsible</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody role="rowgroup">
         {% for t in txns %}
-        <tr>
-          <td class="transaction-table__identity"><a href="/org/{{ org.slug }}/transactions/{{ t.id }}">{{ t.counterparty_display.name if t.counterparty_display else t.counterparty }}</a>{% if t.counterparty_display and t.counterparty_display.bank_account %}<span class="cell__sub">{{ t.counterparty_display.bank_account }}</span>{% endif %}<span class="cell__sub">{{ t.transaction_type }}{% if t.pocket_name and t.pocket_name != t.counterparty %} · {{ t.pocket_name }}{% endif %}</span></td>
-          <td class="cell--nowrap" data-label="Date">{{ t.date }}{% if t.time %} <span class="cell__muted">{{ t.time }}</span>{% endif %}</td>
-          <td class="cell--num cell--nowrap{% if t.amount_minor > 0 %} amount--in{% endif %}" data-label="Amount">{{ t.amount_minor | money }}</td>
-          <td class="cell--num cell--nowrap" data-label="Balance after">{{ t.balance_minor | money }}</td>
-          <td class="transaction-table__status" data-label="Status">
-            {% if t.status == 'pending' %}<span class="badge badge--pending">Pending review</span>
+        <tr role="row">
+          <td role="cell" class="transaction-table__identity"><a href="/org/{{ org.slug }}/transactions/{{ t.id }}">{{ t.counterparty_display.name if t.counterparty_display else t.counterparty }}</a>{% if t.counterparty_display and t.counterparty_display.bank_account %}<span class="cell__sub">{{ t.counterparty_display.bank_account }}</span>{% endif %}<span class="cell__sub">{{ t.transaction_type }}{% if t.pocket_name and t.pocket_name != t.counterparty %} · {{ t.pocket_name }}{% endif %}</span></td>
+          <td role="cell" class="cell--nowrap" data-label="Date">{{ t.date }}{% if t.time %} <span class="cell__muted">{{ t.time }}</span>{% endif %}</td>
+          <td role="cell" class="cell--num cell--nowrap{% if t.amount_minor > 0 %} amount--in{% endif %}" data-label="Amount">{{ t.amount_minor | money }}</td>
+          <td role="cell" class="cell--num cell--nowrap" data-label="Balance after">{{ t.balance_minor | money }}</td>
+          <td role="cell" class="transaction-table__status" data-label="Status">
+            {% if t.status == 'pending' and t.needs_details %}<span class="badge badge--needs">Needs details</span>
+            {% elif t.status == 'pending' %}<span class="badge badge--pending">Pending review</span>
             {% elif t.status == 'approved' %}<span class="badge badge--approved">Approved</span>
             {% elif t.status == 'changes_requested' %}<span class="badge badge--changes">Changes requested</span>
             {% else %}<span class="badge badge--neutral">{{ t.status }}</span>{% endif %}
-            {% if t.needs_details %}<span class="badge badge--needs">Needs details</span>{% endif %}
+            {% if t.needs_details and t.status != 'pending' %}<span class="badge badge--needs">Needs details</span>{% endif %}
             {% if t.suppressed %}<span class="badge badge--suppressed">Suppressed</span>{% endif %}
           </td>
-          <td class="transaction-table__responsible" data-label="Responsible">{{ t.responsible_name or "Unassigned" }}</td>
+          <td role="cell" class="transaction-table__responsible" data-label="Responsible">{{ t.responsible_name or "Unassigned" }}</td>
         </tr>
         {% endfor %}
       </tbody>

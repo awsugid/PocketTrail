@@ -263,7 +263,8 @@ mod tests {
             .next()
             .unwrap();
         assert!(overview.contains("Responsible: Unassigned"));
-        assert!(overview.contains("Pending review"));
+        // A pending transaction owing details shows one status truth, not two.
+        assert!(overview.contains("Needs details") && !overview.contains("Pending review"));
         assert!(!overview.contains("Complete transaction details"));
         for (id, label) in [
             ("bank-facts", "Bank details"),

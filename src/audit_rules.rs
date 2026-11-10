@@ -164,6 +164,11 @@ pub fn action_label(action: &str) -> String {
         "transaction.details_updated" => "Transaction details saved",
         "transaction.evidence_attached" => "Document attached",
         "transaction.submitted" => "Submitted for review",
+        "transaction.approved" => "Transaction approved",
+        "transaction.changes_requested" => "Changes requested",
+        "transaction.notifications_suppressed" => "Transaction notifications suppressed",
+        "transaction.notifications_resumed" => "Transaction notifications resumed",
+        "transaction.created" => "Transaction recorded manually",
         "platform.admin" => "Platform access changed",
         "platform.template" => "Role template saved",
         _ => return action.to_string(),
@@ -174,6 +179,26 @@ pub fn action_label(action: &str) -> String {
 /// Organizer-facing description of a normalized audit target. Route paths
 /// become the thing acted on; non-path targets (names, ids) pass through.
 pub fn target_label(target: &str) -> String {
+    // Handler-written targets: "kind:identifier", possibly several per line.
+    if !target.starts_with('/') && target.contains(':') {
+        let parts: Vec<String> = target
+            .split(' ')
+            .map(|piece| match piece.split_once(':') {
+                Some(("transaction", id)) => format!("Transaction #{id}"),
+                Some(("membership", id)) => format!("Member {}", if id.bytes().all(|b| b.is_ascii_digit()) { format!("#{id}") } else { format!("@{id}") }),
+                Some(("organization", slug)) => format!("Organization /{slug}"),
+                Some(("item", rest)) => format!("Item {}", rest.replace(':', " · ")),
+                Some(("location", name)) => format!("Location {name}"),
+                Some(("delta", n)) => format!("change {n}"),
+                Some(("role", id)) => format!("Role {}", if id.bytes().all(|b| b.is_ascii_digit()) { format!("#{id}") } else { id.to_string() }),
+                Some(("mapping", id)) => format!("Actor mapping {id}"),
+                Some(("pocket", name)) => format!("Pocket {name}"),
+                Some(("session", _)) | None if piece == "session" => "Session".to_string(),
+                _ => piece.to_string(),
+            })
+            .collect();
+        return parts.join(" · ");
+    }
     let seg: Vec<&str> = target.trim_start_matches('/').split('/').collect();
     let rest: &[&str] = match seg.as_slice() {
         ["org", _, rest @ ..] => rest,
@@ -225,7 +250,7 @@ pub fn outcome_label(outcome: &str) -> &str {
         "committed" => "Done",
         "denied" => "Denied",
         "failed" => "Failed",
-        "attempted" => "Attempted",
+        "attempt" | "attempted" => "Attempted",
         other => other,
     }
 }
@@ -333,6 +358,11 @@ mod tests {
         assert_eq!(target_label("/org/:org/transactions/29/approve"), "Transaction #29 · approve");
         assert_eq!(target_label("/org/:org/settings/members/3/remove"), "Member #3 · remove");
         assert_eq!(target_label("Treasurer"), "Treasurer");
+        assert_eq!(target_label("transaction:3"), "Transaction #3");
+        assert_eq!(target_label("item:1 location:1 delta:-2"), "Item 1 · Location 1 · change -2");
+        assert_eq!(target_label("membership:bob"), "Member @bob");
+        assert_eq!(outcome_label("attempt"), "Attempted");
+        assert_eq!(action_label("transaction.notifications_suppressed"), "Transaction notifications suppressed");
         assert_eq!(action_label("member.removed"), "Member removed");
         assert_eq!(action_label("custom.code"), "custom.code");
     }

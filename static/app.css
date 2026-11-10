@@ -43,7 +43,7 @@ input,textarea { caret-color:var(--accent); }
 .topbar { position:sticky; top:0; z-index:40; display:flex; gap:12px; align-items:center; min-height:64px; padding:8px 24px; background:var(--surface); border-bottom:1px solid var(--border); }
 .topbar__spacer { flex:1; }
 .brand { display:inline-flex; align-items:center; gap:10px; color:var(--text); font-size:17px; font-weight:700; letter-spacing:-.035em; text-decoration:none; white-space:nowrap; }
-.brand__mark { width:29px; height:29px; padding:5px; border-radius:8px; color:var(--surface); background:var(--primary); }
+.brand__mark { width:29px; height:29px; border-radius:8px; }
 .icon { flex:none; width:18px; height:18px; }
 .avatar { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; background:var(--surface-2); border:1px solid var(--border); border-radius:50%; }
 .avatar .icon { width:16px; height:16px; }
@@ -90,6 +90,7 @@ input,textarea { caret-color:var(--accent); }
 .page-head__sub { grid-column:1/-1; max-width:76ch; color:var(--text-secondary); line-height:1.65; }
 .page-head > nav { grid-column:1/-1; }
 .panel { padding:20px; margin-bottom:16px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); }
+html { scroll-padding-top:var(--sticky-offset); }
 .panel[id],[id].section-block { scroll-margin-top:var(--sticky-offset); }
 .panel__title { margin-bottom:6px; }
 .panel__sub { margin-bottom:14px; max-width:76ch; color:var(--text-secondary); font-size:13px; }
@@ -284,13 +285,13 @@ body.htmx-request::after { content:""; position:fixed; inset:0 0 auto; z-index:9
 }
 /* Phone cards for tables that carry controls or exception counts. */
 @media (max-width:800px) {
-  .batch-table,.batch-table tbody,.members-table,.members-table tbody { display:block; }
-  .batch-table thead,.members-table thead { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
-  .batch-table tr,.members-table tr { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px 16px; padding:12px 0; border-bottom:1px solid var(--border); }
-  .batch-table tr:last-child,.members-table tr:last-child { border-bottom:0; }
-  .batch-table td,.members-table td { display:block; min-width:0; padding:0; border:0; text-align:left; }
-  .batch-table td[data-label]::before,.members-table td[data-label]::before { content:attr(data-label); display:block; font-size:12px; color:var(--text-secondary); }
-  .batch-table td:first-child,.batch-table .batch-table__attention,.members-table td { grid-column:1/-1; }
+  .batch-table,.batch-table tbody,.members-table,.members-table tbody,.entries-table,.entries-table tbody { display:block; }
+  .batch-table thead,.members-table thead,.entries-table thead { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+  .batch-table tr,.members-table tr,.entries-table tr { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px 16px; padding:12px 0; border-bottom:1px solid var(--border); }
+  .batch-table tr:last-child,.members-table tr:last-child,.entries-table tr:last-child { border-bottom:0; }
+  .batch-table td,.members-table td,.entries-table td { display:block; min-width:0; padding:0; border:0; text-align:left; white-space:normal; }
+  .batch-table td[data-label]::before,.members-table td[data-label]::before,.entries-table td[data-label]::before { content:attr(data-label); display:block; font-size:12px; color:var(--text-secondary); }
+  .batch-table td:first-child,.batch-table .batch-table__attention,.members-table td,.entries-table td:first-child,.entries-table td[data-label="Message"] { grid-column:1/-1; }
   .members-table .form-actions { margin:0; }
 }
 @media (max-width:480px) {

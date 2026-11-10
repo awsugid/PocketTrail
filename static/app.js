@@ -73,6 +73,20 @@
   document.addEventListener("htmx:afterSettle", hideAutosubmitButtons);
   if (document.readyState !== "loading") hideAutosubmitButtons();
 
+  // Anchor targets must clear whatever is sticky: banners + topbar + section nav.
+  function updateStickyOffset() {
+    var topbar = document.querySelector(".topbar");
+    var nav = document.querySelector(".section-nav");
+    var offset = 16;
+    if (topbar && getComputedStyle(topbar).position === "sticky") offset += topbar.getBoundingClientRect().height;
+    if (nav && getComputedStyle(nav).position === "sticky") offset += nav.getBoundingClientRect().height;
+    document.documentElement.style.setProperty("--sticky-offset", Math.round(offset) + "px");
+  }
+  document.addEventListener("DOMContentLoaded", updateStickyOffset);
+  document.addEventListener("htmx:afterSettle", updateStickyOffset);
+  window.addEventListener("resize", updateStickyOffset);
+  if (document.readyState !== "loading") updateStickyOffset();
+
   // Section navigation reflects the section currently in view.
   function trackSectionNav() {
     var nav = document.querySelector(".section-nav");

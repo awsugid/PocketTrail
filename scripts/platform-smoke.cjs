@@ -226,6 +226,8 @@ async function isAdminPage(page) {
       const copied = rolesPanel.locator('.settings-config__row', { hasText: templateName });
       await copied.waitFor({ timeout: 10_000 });
       assert(!(await copied.textContent()).includes('Comment on transactions'), 'copy isolated from template edits');
+      // Role rows are collapsed summaries; expand to read the permission list.
+      if (!(await copied.evaluate(el => el.open))) await copied.locator('summary').click();
       assert(await copied.getByText('Update stock').isVisible());
 
       assert.equal(await alice.locator('dialog:visible').count(), 0);

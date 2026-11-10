@@ -60,23 +60,23 @@
   <p class="panel__sub">Open a batch to inspect individual results and records needing review.</p>
   {% if batches %}
   <div class="table-scroll">
-    <table class="table batch-table">
+    <table class="table batch-table" role="table">
       <caption class="visually-hidden">Import batches</caption>
-      <thead>
-        <tr>
-          <th scope="col">Batch</th>
-          <th scope="col" class="cell--num">Imported</th>
-          <th scope="col" class="cell--num">Unchanged</th>
-          <th scope="col">Attention</th>
+      <thead role="rowgroup">
+        <tr role="row">
+          <th role="columnheader" scope="col">Batch</th>
+          <th role="columnheader" scope="col" class="cell--num">Imported</th>
+          <th role="columnheader" scope="col" class="cell--num">Unchanged</th>
+          <th role="columnheader" scope="col">Attention</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody role="rowgroup">
         {% for b in batches %}
-        <tr>
-          <td class="batch-table__identity"><a href="/org/{{ org.slug }}/imports/{{ b.id }}">{{ b.created_at }}</a><span class="cell__sub">{{ b.by_name }}</span></td>
-          <td class="cell--num" data-label="Imported">{{ b.counts.imported or 0 }}</td>
-          <td class="cell--num" data-label="Unchanged">{{ b.counts.duplicate_unchanged or 0 }}</td>
-          <td class="batch-table__attention" data-label="Attention">{% if (b.counts.conflict or 0) > 0 %}<span class="badge badge--error">{{ b.counts.conflict }} conflict{% if b.counts.conflict != 1 %}s{% endif %}</span>{% endif %}{% if (b.counts.needs_review or 0) > 0 %}<span class="badge badge--pending">{{ b.counts.needs_review }} need{% if b.counts.needs_review == 1 %}s{% endif %} review</span>{% endif %}{% if not (b.counts.conflict or 0) and not (b.counts.needs_review or 0) %}<span class="cell__muted">None</span>{% endif %}</td>
+        <tr role="row">
+          <td role="cell" class="batch-table__identity"><a href="/org/{{ org.slug }}/imports/{{ b.id }}">{{ b.created_at }}</a><span class="cell__sub">{{ b.by_name }}</span></td>
+          <td role="cell" class="cell--num" data-label="Imported">{{ b.counts.imported or 0 }}</td>
+          <td role="cell" class="cell--num" data-label="Unchanged">{{ b.counts.duplicate_unchanged or 0 }}</td>
+          <td role="cell" class="batch-table__attention" data-label="Attention">{% if (b.counts.conflict or 0) > 0 %}<span class="badge badge--error">{{ b.counts.conflict }} conflict{% if b.counts.conflict != 1 %}s{% endif %}</span>{% endif %}{% if (b.counts.needs_review or 0) > 0 %}<span class="badge badge--pending">{{ b.counts.needs_review }} need{% if b.counts.needs_review == 1 %}s{% endif %} review</span>{% endif %}{% if not (b.counts.conflict or 0) and not (b.counts.needs_review or 0) %}<span class="cell__muted">None</span>{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>

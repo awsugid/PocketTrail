@@ -9,11 +9,12 @@
   <p class="page-head__sub">{% if txn.counterparty_display and txn.counterparty_display.bank_account %}<span class="transaction-head__bank">{{ txn.counterparty_display.bank_account }}</span>{% endif %}{% if txn.date %}{{ txn.date }}{% if txn.time %} {{ txn.time }}{% endif %}{% endif %}{% if txn.transaction_type %} · {{ txn.transaction_type }}{% endif %}</p>
   <div class="transaction-head__summary">
     <strong class="transaction-head__amount">{{ txn.amount_minor | money }}</strong>
-    {% if txn.status == 'pending' %}<span class="badge badge--pending">Pending review</span>
+    {% if txn.status == 'pending' and txn.needs_details %}<span class="badge badge--needs">Needs details</span>
+    {% elif txn.status == 'pending' %}<span class="badge badge--pending">Pending review</span>
     {% elif txn.status == 'approved' %}<span class="badge badge--approved">Approved</span>
     {% elif txn.status == 'changes_requested' %}<span class="badge badge--changes">Changes requested</span>
     {% else %}<span class="badge badge--neutral">{{ txn.status }}</span>{% endif %}
-    {% if txn.needs_details %}<span class="badge badge--needs">Needs details</span>{% endif %}
+    {% if txn.needs_details and txn.status != 'pending' %}<span class="badge badge--needs">Needs details</span>{% endif %}
     {% if txn.suppressed %}<span class="badge badge--suppressed">Suppressed</span>{% endif %}
     <span class="transaction-head__responsible">Responsible: {{ txn.responsible_name or "Unassigned" }}</span>
   </div>
@@ -84,7 +85,7 @@
     <div class="field">
       <label for="responsible">Responsible member <span class="req" aria-hidden="true">*</span></label>
       <select class="select" id="responsible" name="responsible_member_id" required>
-        <option value="">Unassigned</option>
+        <option value="">Choose a member…</option>
         {% if members %}{% for m in members %}
         <option value="{{ m.id }}"{% if txn.responsible_member_id and txn.responsible_member_id == m.id %} selected{% endif %}>{{ m.name }}</option>
         {% endfor %}{% endif %}
@@ -225,7 +226,7 @@
 {% if can.submit or can.approve %}
 <section class="panel" id="review-actions" data-dialog-panel aria-labelledby="review-actions-title">
   <h2 class="panel__title" id="review-actions-title">{% if can.submit %}Resubmit for review{% else %}Review transaction{% endif %}</h2>
-  <p class="panel__sub">Decisions cover every purpose. The explanation and documents are repeated here so you can decide without leaving this dialog.</p>
+  <p class="panel__sub">The explanation and documents are repeated here so you can decide without leaving this dialog.</p>
   <h3>Explanation</h3>
   <p class="comment__body">{{ txn.explanation or "No explanation recorded yet." }}</p>
   <h3>Documents</h3>
