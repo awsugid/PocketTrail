@@ -28,7 +28,7 @@
       <tbody role="rowgroup">
         {% for mv in movements %}
         <tr role="row">
-          <td role="cell">{{ mv.created_at }}<span class="cell__sub">{{ mv.member_name }}</span></td>
+          <td role="cell" data-label="When">{{ mv.created_at }}<span class="cell__sub">{{ mv.member_name }}</span></td>
           <td role="cell" data-label="Location">{{ mv.location_name }}</td>
           <td role="cell" data-label="Change" class="cell--num{% if mv.delta > 0 %} amount--in{% endif %}">{% if mv.delta > 0 %}+{% endif %}{{ mv.delta }}</td>
           <td role="cell" data-label="Result" class="cell--num">{{ mv.result_qty }}</td>

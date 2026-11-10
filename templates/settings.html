@@ -471,7 +471,7 @@
     <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">When</th><th role="columnheader" scope="col">Who</th><th role="columnheader" scope="col">What</th><th role="columnheader" scope="col">Outcome</th></tr></thead>
     <tbody role="rowgroup">
     {% for e in audit_events %}
-    <tr role="row"><td role="cell" class="cell--nowrap">{{ e.created_at | ts }}</td><td role="cell" data-label="Who">{{ e.actor_name or e.actor_id or "Not signed in" }}</td><td role="cell" data-label="What">{{ e.action_label }}<span class="cell__sub">{{ e.target_label }}</span></td><td role="cell" data-label="Outcome">{% if e.outcome == 'denied' or e.outcome == 'failed' %}<span class="badge badge--error">{{ e.outcome_label }}</span>{% else %}{{ e.outcome_label }}{% endif %}</td></tr>
+    <tr role="row"><td role="cell" data-label="When" class="cell--nowrap">{{ e.created_at | ts }}</td><td role="cell" data-label="Who">{{ e.actor_name or e.actor_id or "Not signed in" }}</td><td role="cell" data-label="What">{{ e.action_label }}<span class="cell__sub">{{ e.target_label }}</span></td><td role="cell" data-label="Outcome">{% if e.outcome == 'denied' or e.outcome == 'failed' %}<span class="badge badge--error">{{ e.outcome_label }}</span>{% else %}{{ e.outcome_label }}{% endif %}</td></tr>
     {% endfor %}
     </tbody>
   </table></div>

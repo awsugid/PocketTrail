@@ -293,6 +293,8 @@ body.htmx-request::after { content:""; position:fixed; inset:0 0 auto; z-index:9
   .card-table td { display:block; min-width:0; padding:0; border:0; text-align:left; white-space:normal; }
   .card-table td[data-label]::before { content:attr(data-label); display:block; font-size:12px; color:var(--text-secondary); }
   .card-table td:first-child,.card-table td[data-label="Message"],.card-table td[data-label="Reason"],.card-table td[data-label="Attention"],.card-table td[data-label="What"],.members-table td,.users-table td { grid-column:1/-1; }
+  .card-table td:first-child[data-label]::before { display:inline; margin-right:6px; content:attr(data-label) ":"; }
+  .card-table td:first-child + td:not([data-label]) { grid-column:1/-1; order:-1; }
   .card-table td.cell--nowrap { white-space:normal; }
   .members-table .form-actions { margin:0; }
 }

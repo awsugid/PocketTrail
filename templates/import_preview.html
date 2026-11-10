@@ -29,35 +29,35 @@
 <div class="panel panel--flush">
   <h2 class="panel__title">Statement entries</h2>
   <div class="table-scroll">
-    <table class="table">
+    <table class="table card-table entries-table" role="table">
       <caption class="visually-hidden">Planned handling of each statement entry</caption>
-      <thead>
-        <tr>
-          <th scope="col">Date</th>
-          <th scope="col">Counterparty / bank reference</th>
-          <th scope="col" class="cell--num">Amount</th>
-          <th scope="col">Responsible</th>
-          <th scope="col">Plan</th>
-          <th scope="col">Message</th>
-          <th scope="col">Transaction</th>
+      <thead role="rowgroup">
+        <tr role="row">
+          <th role="columnheader" scope="col">Date</th>
+          <th role="columnheader" scope="col">Counterparty / bank reference</th>
+          <th role="columnheader" scope="col" class="cell--num">Amount</th>
+          <th role="columnheader" scope="col">Responsible</th>
+          <th role="columnheader" scope="col">Plan</th>
+          <th role="columnheader" scope="col">Message</th>
+          <th role="columnheader" scope="col">Transaction</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody role="rowgroup">
         {% for it in items %}
-        <tr>
-          <td class="cell--nowrap">{{ it.date }}{% if it.time %} {{ it.time }}{% endif %}</td>
-          <td><strong>{{ it.counterparty_display.name if it.counterparty_display else it.counterparty }}</strong>{% if it.counterparty_display and it.counterparty_display.bank_account %}<span class="cell__sub">{{ it.counterparty_display.bank_account }}</span>{% endif %}<span class="cell__sub cell--mono">{{ it.bank_id or "—" }}</span></td>
-          <td class="cell--num cell--nowrap">{{ it.amount_minor | money }}</td>
-          <td>{{ it.responsible_name or "Unassigned" }}</td>
-          <td class="cell--nowrap">
+        <tr role="row">
+          <td role="cell" data-label="Date" class="cell--nowrap">{{ it.date }}{% if it.time %} {{ it.time }}{% endif %}</td>
+          <td role="cell"><strong>{{ it.counterparty_display.name if it.counterparty_display else it.counterparty }}</strong>{% if it.counterparty_display and it.counterparty_display.bank_account %}<span class="cell__sub">{{ it.counterparty_display.bank_account }}</span>{% endif %}<span class="cell__sub cell--mono">{{ it.bank_id or "—" }}</span></td>
+          <td role="cell" data-label="Amount" class="cell--num cell--nowrap">{{ it.amount_minor | money }}</td>
+          <td role="cell" data-label="Responsible">{{ it.responsible_name or "Unassigned" }}</td>
+          <td role="cell" data-label="Plan" class="cell--nowrap">
             {% if it.status == 'imported' %}<span class="badge badge--pending">Will import</span>
             {% elif it.status == 'duplicate_unchanged' %}<span class="badge badge--neutral">Skip (unchanged)</span>
             {% elif it.status == 'conflict' %}<span class="badge badge--error">Conflict</span>
             {% elif it.status == 'needs_review' %}<span class="badge badge--pending">Needs review</span>
             {% else %}<span class="badge badge--neutral">{{ it.status }}</span>{% endif %}
           </td>
-          <td>{{ it.message or "—" }}</td>
-          <td>{% if it.transaction_id %}<a href="/org/{{ org.slug }}/transactions/{{ it.transaction_id }}">Open</a>{% else %}—{% endif %}</td>
+          <td role="cell" data-label="Message">{{ it.message or "—" }}</td>
+          <td role="cell" data-label="Transaction">{% if it.transaction_id %}<a href="/org/{{ org.slug }}/transactions/{{ it.transaction_id }}">Open</a>{% else %}—{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>

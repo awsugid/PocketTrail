@@ -83,7 +83,7 @@ const pages = JSON.parse(execFileSync('cargo', ['run', '--quiet', '--example', '
       return tables;
     }
     async function checkKeyboardScroll(label) {
-      const wrapper = page.locator('.table-scroll:visible').first();
+      const wrapper = page.locator('.table-scroll:visible').filter({ has: page.locator('.table') }).last();
       await wrapper.focus();
       await page.keyboard.press('ArrowRight');
       await page.waitForFunction(() => [...document.querySelectorAll('.table-scroll')]
@@ -148,9 +148,16 @@ const pages = JSON.parse(execFileSync('cargo', ['run', '--quiet', '--example', '
           assert(tables.length, `${name}: missing fixture table`);
         }
         assert.equal(await page.locator('.table-scroll-cue').count(), await page.locator('.table-scroll').count());
-        // Import history became phone cards; the preview's full fact table still scrolls.
+        // Every fixture table card-stacks on phones now; prove the scroll fallback
+        // with a synthetic wide table so the cue/tabindex rule stays exercised.
         if (width === 320 && name === 'import-preview') {
-          assert(tables.some(table => table.overflowing), `${name}: exercise offscreen actions`);
+          await page.evaluate(() => {
+            const wrap = document.createElement('div'); wrap.className = 'table-scroll';
+            wrap.innerHTML = '<table class="table"><caption>Synthetic wide</caption><tr>' + '<td style="min-width:200px">wide</td>'.repeat(5) + '</tr></table>';
+            document.querySelector('main').append(wrap);
+            document.dispatchEvent(new Event('htmx:load'));
+          });
+          await page.locator('.table-scroll-cue:visible').first().waitFor();
           await checkKeyboardScroll(name);
         }
         if (name === 'inventory') {
@@ -329,9 +336,17 @@ const pages = JSON.parse(execFileSync('cargo', ['run', '--quiet', '--example', '
     // Resize the same document: fitting tables must lose stale cues/tab stops.
     await page.setViewportSize({ width: 320, height: 1000 });
     await page.goto('http://pockettrail.test/import-preview');
-    await page.locator('.table-scroll-cue:visible').waitFor();
     await page.evaluate(() => {
-      const wrapper = document.querySelector('.table-scroll');
+      const wrap = document.createElement('div'); wrap.className = 'table-scroll';
+      wrap.innerHTML = '<table class="table"><tr>' + '<td style="min-width:200px">wide</td>'.repeat(5) + '</tr></table>';
+      document.querySelector('main').prepend(wrap);
+      document.dispatchEvent(new Event('htmx:load'));
+    });
+    await page.locator('.table-scroll-cue:visible').waitFor();
+    // The page's own (card-stacked) table never overflows; only the synthetic ones cue.
+    const baseCues = await page.locator('.table-scroll-cue').count();
+    await page.evaluate(() => {
+      const wrapper = document.querySelector('main > .table-scroll');
       const added = wrapper.cloneNode(true);
       added.removeAttribute('aria-describedby');
       added.removeAttribute('tabindex');
@@ -340,14 +355,14 @@ const pages = JSON.parse(execFileSync('cargo', ['run', '--quiet', '--example', '
     });
     assert.equal(await page.locator('.table-scroll-cue:visible').count(), 2, 'New HTMX content gets its own cue');
     const cueIds = await page.locator('.table-scroll-cue').evaluateAll(cues => cues.map(cue => cue.id));
-    assert.equal(new Set(cueIds).size, 2, 'Cue descriptions have unique IDs');
-    await page.locator('.table-scroll').last().evaluate(wrapper => {
+    assert.equal(new Set(cueIds).size, baseCues + 1, 'Cue descriptions have unique IDs');
+    await page.locator('main > .table-scroll').last().evaluate(wrapper => {
       wrapper.previousElementSibling.remove();
       wrapper.remove();
     });
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.locator('.table-scroll-cue').waitFor({ state: 'hidden' });
-    assert.equal(await page.locator('.table-scroll').getAttribute('tabindex'), null);
+    await page.locator('.table-scroll-cue:visible').waitFor({ state: 'hidden' });
+    assert.equal(await page.locator('.table-scroll').first().getAttribute('tabindex'), null);
     assert.deepEqual(errors, []);
     if (process.env.POCKETTRAIL_SCREENSHOTS) {
       require('node:fs').writeFileSync(path.join(process.env.POCKETTRAIL_SCREENSHOTS, 'measurements.json'),
