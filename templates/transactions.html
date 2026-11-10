@@ -32,7 +32,7 @@
       <button class="btn" type="submit" data-autosubmit-fallback>Apply</button>
       {% if filters and filters.status and filters.status != 'all' %}<a class="btn" href="/org/{{ org.slug }}/transactions">Clear</a>{% endif %}
     </div>
-    <p class="toolbar__count">{{ txns | length }}{% if has_next %}+{% endif %} transaction{% if txns | length != 1 %}s{% endif %}{% if page_number and page_number > 1 %} · page {{ page_number }}{% endif %}</p>
+    <p class="toolbar__count" data-result-count>{{ txns | length }}{% if has_next %}+{% endif %} transaction{% if txns | length != 1 %}s{% endif %}{% if page_number and page_number > 1 %} · page {{ page_number }}{% endif %}</p>
   </form>
 </div>
 

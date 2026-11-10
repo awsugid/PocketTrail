@@ -171,6 +171,54 @@ pub fn action_label(action: &str) -> String {
     label.to_string()
 }
 
+/// Organizer-facing description of a normalized audit target. Route paths
+/// become the thing acted on; non-path targets (names, ids) pass through.
+pub fn target_label(target: &str) -> String {
+    let seg: Vec<&str> = target.trim_start_matches('/').split('/').collect();
+    let rest: &[&str] = match seg.as_slice() {
+        ["org", _, rest @ ..] => rest,
+        other => other,
+    };
+    let id = |s: &str| format!("#{s}");
+    let text = match rest {
+        ["transactions"] => "Transactions".to_string(),
+        ["transactions", "new"] => "New transaction".to_string(),
+        ["transactions", n] => format!("Transaction {}", id(n)),
+        ["transactions", n, action] => format!("Transaction {} · {}", id(n), action.replace('-', " ")),
+        ["documents", n] => format!("Document {}", id(n)),
+        ["imports"] => "Statement import".to_string(),
+        ["imports", n] => format!("Import batch {}", id(n)),
+        ["imports", n, "confirm"] => format!("Import batch {} · confirm", id(n)),
+        ["inventory"] => "Inventory".to_string(),
+        ["inventory", "items"] => "Inventory items".to_string(),
+        ["inventory", "items", n] => format!("Inventory item {}", id(n)),
+        ["inventory", "locations"] => "Inventory locations".to_string(),
+        ["inventory", "stock"] => "Stock levels".to_string(),
+        ["settings"] => "Settings".to_string(),
+        ["settings", "roles"] => "Roles".to_string(),
+        ["settings", "roles", n] => format!("Role {}", id(n)),
+        ["settings", "role-templates"] => "Role templates".to_string(),
+        ["settings", "members"] => "Members".to_string(),
+        ["settings", "members", n, action] => format!("Member {} · {}", id(n), action),
+        ["settings", "mappings"] => "Actor mappings".to_string(),
+        ["settings", "mappings", n, "delete"] => format!("Actor mapping {} · delete", id(n)),
+        ["settings", "pockets"] => "Pockets".to_string(),
+        ["settings", "notifications"] => "Notification settings".to_string(),
+        ["settings", "invitations"] => "Invitations".to_string(),
+        ["settings", "invitations", _, action] => format!("Invitation · {action}"),
+        ["notifications", "digest"] => "Weekly digest".to_string(),
+        ["login", _] | ["logout"] | ["session"] => "Session".to_string(),
+        ["orgs"] => "Organizations".to_string(),
+        ["platform"] => "Global settings".to_string(),
+        ["platform", "users", "admin"] => "Platform access".to_string(),
+        ["platform", "role-templates"] => "Role templates".to_string(),
+        ["invitations", "accept"] => "Invitation acceptance".to_string(),
+        ["unrecognized"] => "Unrecognized request".to_string(),
+        _ => return target.to_string(),
+    };
+    text
+}
+
 /// Plain-English outcome for the audit table.
 pub fn outcome_label(outcome: &str) -> &str {
     match outcome {
@@ -279,6 +327,15 @@ pub fn page_offset(page: u32) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn labels_hide_route_syntax() {
+        assert_eq!(target_label("/org/:org/transactions/29/approve"), "Transaction #29 · approve");
+        assert_eq!(target_label("/org/:org/settings/members/3/remove"), "Member #3 · remove");
+        assert_eq!(target_label("Treasurer"), "Treasurer");
+        assert_eq!(action_label("member.removed"), "Member removed");
+        assert_eq!(action_label("custom.code"), "custom.code");
+    }
 
     #[test]
     fn observe_mutations_and_downloads_record_intent() {

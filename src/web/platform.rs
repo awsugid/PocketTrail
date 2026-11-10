@@ -43,7 +43,7 @@ impl serde::Serialize for Event {
     /// Templates get the stored codes plus organizer-facing labels.
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;
-        let mut st = s.serialize_struct("Event", 10)?;
+        let mut st = s.serialize_struct("Event", 11)?;
         st.serialize_field("id", &self.id)?;
         st.serialize_field("actor_id", &self.actor_id)?;
         st.serialize_field("actor_name", &self.actor_name)?;
@@ -51,6 +51,7 @@ impl serde::Serialize for Event {
         st.serialize_field("action", &self.action)?;
         st.serialize_field("action_label", &crate::audit_rules::action_label(&self.action))?;
         st.serialize_field("target", &self.target)?;
+        st.serialize_field("target_label", &crate::audit_rules::target_label(&self.target))?;
         st.serialize_field("outcome", &self.outcome)?;
         st.serialize_field("outcome_label", crate::audit_rules::outcome_label(&self.outcome))?;
         st.serialize_field("created_at", &self.created_at)?;

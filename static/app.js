@@ -38,16 +38,67 @@
   // Destructive forms carry hx-confirm; htmx owns that prompt.
 
   // Filter toolbars submit on change; the button stays as the no-JS fallback.
+  // After the boosted navigation, focus returns to the control that changed and
+  // the result count is announced, so keyboard users keep their place.
+  var pendingFilterFocus = null;
   document.addEventListener("change", function (event) {
     var form = event.target.closest("form[data-autosubmit]");
-    if (form) form.requestSubmit();
+    if (!form) return;
+    pendingFilterFocus = event.target.id;
+    form.requestSubmit();
   });
   function hideAutosubmitButtons() {
     document.querySelectorAll("[data-autosubmit-fallback]").forEach(function (button) { button.hidden = true; });
+    if (!pendingFilterFocus) return;
+    var field = document.getElementById(pendingFilterFocus);
+    pendingFilterFocus = null;
+    if (!field) return;
+    var control = field.closest(".pt-control");
+    var trigger = control && control.querySelector(".pt-trigger");
+    (trigger || field).focus({ preventScroll: true });
+    var count = field.closest("form") && field.closest("form").querySelector("[data-result-count]");
+    if (count) {
+      var live = document.getElementById("filter-announce");
+      if (!live) {
+        live = document.createElement("p");
+        live.id = "filter-announce";
+        live.className = "visually-hidden";
+        live.setAttribute("role", "status");
+        document.body.append(live);
+      }
+      live.textContent = "Filter applied. " + count.textContent.trim() + ".";
+    }
   }
   document.addEventListener("DOMContentLoaded", hideAutosubmitButtons);
-  document.addEventListener("htmx:load", hideAutosubmitButtons);
+  document.addEventListener("htmx:afterSettle", hideAutosubmitButtons);
   if (document.readyState !== "loading") hideAutosubmitButtons();
+
+  // Section navigation reflects the section currently in view.
+  function trackSectionNav() {
+    var nav = document.querySelector(".section-nav");
+    if (!nav || nav.dataset.tracked) return;
+    nav.dataset.tracked = "true";
+    var links = Array.from(nav.querySelectorAll("a[href^='#']"));
+    var targets = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); }).filter(Boolean);
+    if (!targets.length) return;
+    function setCurrent(id) {
+      links.forEach(function (a) {
+        if (a.getAttribute("href") === "#" + id) a.setAttribute("aria-current", "true");
+        else a.removeAttribute("aria-current");
+      });
+    }
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) { if (entry.isIntersecting) setCurrent(entry.target.id); });
+    }, { rootMargin: "-40% 0px -55% 0px" });
+    targets.forEach(function (t) { observer.observe(t); });
+    nav.addEventListener("click", function (event) {
+      var a = event.target.closest("a[href^='#']");
+      if (a) setCurrent(a.getAttribute("href").slice(1));
+    });
+  }
+  document.addEventListener("DOMContentLoaded", trackSectionNav);
+  document.addEventListener("htmx:load", trackSectionNav);
+  if (document.readyState !== "loading") trackSectionNav();
 
   // One overflow rule for every table, including HTMX-loaded and resized content.
   var tableCueId = 0;
@@ -173,6 +224,21 @@
       dialog.addEventListener("cancel", function (event) {
         event.preventDefault();
         requestDialogClose(dialog);
+      });
+      // Native modal cycling can land on <body> for one Tab press; wrap
+      // deterministically between the first and last focusable controls.
+      dialog.addEventListener("keydown", function (event) {
+        if (event.key !== "Tab") return;
+        var focusable = Array.from(dialog.querySelectorAll(
+          "a[href], button:not(:disabled), input:not(:disabled):not([type=hidden]), select:not(:disabled), textarea:not(:disabled), summary, [tabindex]:not([tabindex='-1'])"
+        )).filter(function (el) { return el.offsetParent !== null || el === document.activeElement; });
+        if (!focusable.length) return;
+        var first = focusable[0], last = focusable[focusable.length - 1];
+        if (event.shiftKey && (document.activeElement === first || document.activeElement === title)) {
+          event.preventDefault(); last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault(); first.focus();
+        }
       });
       // A drag out of the content must not count as a backdrop click.
       var backdropDown = false;
@@ -404,6 +470,16 @@
     var opts = Number.isInteger(rupiah) ? {} : { minimumFractionDigits: 2, maximumFractionDigits: 2 };
     return "Rp " + rupiah.toLocaleString("id-ID", opts);
   }
+
+  /* Formatted IDR preview beside manual-entry money fields. */
+  document.addEventListener("input", function (e) {
+    var input = e.target.closest("[data-money-preview]");
+    if (!input) return;
+    var out = document.querySelector(input.getAttribute("data-money-preview"));
+    if (!out) return;
+    var match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(input.value.trim());
+    out.textContent = match ? "= " + formatMinor(Number(match[1]) * 100 + Number(((match[2] || "") + "00").slice(0, 2))) : "";
+  });
 
   function updateAllocTotal(list) {
     var out = document.querySelector(list.getAttribute("data-alloc-total"));

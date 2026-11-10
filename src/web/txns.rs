@@ -276,16 +276,18 @@ pub async fn create(mut req: Request, ctx: RouteContext<App>) -> worker::Result<
     if counterparty.is_empty() {
         return Ok(fail(400, "Counterparty is required."));
     }
-    // Forms speak IDR; minor units stay internal.
-    let amount = match form_str(&form, "amount")
+    // Forms speak IDR with an explicit direction; signed minor units stay internal.
+    let magnitude = form_str(&form, "amount")
         .as_deref()
         .and_then(crate::fmt::parse_rupiah)
-    {
-        Some(v) if v != 0 => v,
+        .filter(|v| *v > 0);
+    let amount = match (magnitude, form_str(&form, "direction").as_deref()) {
+        (Some(v), Some("out")) => -v,
+        (Some(v), Some("in")) => v,
         _ => {
             return Ok(fail(
                 400,
-                "Amount must be a nonzero IDR value such as 150000 or -150000 (negative = money out).",
+                "Amount must be a positive IDR value such as 150000, with a direction of money in or money out.",
             ))
         }
     };
@@ -476,9 +478,11 @@ pub async fn detail(req: Request, ctx: RouteContext<App>) -> worker::Result<Resp
             "note": details.get("note").and_then(|v| v.as_str()).unwrap_or_default(),
         });
     }
+    let member_name = |id: i64| g.mem_name(Some(id));
     body["audit"]=serde_json::json!(audit.iter().map(|a|serde_json::json!({
         "action":a.action,"previous_status":a.previous_status,"new_status":a.new_status,
-        "details":a.details,"author_name":a.author_name,"created_at":crate::fmt::fmt_ts(a.created_at)
+        "facts":crate::domain_map::history_facts(&a.details, &member_name),
+        "author_name":a.author_name,"created_at":crate::fmt::fmt_ts(a.created_at)
     })).collect::<Vec<_>>());
     body["can"] = serde_json::json!({
         "edit": g.can(Permission::DocumentTransactions),

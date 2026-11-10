@@ -188,6 +188,8 @@ legend { padding:0 6px; font-size:13px; font-weight:600; }
 .accordion[open] > summary { border-bottom:1px solid var(--border); }
 .accordion__body { padding:20px 0; }
 .history-details { max-inline-size:100%; white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.7 var(--mono); }
+.history-facts { margin-top:8px; }
+.history-facts dd { white-space:pre-line; font-size:13px; }
 .htmx-indicator { opacity:0; transition:opacity 150ms ease; }
 .htmx-request .htmx-indicator,.htmx-request.htmx-indicator { opacity:1; }
 form.htmx-request .btn[type="submit"] { opacity:.6; cursor:progress; }
@@ -312,6 +314,10 @@ body.htmx-request::after { content:""; position:fixed; inset:0 0 auto; z-index:9
 .settings-config__row { padding:10px 0; border-top:1px solid var(--border); overflow-wrap:anywhere; }
 .settings-config__row .badge { margin-left:4px; }
 .settings-permissions { margin:4px 0 0; padding-left:18px; color:var(--text-secondary); font-size:13px; }
+.settings-role > summary { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; min-height:32px; cursor:pointer; list-style:none; }
+.settings-role > summary::-webkit-details-marker { display:none; }
+.settings-role > summary::after { content:""; width:7px; height:7px; margin-left:auto; border-right:1.5px solid currentColor; border-bottom:1.5px solid currentColor; transform:rotate(45deg); transition:transform 160ms ease; color:var(--text-secondary); }
+.settings-role[open] > summary::after { transform:rotate(225deg); }
 @media (min-width:1101px) {
   .settings-config { grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; }
   .settings-config__wide { grid-column:1/-1; }
@@ -337,7 +343,7 @@ body.htmx-request::after { content:""; position:fixed; inset:0 0 auto; z-index:9
 .workspace-link:hover { border-color:var(--border-strong); background:var(--surface-2); color:var(--text); }
 .workspace-link p { margin-top:4px; color:var(--text-secondary); font-size:13px; }
 @media (max-width:1100px) { .section-block { grid-template-columns:minmax(0,1fr); gap:20px; } }
-@media (max-width:800px) { .section-nav { top:0; position:relative; } }
+@media (max-width:800px) { .section-nav { top:0; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; margin-inline:-16px; padding-inline:16px; } .section-nav a { flex:none; } }
 @media (max-width:800px) {
   .settings-head { margin-bottom:16px; }
   .settings-layout .section-nav { margin-bottom:16px; }

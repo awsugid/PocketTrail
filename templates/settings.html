@@ -25,13 +25,12 @@
   </header>
   <p class="panel__sub">Permission bundles assigned to members. Enforced on the server.</p>
   {% for r in roles %}
-  <div class="settings-config__row">
-    <strong>{{ r.name }}</strong>
+  <details class="settings-config__row settings-role"{% if loop.first %} open{% endif %}>
+    <summary><strong>{{ r.name }}</strong><span class="cell__sub">{% if r.permissions %}{{ r.permissions | length }} permission{% if r.permissions | length != 1 %}s{% endif %}{% else %}No permissions · no access{% endif %}</span></summary>
     <ul class="settings-permissions">
       {% for p in permissions %}{% if p.id in r.permissions %}<li>{{ p.label }}</li>{% endif %}{% endfor %}
-      {% if not r.permissions %}<li>No permissions · no access</li>{% endif %}
     </ul>
-  </div>
+  </details>
   {% else %}<p class="hint">No roles defined yet.</p>{% endfor %}
 </section>
 
@@ -471,7 +470,7 @@
     <thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">What</th><th scope="col">Outcome</th></tr></thead>
     <tbody>
     {% for e in audit_events %}
-    <tr><td class="cell--nowrap">{{ e.created_at | ts }}</td><td>{{ e.actor_name or e.actor_id or "Not signed in" }}</td><td>{{ e.action_label }}<span class="cell__sub cell--mono">{{ e.target }}</span></td><td>{% if e.outcome == 'denied' or e.outcome == 'failed' %}<span class="badge badge--error">{{ e.outcome_label }}</span>{% else %}{{ e.outcome_label }}{% endif %}</td></tr>
+    <tr><td class="cell--nowrap">{{ e.created_at | ts }}</td><td>{{ e.actor_name or e.actor_id or "Not signed in" }}</td><td>{{ e.action_label }}<span class="cell__sub">{{ e.target_label }}</span></td><td>{% if e.outcome == 'denied' or e.outcome == 'failed' %}<span class="badge badge--error">{{ e.outcome_label }}</span>{% else %}{{ e.outcome_label }}{% endif %}</td></tr>
     {% endfor %}
     </tbody>
   </table></div>

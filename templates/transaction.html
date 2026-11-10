@@ -363,7 +363,7 @@
     <summary>{{ entry.action | replace("_", " ") | capitalize }} · {{ entry.author_name }} · {{ entry.created_at }}</summary>
     <div class="accordion__body">
       {% if entry.previous_status != entry.new_status %}<p>Status: {{ entry.previous_status | replace("_", " ") }} → {{ entry.new_status | replace("_", " ") }}</p>{% endif %}
-      {% if entry.details and entry.details != '{}' %}<pre class="history-details">{{ entry.details }}</pre>{% else %}<p class="hint">No further detail recorded.</p>{% endif %}
+      {% if entry.facts %}<dl class="facts history-facts">{% for f in entry.facts %}<dt>{{ f[0] }}</dt><dd>{{ f[1] }}</dd>{% endfor %}</dl>{% elif entry.details %}<pre class="history-details">{{ entry.details }}</pre>{% else %}<p class="hint">No further detail recorded.</p>{% endif %}
     </div>
   </details>
   {% endfor %}
