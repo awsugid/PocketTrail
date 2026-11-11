@@ -102,6 +102,29 @@ committed tests; private samples stay ignored.
 
 Exit: reviewed parity checklist with no unowned route, permission or data flow.
 
+Inventory findings from independent workflow review:
+
+- The required in-app action list is absent. Add a task queue grouping authorized
+  explanation requests, eligible reviews, income notes and pending imports. Make
+  it the default for task-bearing members; read-only members retain the ledger.
+  Empty actions must not imply an empty ledger or suggest importing to a user
+  without import permission.
+- Route documentation is incomplete: inventory the router itself, including
+  invitations, platform administration, import confirmation, review submission,
+  member restoration and role templates. Do not treat templates/README.md as
+  the complete contract.
+- Manual transaction entry is exposed despite statement-first product guidance.
+  Resolve whether to retain it before implementing that route; do not silently
+  expand scope or silently remove existing data capabilities.
+- Replace equal-weight detail cards with a dominant task column and a narrower
+  reference rail when useful. Primary explanation/review tasks belong inline;
+  secondary actions may use accessible dialogs. Settings become focused routes.
+- Parent layout loads alone are not a security gate: SvelteKit loads can run
+  concurrently or be reused during navigation. Every protected server load,
+  action and endpoint must invoke shared authorization against current state.
+- Rust-source SQL inspection tests need behavioral replacements that still
+  exercise real D1 statements, constraints and audit records.
+
 ### 1. Prove one full-stack vertical slice
 
 Create SvelteKit setup in an isolated migration location while Rust remains
@@ -189,6 +212,8 @@ delivery is part of this plan. Existing local-validation release boundary holds.
 ## Pending decisions before implementation
 
 - Confirm component spike and visual direction with one representative journey.
+- Resolve manual-entry scope against statement-first guidance; inventory all
+  actual router endpoints rather than relying on incomplete template docs.
 - Choose supported SvelteKit/adapter versions and verify local binding state paths.
 - Resolve pre-existing product gaps from inventory rather than adding features:
   bootstrap policy, notification transport and unresolved import-correction rules.
