@@ -146,6 +146,7 @@ scripts output counts and mismatch counts, not names, IDs, notes, or balances.
 - [Product decisions](PRODUCT.md)
 - [Domain glossary](CONTEXT.md)
 - [Design system](DESIGN.md)
-- [Implementation plan](docs/implementation-plan.md)
+- [SvelteKit rewrite plan](docs/sveltekit-migration.md)
+- [Original local implementation plan](docs/implementation-plan.md)
 - [Validation evidence](docs/validation.md)
 - [Template and route contract](templates/README.md)
