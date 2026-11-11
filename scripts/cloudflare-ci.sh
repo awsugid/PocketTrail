@@ -42,6 +42,14 @@ if [ "$mode" = build ]; then
     rustup default stable
     rustup target add wasm32-unknown-unknown
     cargo install worker-build --version 0.8.7 --locked
+    # Cloudflare's asdf Python may omit _sqlite3; use distro Python when needed.
+    if ! python3 -c 'import sqlite3' 2>/dev/null; then
+        /usr/bin/python3 -c 'import sqlite3'
+        python_bin=$(mktemp -d)
+        trap 'rm -rf "${download:-}" "$python_bin"' EXIT HUP INT TERM
+        ln -s /usr/bin/python3 "$python_bin/python3"
+        export PATH="$python_bin:$PATH"
+    fi
     npm test
     npm run build
 else

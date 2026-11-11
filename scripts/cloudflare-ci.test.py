@@ -40,6 +40,16 @@ printf '%s %s\\n' "$(basename "$0")" "$*" >> "$LOG"
     assert code == 0, commands
     assert commands == ['rustup default stable', 'rustup target add wasm32-unknown-unknown',
                         'cargo install worker-build --version 0.8.7 --locked', 'npm test', 'npm run build']
+    # Reproduce Cloudflare's Python missing _sqlite3; npm must see working Python.
+    broken_python = bin_dir / 'python3'
+    broken_python.write_text('#!/bin/sh\necho "ModuleNotFoundError: No module named _sqlite3" >&2\nexit 1\n')
+    broken_python.chmod(0o755)
+    npm = bin_dir / 'npm'
+    npm.write_text(npm.read_text().replace(
+        'set -eu\n', 'set -eu\npython3 -c "import sqlite3"\n', 1))
+    code, commands = run('build')
+    assert code == 0 and commands[-2:] == ['npm test', 'npm run build'], commands
+    broken_python.unlink()
     assert run('deploy') == (0, ['npm run deploy'])
     code, commands = run('build', 'npm test')
     assert code != 0 and commands[-1] == 'npm test' and 'npm run build' not in commands
