@@ -127,6 +127,11 @@ Context: `batch {id, created_at, by_name, counts{...}}`, `items [{bank_id,
 status, counterparty, counterparty_display?, amount_minor, message?, transaction_id?}]` with `status`
 ∈ `imported|duplicate_unchanged|conflict|needs_review`.
 
+The import preview additionally carries `owner_required` (the batch's pocket
+has no active owner) and `ready`/`can_confirm`; an owner-required preview
+renders a warning linking to `/org/{org}/settings#pockets` and stays
+unconfirmable.
+
 ### inventory.html — GET /org/{org}/inventory
 
 Context: `items [{id, name, variant?, levels [{location_name, qty}],
@@ -169,7 +174,7 @@ POST endpoints (all under `/org/{org}/…`, forms rendered only when
 | `/settings/members/{id}/role` | `role_id` |
 | `/settings/members/{id}/remove` | — |
 | `/settings/pockets` | `name`, `opening_balance`, `owner_membership_id` (optional; empty = active organization creator) |
-| `/settings/pockets/{id}/owner` | `owner_membership_id` (empty = organization creator) |
+| `/settings/pockets/{id}/owner` | `owner_membership_id` (active member; required — the server rejects clearing) |
 | `/settings/mappings` | `pocket_id`, `pattern`, `member_id` |
 | `/settings/mappings/{id}/delete` | — |
 | `/settings/income-role` | `income_explanation_role_id` (empty clears; all active role members are notified about incoming funds, pocket owner fallback) |

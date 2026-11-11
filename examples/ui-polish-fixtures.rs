@@ -93,6 +93,9 @@ fn main() {
         "bank_id":"SYNTHETIC-REF_2026-01-01_COMPLETE","date":"2026-01-01",
         "amount_minor":-1500000000_i64,"status":"imported"
     }]);
+    preview["owner_required"] = json!(true);
+    preview["ready"] = json!(false);
+    preview["can_confirm"] = json!(true);
     pages.insert(
         "import-preview".into(),
         json!(render("import_preview", &preview).unwrap()),

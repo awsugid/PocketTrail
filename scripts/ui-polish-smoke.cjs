@@ -153,6 +153,10 @@ const pages = JSON.parse(execFileSync('cargo', ['run', '--quiet', '--example', '
           assert.equal(await page.locator('td strong').textContent(), 'Synthetic name / Other name');
           assert(await page.getByText('Jago 000123456789', { exact: true }).isVisible());
           assert(await page.getByText('SYNTHETIC-REF_2026-01-01_COMPLETE', { exact: true }).isVisible());
+          assert(await page.getByText('has no active owner', { exact: false }).first().isVisible(),
+            'Missing pocket owner explains the blocked confirmation');
+          assert(await page.locator('a[href$="/settings#pockets"]').isVisible(), 'Recovery links to pocket settings');
+          assert.equal(await page.locator('form[action$="/confirm"]').count(), 0, 'Ownerless preview stays unconfirmable');
         }
         if (name === 'import') {
           assert.equal(await page.locator('.page-head .page-head__sub').count(), 0, 'No long header intro');

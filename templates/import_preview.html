@@ -85,6 +85,9 @@
       <p class="hint" style="margin-top: 8px;">Creates the {{ batch.counts.imported or 0 }} new transactions above and links them to this batch. Until then nothing is recorded. Notifications are only sent after a confirmed import, and never while this organization has notifications disabled.</p>
     </form>
     {% else %}
+    {% if owner_required %}
+    <div class="notice notice--warning">The pocket of this statement import has no active owner, so its imports cannot be confirmed. Choose an active owner for the pocket in <a href="/org/{{ org.slug }}/settings#pockets">Settings · Manage pockets</a>, then run the import again.</div>
+    {% endif %}
     <p class="hint">This preview cannot be confirmed yet. Resolve the flagged rows above — fix the extraction and re-run the import, add missing actor mappings in Settings, or leave conflicts for review — then import again. A re-import classifies every row against the pocket's current transactions.</p>
     {% endif %}
   {% else %}

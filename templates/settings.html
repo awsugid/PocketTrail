@@ -46,7 +46,7 @@
     {% if can.mappings %}<a class="btn btn--small" href="#pockets" data-dialog-open="pockets">Manage pockets</a>{% endif %}
   </header>
   {% for pocket in pockets %}
-  <div class="settings-config__row"><strong>{{ pocket.name }}</strong><span class="cell__sub">Opening balance <span class="cell--num">{{ pocket.opening_balance_minor | money }}</span></span><span class="cell__sub">Owner: {{ pocket.owner_name or "organization creator" }}</span></div>
+  <div class="settings-config__row"><strong>{{ pocket.name }}</strong><span class="cell__sub">Opening balance <span class="cell--num">{{ pocket.opening_balance_minor | money }}</span></span><span class="cell__sub">Owner: {% if pocket.owner_name %}{{ pocket.owner_name }}{% else %}Not set — choose an active owner{% endif %}</span></div>
   {% else %}<p class="hint">No pockets yet.</p>{% endfor %}
 </section>
 
@@ -352,8 +352,7 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="form-actions" style="margin: 0;">
       <label for="pocket-owner-{{ pocket.id }}">Owner of {{ pocket.name }}</label>
-      <select class="select" id="pocket-owner-{{ pocket.id }}" name="owner_membership_id" style="min-width: 200px;">
-        <option value=""{% if not pocket.owner_membership_id %} selected{% endif %}>Organization creator (default)</option>
+      <select class="select" id="pocket-owner-{{ pocket.id }}" name="owner_membership_id" required style="min-width: 200px;">
         {% if members %}{% for m in members %}{% if m.active %}
         <option value="{{ m.id }}"{% if pocket.owner_membership_id == m.id %} selected{% endif %}>{{ m.name }}</option>
         {% endif %}{% endfor %}{% endif %}

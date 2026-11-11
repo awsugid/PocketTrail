@@ -46,7 +46,7 @@ const pages = JSON.parse(execFileSync('cargo', ['run', '--quiet', '--example', '
       await page.goto('http://pockettrail.test/settings-populated');
       for (const text of ['View transactions', 'No permissions · no access', 'Former member',
         'No role', 'Community pocket', 'Main Pocket', '2026-01-01', '3 pending items', 'Synthetic reminder',
-        'Owner: Synthetic organizer', 'Owner: organization creator', 'Income routing', 'Organizer']) {
+        'Owner: Synthetic organizer', 'Owner: Not set — choose an active owner', 'Income routing', 'Organizer']) {
         assert(await page.locator('.settings-config').getByText(text, { exact: false }).first().isVisible(), text);
       }
       assert.equal(await page.locator('dialog:visible').count(), 0);
@@ -107,7 +107,8 @@ const pages = JSON.parse(execFileSync('cargo', ['run', '--quiet', '--example', '
     await page.locator('[data-dialog-open="pockets"]').click();
     assert.equal(await page.locator('#pocket-owner').inputValue(), '', 'Add-pocket owner defaults to organization creator');
     assert.equal(await page.locator('#pocket-owner-1').inputValue(), '1');
-    assert.equal(await page.locator('#pocket-owner-2').inputValue(), '');
+    assert.equal(await page.locator('#pocket-owner-2').inputValue(), '1', 'Ownerless pocket prompts for an active owner (no empty option)');
+    assert.equal(await page.locator('#pocket-owner-2 option[value=""]').count(), 0, 'Clearing an owner is not offered');
     for (const form of await page.locator('#pockets-dialog form[action$="/owner"]').all()) {
       assert(/\/settings\/pockets\/\d+\/owner$/.test(await form.getAttribute('action')));
       const names = await form.evaluate(el =>
