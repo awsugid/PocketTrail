@@ -152,6 +152,35 @@ idempotence. Preserve schema and R2 object identifiers.
 Exit: parity tests pass; private parser validation reports aggregate mismatches
 only. No real statement content enters source control or external AI services.
 
+Backend review adds these explicit phase-2 acceptance gates:
+
+- Preserve D1 batch atomicity, revision/mutation-token winner probes and
+  token-gated success audits. Trigger-inflated affected-row counts cannot prove
+  a transaction mutation won. Test concurrent losers write no child/audit rows.
+- Keep append-only audit, notification cancellation/snapshot, invitation and
+  active pocket-owner/mapping triggers. Inventory-level scope comes through
+  item/location joins, not an org_id column on the level itself.
+- Persisted pending status derives draft versus submitted from documentation
+  completeness. Keep domain decisions, ledger filters and outbox eligibility in
+  agreement; exercise all three against the same cases.
+- Quarantine every occurrence of a repeated bank ID within one statement. Keep
+  import confirmation idempotent and stage/confirm winner checks atomic. Retain
+  payload pointers, original PDFs, existing R2 keys and bounded import chunking.
+- Exercise income-recipient exceptions separately: scoped notes/documents access
+  must not become general ledger access, expense editing or approval authority.
+- Preserve notification cancellation and read-time eligibility checks, not only
+  enqueue-time gates. Date cutoff applies to assignment/digest, not mentions;
+  organization disablement and transaction suppression still block mentions.
+- Choose session-cookie compatibility or explicit forced re-login. Preserve
+  verified Google claims, login nonce, session-bound CSRF and invitation token
+  hashing/redaction. Invitation email is distinct from financial notifications:
+  keep delivery disabled locally and document any deferred transport replacement.
+- Carry over Jakarta date/time semantics, exact decimal parsing and existing
+  safe monetary limits; check intermediate sums as well as individual values.
+- Existing validation records a 10-PDF/552-row comparison. Reproduce its aggregate
+  result if those authorized private fixtures remain available; otherwise mark
+  that gate unverified, never replace it with synthetic evidence.
+
 ### 3. Deliver complete journeys
 
 Order: authentication/organization context; pockets and assignment setup; import
