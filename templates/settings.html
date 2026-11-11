@@ -43,10 +43,10 @@
 <section class="panel" aria-labelledby="pockets-config-title">
   <header class="settings-config__head">
     <h2 class="panel__title" id="pockets-config-title">Pockets</h2>
-    {% if can.mappings %}<a class="btn btn--small" href="#pockets" data-dialog-open="pockets">Add pocket</a>{% endif %}
+    {% if can.mappings %}<a class="btn btn--small" href="#pockets" data-dialog-open="pockets">Manage pockets</a>{% endif %}
   </header>
   {% for pocket in pockets %}
-  <div class="settings-config__row"><strong>{{ pocket.name }}</strong><span class="cell__sub">Opening balance <span class="cell--num">{{ pocket.opening_balance_minor | money }}</span></span></div>
+  <div class="settings-config__row"><strong>{{ pocket.name }}</strong><span class="cell__sub">Opening balance <span class="cell--num">{{ pocket.opening_balance_minor | money }}</span></span><span class="cell__sub">Owner: {{ pocket.owner_name or "organization creator" }}</span></div>
   {% else %}<p class="hint">No pockets yet.</p>{% endfor %}
 </section>
 
@@ -56,8 +56,26 @@
     {% if can.mappings %}<a class="btn btn--small" href="#mappings" data-dialog-open="mappings">Manage mappings</a>{% endif %}
   </header>
   {% for mp in mappings %}
-  <div class="settings-config__row"><strong>{{ mp.pattern }}</strong><span class="cell__sub">Responsible: {{ mp.member_name or "Unassigned" }}</span></div>
+  <div class="settings-config__row"><strong>{{ mp.pattern }}</strong><span class="cell__sub">Responsible: {{ mp.member_name or "Unassigned" }}</span><span class="cell__sub">Pocket: {% if mp.pocket_id %}{% for p in pockets %}{% if p.id == mp.pocket_id %}{{ p.name }}{% endif %}{% endfor %}{% else %}—{% endif %}</span></div>
   {% else %}<p class="hint">No mappings yet. Unknown counterparties stay unassigned.</p>{% endfor %}
+</section>
+
+<section class="panel" aria-labelledby="income-config-title">
+  <header class="settings-config__head">
+    <h2 class="panel__title" id="income-config-title">Income routing</h2>
+    {% if can.roles %}<a class="btn btn--small" href="#income" data-dialog-open="income">Edit income routing</a>{% endif %}
+  </header>
+  {% if income_explanation_role_id %}
+  {% set income_role = namespace(name="") %}
+  {% for r in roles %}{% if r.id == income_explanation_role_id %}{% set income_role.name = r.name %}{% endif %}{% endfor %}
+  {% if income_role.name %}
+  <div class="settings-config__row"><strong>{{ income_role.name }}</strong><span class="cell__sub">All active members of this role are notified about incoming funds; the pocket owner is the fallback.</span></div>
+  {% else %}
+  <div class="settings-config__row"><strong>No responsibility role</strong><span class="cell__sub">The pocket owner is notified about incoming funds.</span></div>
+  {% endif %}
+  {% else %}
+  <div class="settings-config__row"><strong>No responsibility role</strong><span class="cell__sub">The pocket owner is notified about incoming funds.</span></div>
+  {% endif %}
 </section>
 
 <section class="panel settings-config__wide" aria-labelledby="notifications-config-title">
@@ -299,7 +317,7 @@
 {% if can.mappings %}
 <section class="panel" id="pockets" data-dialog-panel aria-labelledby="pockets-heading">
   <header>
-  <h2 class="panel__title" id="pockets-heading">Add pocket</h2>
+  <h2 class="panel__title" id="pockets-heading">Manage pockets</h2>
   </header>
   <div>
   {% if can.mappings %}
@@ -314,9 +332,37 @@
         <label for="pocket-opening">Opening balance (IDR)</label>
         <input class="input" id="pocket-opening" name="opening_balance" type="number" step="0.01" value="0" required>
       </div>
+      <div class="field">
+        <label for="pocket-owner">Owner</label>
+        <select class="select" id="pocket-owner" name="owner_membership_id">
+          <option value="" selected>Organization creator (default)</option>
+          {% if members %}{% for m in members %}{% if m.active %}
+          <option value="{{ m.id }}">{{ m.name }}</option>
+          {% endif %}{% endfor %}{% endif %}
+        </select>
+        <p class="hint">The pocket owner is notified about incoming funds when no income responsibility role covers them.</p>
+      </div>
     </div>
     <button class="btn" type="submit">Add pocket</button>
   </form>
+  {% if pockets %}
+  <h3>Pocket owners</h3>
+  {% for pocket in pockets %}
+  <form method="post" action="/org/{{ org.slug }}/settings/pockets/{{ pocket.id }}/owner" class="field" style="margin-top: 14px;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-actions" style="margin: 0;">
+      <label for="pocket-owner-{{ pocket.id }}">Owner of {{ pocket.name }}</label>
+      <select class="select" id="pocket-owner-{{ pocket.id }}" name="owner_membership_id" style="min-width: 200px;">
+        <option value=""{% if not pocket.owner_membership_id %} selected{% endif %}>Organization creator (default)</option>
+        {% if members %}{% for m in members %}{% if m.active %}
+        <option value="{{ m.id }}"{% if pocket.owner_membership_id == m.id %} selected{% endif %}>{{ m.name }}</option>
+        {% endif %}{% endfor %}{% endif %}
+      </select>
+      <button class="btn btn--small" type="submit" aria-label="Save owner for {{ pocket.name }}">Save owner</button>
+    </div>
+  </form>
+  {% endfor %}
+  {% endif %}
   {% endif %}
 </div>
 </section>
@@ -332,6 +378,7 @@
     <table class="table">
       <thead>
         <tr>
+          <th scope="col">Pocket</th>
           <th scope="col">Statement label</th>
           <th scope="col">Responsible member</th>
           {% if can.mappings %}<th scope="col"><span class="visually-hidden">Actions</span></th>{% endif %}
@@ -340,6 +387,7 @@
       <tbody>
         {% for mp in mappings %}
         <tr>
+          <td>{% if mp.pocket_id %}{% for p in pockets %}{% if p.id == mp.pocket_id %}{{ p.name }}{% endif %}{% endfor %}{% else %}—{% endif %}</td>
           <td class="cell--mono">{{ mp.pattern }}</td>
           <td>{{ mp.member_name or "—" }}</td>
           {% if can.mappings %}
@@ -366,8 +414,18 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="form-grid">
       <div class="field">
+        <label for="mapping-pocket">Pocket <span class="req" aria-hidden="true">*</span></label>
+        <select class="select" id="mapping-pocket" name="pocket_id" required>
+          {% if pockets %}{% for p in pockets %}
+          <option value="{{ p.id }}" data-imported-labels="[{% for label in p.imported_labels or [] %}{% if not loop.first %},{% endif %}{{ '"' }}{{ label }}{{ '"' }}{% endfor %}]">{{ p.name }}</option>
+          {% endfor %}{% endif %}
+        </select>
+        <p class="hint">Statement labels are matched against this pocket's imports.</p>
+      </div>
+      <div class="field">
         <label for="mapping-pattern">Statement label <span class="req" aria-hidden="true">*</span></label>
-        <input class="input" id="mapping-pattern" name="pattern" required placeholder="e.g. Main Pocket">
+        <input class="input" id="mapping-pattern" name="pattern" required maxlength="300" placeholder="e.g. Main Pocket" autocomplete="off" data-combobox data-combobox-source="#mapping-pocket">
+        <p class="hint">Suggestions come from labels already imported for the chosen pocket. Any label is accepted, and several labels can map to the same member.</p>
       </div>
       <div class="field">
         <label for="mapping-member">Responsible member <span class="req" aria-hidden="true">*</span></label>
@@ -388,6 +446,31 @@
 </div>
 </section>
 
+{% endif %}
+{% if can.roles %}
+<section class="panel" id="income" data-dialog-panel aria-labelledby="income-heading">
+  <header>
+  <h2 class="panel__title" id="income-heading">Edit income routing</h2>
+  </header>
+  <div>
+  <form method="post" action="/org/{{ org.slug }}/settings/income-role">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field">
+      <label for="income-role">Income responsibility role</label>
+      <select class="select" id="income-role" name="income_explanation_role_id">
+        <option value=""{% if not income_explanation_role_id %} selected{% endif %}>No role — the pocket owner is notified</option>
+        {% if roles %}{% for r in roles %}
+        <option value="{{ r.id }}"{% if income_explanation_role_id == r.id %} selected{% endif %}>{{ r.name }}</option>
+        {% endfor %}{% endif %}
+      </select>
+      <p class="hint">When a payment arrives, all active members of this role are notified to explain it. With no role, the pocket owner is notified instead.</p>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn--primary" type="submit">Save income routing</button>
+    </div>
+  </form>
+</div>
+</section>
 {% endif %}
 {% if can.notifications %}
 <section class="panel" id="notifications" data-dialog-panel aria-labelledby="notifications-heading">

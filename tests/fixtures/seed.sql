@@ -23,13 +23,17 @@ INSERT INTO memberships (id, org_id, user_id, role_id, handle, created_at) VALUE
   (2, 1, 'bob', 2, 'bob', 0),
   (3, 2, 'bob', 5, 'bob', 0);
 
-INSERT INTO pockets (id, org_id, name, opening_balance_minor) VALUES
-  (1, 1, 'Main Pocket (demo)', 0),
-  (2, 2, 'Indonesia Pocket (demo)', 0);
+-- Explicit synthetic creators, not inferred from membership ordering.
+UPDATE organizations SET creator_membership_id=1 WHERE id=1;
+UPDATE organizations SET creator_membership_id=3 WHERE id=2;
 
-INSERT INTO actor_mappings (org_id, pattern, membership_id, created_by_membership_id, created_at) VALUES
-  (1, 'Main Pocket (demo)', 1, 1, 0),
-  (1, 'Demo Coffee Supplier', 2, 1, 0);
+INSERT INTO pockets (id, org_id, name, opening_balance_minor, owner_membership_id) VALUES
+  (1, 1, 'Main Pocket (demo)', 0, 1),
+  (2, 2, 'Indonesia Pocket (demo)', 0, 3);
+
+INSERT INTO actor_mappings (org_id, pocket_id, pattern, membership_id, created_by_membership_id, created_at) VALUES
+  (1, 1, 'Main Pocket (demo)', 1, 1, 0),
+  (1, 1, 'Demo Coffee Supplier', 2, 1, 0);
 
 INSERT INTO transactions
   (id, org_id, pocket_id, bank_id, txn_date, txn_time, counterparty, transaction_type,

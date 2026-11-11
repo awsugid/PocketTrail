@@ -45,11 +45,17 @@ fn main() {
             "handle":"former","role_id":null,"active":false}
     ]);
     settings["pockets"] = json!([
-        {"id":1,"name":"Community pocket","opening_balance_minor":2500000000_i64}
+        {"id":1,"name":"Community pocket","opening_balance_minor":2500000000_i64,
+            "owner_membership_id":1,"owner_name":"Synthetic organizer",
+            "imported_labels":["Main Pocket","Community pocket","DEMO Supplier"]},
+        {"id":2,"name":"Operations pocket","opening_balance_minor":0,
+            "owner_membership_id":null,"owner_name":null,"imported_labels":[]}
     ]);
     settings["mappings"] = json!([
-        {"id":1,"pattern":"Main Pocket","member_name":"Synthetic organizer","member_id":1}
+        {"id":1,"pattern":"Main Pocket","member_id":1,"member_name":"Synthetic organizer","pocket_id":1},
+        {"id":2,"pattern":"Community pocket","member_id":1,"member_name":"Synthetic organizer","pocket_id":1}
     ]);
+    settings["income_explanation_role_id"] = json!(1);
     settings["notifications"] = json!({"enabled":false,"cutoff_date":"2026-01-01"});
     settings["notification_preview_cutoff"] = json!("2026-01-01");
     settings["preview_token"] = json!("synthetic-cutoff-token");
@@ -131,6 +137,31 @@ fn main() {
     pages.insert(
         "transaction-empty".into(),
         json!(render("transaction", &detail).unwrap()),
+    );
+    let mut income = context.clone();
+    income["txn"] = json!({
+        "id":4,"date":"2026-01-04","time":"09:30","counterparty":"DEMO Sponsor Payment",
+        "transaction_type":"Transfer","amount_minor":500000000_i64,"balance_minor":3000000000_i64,
+        "pocket_name":"Community pocket","bank_id":"SYNTHETIC-REF_2026-01-04_INCOME",
+        "notes":"DEMO: sponsor transfer","status":"pending","explanation":"",
+        "responsible_name":null,"suppressed":false,"revision":1,
+        "is_income":true,"income_complete":false
+    });
+    income["splits"] = json!([]);
+    income["evidence"] = json!([]);
+    income["comments"] = json!([]);
+    income["can"] = json!({"income_notes":true,"upload":true,"comment":true,
+        "edit":false,"approve":false,"request_changes":false,"submit":false,"suppress":false});
+    pages.insert(
+        "transaction-income".into(),
+        json!(render("transaction", &income).unwrap()),
+    );
+    income["txn"]["explanation"] =
+        json!("DEMO: quarterly sponsor payment covering the June meetup venue.");
+    income["txn"]["income_complete"] = json!(true);
+    pages.insert(
+        "transaction-income-complete".into(),
+        json!(render("transaction", &income).unwrap()),
     );
     println!("{}", serde_json::Value::Object(pages));
 }

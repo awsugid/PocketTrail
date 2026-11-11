@@ -44,6 +44,33 @@ pub fn documentation_owed(status_row: &str, complete: bool) -> bool {
     )
 }
 
+/// Income needs member-authored notes only; bank notes and attachments are context.
+pub fn income_complete(explanation: &str) -> bool {
+    !explanation.trim().is_empty()
+}
+
+/// Resolve against current membership on every request, never stored assignments.
+pub fn income_recipients(
+    role: Option<i64>,
+    owner: Option<i64>,
+    members: &[(i64, i64, bool)],
+) -> Vec<i64> {
+    let recipients: Vec<_> = members
+        .iter()
+        .filter(|(_, r, active)| *active && Some(*r) == role)
+        .map(|(id, _, _)| *id)
+        .collect();
+    if recipients.is_empty() {
+        members
+            .iter()
+            .filter(|(id, _, active)| *active && Some(*id) == owner)
+            .map(|(id, _, _)| *id)
+            .collect()
+    } else {
+        recipients
+    }
+}
+
 pub fn perm_variant(p: Permission) -> &'static str {
     match p {
         Permission::ViewTransactions => "ViewTransactions",
@@ -132,6 +159,19 @@ mod tests {
         assert!(!documentation_owed("pending", true));
         assert!(documentation_owed("changes_requested", false));
         assert!(!documentation_owed("approved", true));
+    }
+
+    #[test]
+    fn income_tracks_current_role_members_and_owner() {
+        let members = [(1, 10, true), (2, 10, true), (3, 10, false), (4, 20, true)];
+        assert_eq!(income_recipients(Some(10), Some(4), &members), vec![1, 2]);
+        assert_eq!(income_recipients(Some(20), Some(1), &members), vec![4]);
+        assert_eq!(income_recipients(Some(30), Some(4), &members), vec![4]);
+        assert_eq!(income_recipients(None, Some(4), &members), vec![4]);
+        assert!(income_recipients(None, Some(3), &members).is_empty());
+        assert!(income_recipients(None, None, &members).is_empty());
+        assert!(!income_complete(" \n\t"));
+        assert!(income_complete("Member explanation"));
     }
 
     #[test]

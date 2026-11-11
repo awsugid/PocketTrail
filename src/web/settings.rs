@@ -43,12 +43,16 @@ pub async fn page(req: Request, ctx: RouteContext<App>) -> worker::Result<Respon
         .collect::<Vec<_>>());
     body["mappings"] =
         serde_json::json!(mappings.iter().map(|m|serde_json::json!({
-        "id":m.id,"pattern":m.pattern,"member_id":m.membership_id,"member_name":m.member_name
+        "id":m.id,"pocket_id":m.pocket_id,"pattern":m.pattern,"member_id":m.membership_id,"member_name":m.member_name
     })).collect::<Vec<_>>());
+    let labels = db::q_all::<serde_json::Value>(&g.app.db,"SELECT DISTINCT b.pocket_id,i.counterparty AS label FROM import_items i JOIN import_batches b ON b.id=i.batch_id WHERE b.org_id=?1 AND trim(i.counterparty)<>'' ORDER BY i.counterparty",vec![db::i(g.org.id)]).await?;
+    body["income_explanation_role_id"] = serde_json::json!(g.org.income_explanation_role_id);
     body["pockets"] = serde_json::json!(pockets
         .iter()
         .map(|p| serde_json::json!({
-            "id":p.id,"name":p.name,"opening_balance_minor":p.opening_balance_minor
+            "id":p.id,"name":p.name,"opening_balance_minor":p.opening_balance_minor,
+            "owner_membership_id":p.owner_membership_id,"owner_name":active_mem(&g.mems,p.owner_membership_id).map(|m|&m.name),
+            "imported_labels":labels.iter().filter(|v|v["pocket_id"].as_i64()==Some(p.id)).map(|v|v["label"].clone()).collect::<Vec<_>>()
         }))
         .collect::<Vec<_>>());
     body["notifications"] = serde_json::json!({
@@ -95,6 +99,8 @@ pub async fn page(req: Request, ctx: RouteContext<App>) -> worker::Result<Respon
             notifications_enabled: g.org.notifications_enabled,
             created_at: g.org.created_at,
             notification_revision: g.org.notification_revision,
+            creator_membership_id: g.org.creator_membership_id,
+            income_explanation_role_id: g.org.income_explanation_role_id,
         };
         let targets = notify::digest_targets(&g.app.db, &preview_org, &g.dom_org, &g.mems).await?;
         body["notification_preview"] = notify::preview_json(&targets);
@@ -177,29 +183,35 @@ async fn save_role(
     };
     match id {
         Some(id) => {
-            g.app.db.batch(vec![
-                g.app.db.prepare(
-                    "UPDATE roles SET name=?1,permissions=?2 WHERE id=?3 AND org_id=?4",
-                )
-                .bind(&[
-                    db::s(&name),
-                    db::s(&permissions),
-                    db::i(id),
-                    db::i(g.org.id),
-                ])?,
-                audit_changed("role.updated", format!("role:{id}"))?,
-            ])
-            .await?;
+            g.app
+                .db
+                .batch(vec![
+                    g.app
+                        .db
+                        .prepare(
+                            "UPDATE roles SET name=?1,permissions=?2 WHERE id=?3 AND org_id=?4",
+                        )
+                        .bind(&[
+                            db::s(&name),
+                            db::s(&permissions),
+                            db::i(id),
+                            db::i(g.org.id),
+                        ])?,
+                    audit_changed("role.updated", format!("role:{id}"))?,
+                ])
+                .await?;
         }
         None => {
-            g.app.db.batch(vec![
-                g.app.db.prepare(
-                    "INSERT INTO roles(org_id,name,permissions) VALUES(?1,?2,?3)",
-                )
-                .bind(&[db::i(g.org.id), db::s(&name), db::s(&permissions)])?,
-                audit("role.created", format!("role:{name}"))?,
-            ])
-            .await?;
+            g.app
+                .db
+                .batch(vec![
+                    g.app
+                        .db
+                        .prepare("INSERT INTO roles(org_id,name,permissions) VALUES(?1,?2,?3)")
+                        .bind(&[db::i(g.org.id), db::s(&name), db::s(&permissions)])?,
+                    audit("role.created", format!("role:{name}"))?,
+                ])
+                .await?;
         }
     }
     Ok(back(&g, "Role saved"))
@@ -294,20 +306,22 @@ pub async fn set_role(mut req: Request, ctx: RouteContext<App>) -> worker::Resul
     {
         return Ok(fail(400, "Choose a role belonging to this organization."));
     }
-    g.app.db.batch(vec![
-        g.app.db.prepare(
-            "UPDATE memberships SET role_id=?1 WHERE id=?2 AND org_id=?3",
-        )
-        .bind(&[db::i(role_id), db::i(id), db::i(g.org.id)])?,
-        audit::committed_if_changed(
-            &g.app.db,
-            Some(g.org.id),
-            &g.user.id,
-            "member.role_changed",
-            &format!("membership:{id}"),
-        )?,
-    ])
-    .await?;
+    g.app
+        .db
+        .batch(vec![
+            g.app
+                .db
+                .prepare("UPDATE memberships SET role_id=?1 WHERE id=?2 AND org_id=?3")
+                .bind(&[db::i(role_id), db::i(id), db::i(g.org.id)])?,
+            audit::committed_if_changed(
+                &g.app.db,
+                Some(g.org.id),
+                &g.user.id,
+                "member.role_changed",
+                &format!("membership:{id}"),
+            )?,
+        ])
+        .await?;
     Ok(back(&g, "Member role changed"))
 }
 
@@ -330,30 +344,47 @@ async fn set_membership_active(
     if !g.mems.iter().any(|m| m.id == id) {
         return Ok(fail(404, "Membership not found."));
     }
+    if !active
+        && pockets_of(&g.app.db, g.org.id)
+            .await?
+            .iter()
+            .any(|p| p.owner_membership_id == Some(id))
+    {
+        return Ok(fail(
+            400,
+            "Transfer pocket ownership before deactivating this member.",
+        ));
+    }
     if !active && id == g.me().id {
         return Ok(fail(
             400,
             "Ask another membership manager to remove your membership.",
         ));
     }
-    g.app.db.batch(vec![
-        g.app.db.prepare(
-            "UPDATE memberships SET removed_at=?1 WHERE id=?2 AND org_id=?3",
-        )
-        .bind(&[
-            db::opt_i((!active).then_some(db::now_ms())),
-            db::i(id),
-            db::i(g.org.id),
-        ])?,
-        audit::committed_if_changed(
-            &g.app.db,
-            Some(g.org.id),
-            &g.user.id,
-            if active { "member.restored" } else { "member.removed" },
-            &format!("membership:{id}"),
-        )?,
-    ])
-    .await?;
+    g.app
+        .db
+        .batch(vec![
+            g.app
+                .db
+                .prepare("UPDATE memberships SET removed_at=?1 WHERE id=?2 AND org_id=?3")
+                .bind(&[
+                    db::opt_i((!active).then_some(db::now_ms())),
+                    db::i(id),
+                    db::i(g.org.id),
+                ])?,
+            audit::committed_if_changed(
+                &g.app.db,
+                Some(g.org.id),
+                &g.user.id,
+                if active {
+                    "member.restored"
+                } else {
+                    "member.removed"
+                },
+                &format!("membership:{id}"),
+            )?,
+        ])
+        .await?;
     if !active {
         db::exec(&g.app.db,"UPDATE notification_outbox SET cancelled_at=?1 WHERE org_id=?2 AND to_membership_id=?3 AND cancelled_at IS NULL",
             vec![db::i(db::now_ms()),db::i(g.org.id),db::i(id)]).await?;
@@ -376,9 +407,18 @@ pub async fn add_mapping(mut req: Request, ctx: RouteContext<App>) -> worker::Re
     let form = try_resp!(form_post(&g, &mut req).await);
     let pattern = form_str(&form, "pattern")
         .unwrap_or_default()
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ");
+        .trim()
+        .to_string();
+    let pocket_id = form_str(&form, "pocket_id")
+        .and_then(|s| s.parse::<i64>().ok())
+        .unwrap_or(0);
+    if !pockets_of(&g.app.db, g.org.id)
+        .await?
+        .iter()
+        .any(|p| p.id == pocket_id)
+    {
+        return Ok(fail(400, "Choose a pocket in this organization."));
+    }
     let id = form_str(&form, "member_id").and_then(|s| s.parse::<i64>().ok());
     if pattern.is_empty() || pattern.len() > 300 || active_mem(&g.mems, id).is_none() {
         return Ok(fail(
@@ -386,11 +426,9 @@ pub async fn add_mapping(mut req: Request, ctx: RouteContext<App>) -> worker::Re
             "Supply a statement label and an active member of this organization.",
         ));
     }
-    if mappings_of(&g.app.db, g.org.id)
-        .await?
-        .iter()
-        .any(|m| m.pattern.eq_ignore_ascii_case(&pattern))
-    {
+    if mappings_of(&g.app.db, g.org.id).await?.iter().any(|m| {
+        m.pocket_id == pocket_id && m.pattern.trim().to_lowercase() == pattern.to_lowercase()
+    }) {
         return Ok(fail(
             400,
             "This label already has a mapping. Remove it before assigning another member.",
@@ -398,9 +436,9 @@ pub async fn add_mapping(mut req: Request, ctx: RouteContext<App>) -> worker::Re
     }
     g.app.db.batch(vec![
         g.app.db.prepare(
-            "INSERT INTO actor_mappings(org_id,pattern,membership_id,created_by_membership_id,created_at) VALUES(?1,?2,?3,?4,?5)",
+            "INSERT INTO actor_mappings(org_id,pattern,membership_id,created_by_membership_id,created_at,pocket_id) VALUES(?1,?2,?3,?4,?5,?6)",
         )
-        .bind(&[db::i(g.org.id),db::s(&pattern),db::i(id.unwrap()),db::i(g.me().id),db::i(db::now_ms())])?,
+        .bind(&[db::i(g.org.id),db::s(&pattern),db::i(id.unwrap()),db::i(g.me().id),db::i(db::now_ms()),db::i(pocket_id)])?,
         audit::committed(
             &g.app.db,
             Some(g.org.id),
@@ -424,20 +462,22 @@ pub async fn delete_mapping(mut req: Request, ctx: RouteContext<App>) -> worker:
         require_member(ctx.data.clone(), &req, &slug, Permission::ImportStatements).await
     );
     let _form = try_resp!(form_post(&g, &mut req).await);
-    g.app.db.batch(vec![
-        g.app.db.prepare(
-            "DELETE FROM actor_mappings WHERE id=?1 AND org_id=?2",
-        )
-        .bind(&[db::i(id), db::i(g.org.id)])?,
-        audit::committed_if_changed(
-            &g.app.db,
-            Some(g.org.id),
-            &g.user.id,
-            "mapping.deleted",
-            &format!("mapping:{id}"),
-        )?,
-    ])
-    .await?;
+    g.app
+        .db
+        .batch(vec![
+            g.app
+                .db
+                .prepare("DELETE FROM actor_mappings WHERE id=?1 AND org_id=?2")
+                .bind(&[db::i(id), db::i(g.org.id)])?,
+            audit::committed_if_changed(
+                &g.app.db,
+                Some(g.org.id),
+                &g.user.id,
+                "mapping.deleted",
+                &format!("mapping:{id}"),
+            )?,
+        ])
+        .await?;
     Ok(back(&g, "Mapping removed; historical assignments retained"))
 }
 
@@ -467,11 +507,18 @@ pub async fn add_pocket(mut req: Request, ctx: RouteContext<App>) -> worker::Res
     {
         return Ok(fail(400, "A pocket already uses that name."));
     }
+    let owner = form_str(&form, "owner_membership_id")
+        .filter(|s| !s.is_empty())
+        .map(|s| s.parse::<i64>().unwrap_or(0))
+        .or(g.org.creator_membership_id);
+    let Some(owner) = active_mem(&g.mems, owner) else {
+        return Ok(fail(400, "Choose an active pocket owner."));
+    };
     g.app.db.batch(vec![
         g.app.db.prepare(
-            "INSERT INTO pockets(org_id,name,opening_balance_minor) VALUES(?1,?2,?3)",
+            "INSERT INTO pockets(org_id,name,opening_balance_minor,owner_membership_id) VALUES(?1,?2,?3,?4)",
         )
-        .bind(&[db::i(g.org.id), db::s(&name), db::i(opening)])?,
+        .bind(&[db::i(g.org.id), db::s(&name), db::i(opening), db::i(owner.id)])?,
         audit::committed(
             &g.app.db,
             Some(g.org.id),
@@ -482,6 +529,88 @@ pub async fn add_pocket(mut req: Request, ctx: RouteContext<App>) -> worker::Res
     ])
     .await?;
     Ok(back(&g, "Pocket created"))
+}
+
+pub async fn set_pocket_owner(
+    mut req: Request,
+    ctx: RouteContext<App>,
+) -> worker::Result<Response> {
+    let slug = path_param(&ctx, "org");
+    let id = path_param(&ctx, "id").parse::<i64>().unwrap_or(0);
+    let g = try_resp!(
+        require_member(ctx.data.clone(), &req, &slug, Permission::ImportStatements).await
+    );
+    let form = try_resp!(form_post(&g, &mut req).await);
+    let owner = form_str(&form, "owner_membership_id").and_then(|s| s.parse::<i64>().ok());
+    let Some(owner) = active_mem(&g.mems, owner) else {
+        return Ok(fail(400, "Choose an active pocket owner."));
+    };
+    if !pockets_of(&g.app.db, g.org.id)
+        .await?
+        .iter()
+        .any(|p| p.id == id)
+    {
+        return Ok(fail(404, "Pocket not found."));
+    }
+    g.app
+        .db
+        .batch(vec![
+            g.app
+                .db
+                .prepare("UPDATE pockets SET owner_membership_id=?1 WHERE id=?2 AND org_id=?3")
+                .bind(&[db::i(owner.id), db::i(id), db::i(g.org.id)])?,
+            audit::committed_if_changed(
+                &g.app.db,
+                Some(g.org.id),
+                &g.user.id,
+                "pocket.owner_changed",
+                &format!("pocket:{id}"),
+            )?,
+        ])
+        .await?;
+    Ok(back(
+        &g,
+        "Pocket owner saved; historical assignments retained",
+    ))
+}
+
+pub async fn save_income_role(
+    mut req: Request,
+    ctx: RouteContext<App>,
+) -> worker::Result<Response> {
+    let slug = path_param(&ctx, "org");
+    let g = try_resp!(require_member(ctx.data.clone(), &req, &slug, Permission::ManageRoles).await);
+    let form = try_resp!(form_post(&g, &mut req).await);
+    let raw = form_str(&form, "income_explanation_role_id").unwrap_or_default();
+    let role = if raw.is_empty() {
+        None
+    } else {
+        Some(raw.parse::<i64>().unwrap_or(0))
+    };
+    if role.is_some_and(|id| {
+        !g.dom_org
+            .roles
+            .contains_key(&pockettrail_domain::RoleId::new(id.to_string()))
+    }) {
+        return Ok(fail(400, "Choose a role in this organization."));
+    }
+    g.app
+        .db
+        .batch(vec![
+            g.app
+                .db
+                .prepare("UPDATE organizations SET income_explanation_role_id=?1 WHERE id=?2")
+                .bind(&[db::opt_i(role), db::i(g.org.id)])?,
+            audit::committed_if_changed(
+                &g.app.db,
+                Some(g.org.id),
+                &g.user.id,
+                "income.role_changed",
+                &format!("organization:{}", g.org.id),
+            )?,
+        ])
+        .await?;
+    Ok(back(&g, "Income explanation role saved"))
 }
 
 pub async fn save_notifications(

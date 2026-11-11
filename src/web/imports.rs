@@ -122,8 +122,13 @@ const SAME: &str = "t.txn_date=json_extract(j.value,'$.date') AND t.txn_time IS 
 
 /// Build bounded JSON parameters, keeping each D1 value below its 2 MB limit.
 /// Duplicate IDs within the statement are all quarantined, not first-row-wins.
-async fn row_chunks(g: &Ctx, payload: &Payload) -> worker::Result<Vec<String>> {
+async fn row_chunks(g: &Ctx, pocket_id: i64, payload: &Payload) -> worker::Result<Vec<String>> {
     let mappings = mappings_of(&g.app.db, g.org.id).await?;
+    let owner = pockets_of(&g.app.db, g.org.id)
+        .await?
+        .into_iter()
+        .find(|p| p.id == pocket_id)
+        .and_then(|p| p.owner_membership_id);
     let mut seen = BTreeSet::new();
     let mut repeated = BTreeSet::new();
     for row in &payload.rows {
@@ -135,10 +140,14 @@ async fn row_chunks(g: &Ctx, payload: &Payload) -> worker::Result<Vec<String>> {
     let mut current = Vec::new();
     let mut size = 2;
     for row in &payload.rows {
-        let responsible = map_counterparty(&mappings, &row.counterparty)
-            .and_then(|m| active_mem(&g.mems, Some(m.membership_id)))
-            .filter(|m| m.org_id == g.org.id)
-            .map(|m| m.id);
+        let responsible = if row.amount_minor < 0 {
+            map_counterparty(&mappings, pocket_id, &row.counterparty)
+                .and_then(|m| active_mem(&g.mems, Some(m.membership_id)))
+                .or_else(|| active_mem(&g.mems, owner))
+                .map(|m| m.id)
+        } else {
+            None
+        };
         let mut value = serde_json::to_value(row)
             .map_err(|_| worker::Error::RustError("Import serialization failed".into()))?;
         value["responsible"] = json!(responsible);
@@ -186,7 +195,7 @@ fn stage_statements(
             statements.push(g.app.db.prepare(
                 "INSERT OR IGNORE INTO transactions(org_id,pocket_id,bank_id,txn_date,txn_time,counterparty,transaction_type,bank_notes,amount_minor,balance_minor,responsible_membership_id,import_batch_id,created_at,updated_at,mutation_token)
                  SELECT ?2,?4,json_extract(j.value,'$.bank_id'),json_extract(j.value,'$.date'),json_extract(j.value,'$.time'),json_extract(j.value,'$.counterparty'),json_extract(j.value,'$.transaction_type'),json_extract(j.value,'$.notes'),json_extract(j.value,'$.amount_minor'),json_extract(j.value,'$.balance_minor'),
-                 (SELECT id FROM memberships WHERE id=json_extract(j.value,'$.responsible') AND org_id=?2 AND removed_at IS NULL),?1,?6,?6,?3
+                 CASE WHEN json_extract(j.value,'$.amount_minor')<0 THEN COALESCE((SELECT id FROM memberships WHERE id=json_extract(j.value,'$.responsible') AND org_id=?2 AND removed_at IS NULL),(SELECT owner_membership_id FROM pockets WHERE id=?4 AND org_id=?2)) ELSE NULL END,?1,?6,?6,?3
                  FROM json_each(?5) j WHERE json_extract(j.value,'$.bank_id')<>'' AND json_extract(j.value,'$.repeated')=0
                  AND EXISTS(SELECT 1 FROM import_batches WHERE id=?1 AND org_id=?2 AND status=?3)"
             ).bind(&params)?);
@@ -291,7 +300,7 @@ pub async fn create(mut req: Request, ctx: RouteContext<App>) -> worker::Result<
     let original_key = format!("{root}/original.pdf");
     let payload_key = format!("{root}/payload.json");
     let pointer = json!({"r2_key":payload_key}).to_string();
-    let chunks = row_chunks(&g, &payload).await?;
+    let chunks = row_chunks(&g, pocket_id, &payload).await?;
     bucket.put(&original_key, bytes.clone()).execute().await?;
     bucket
         .put(
@@ -350,14 +359,24 @@ pub async fn batch_page(req: Request, ctx: RouteContext<App>) -> worker::Result<
     } else {
         None
     };
+    let owner = pockets_of(&g.app.db, g.org.id)
+        .await?
+        .into_iter()
+        .find(|p| p.id == batch.pocket_id)
+        .and_then(|p| p.owner_membership_id);
     let mappings = mappings_of(&g.app.db, g.org.id).await?;
     view["items"] = json!(items
         .iter()
         .enumerate()
         .map(|(index, it)| {
             let row = payload.as_ref().and_then(|p| p.rows.get(index));
-            let member = map_counterparty(&mappings, &it.counterparty)
-                .and_then(|m| active_mem(&g.mems, Some(m.membership_id)));
+            let member = if it.amount_minor.is_some_and(|v| v < 0) {
+                map_counterparty(&mappings, batch.pocket_id, &it.counterparty)
+                    .and_then(|m| active_mem(&g.mems, Some(m.membership_id)))
+                    .or_else(|| active_mem(&g.mems, owner))
+            } else {
+                None
+            };
             json!({"bank_id":it.bank_id,"transaction_id":it.transaction_id,
             "counterparty":it.counterparty,"amount_minor":it.amount_minor,
             "counterparty_display":pockettrail_jago_parser::counterparty_display(&it.counterparty),
@@ -371,7 +390,9 @@ pub async fn batch_page(req: Request, ctx: RouteContext<App>) -> worker::Result<
             || payload.rows.iter().any(|r| r.bank_id.trim().is_empty());
         view["warnings"] = json!(payload.warnings);
         view["blocking_warnings"] = json!(blocked);
-        view["ready"] = json!(!blocked && batch.status == "ready");
+        view["owner_required"] = json!(active_mem(&g.mems, owner).is_none());
+        view["ready"] =
+            json!(!blocked && batch.status == "ready" && active_mem(&g.mems, owner).is_some());
         view["can_confirm"] = json!(true);
     }
     Ok(page(
@@ -406,9 +427,12 @@ pub async fn confirm(mut req: Request, ctx: RouteContext<App>) -> worker::Result
     if !pockets_of(&g.app.db, g.org.id)
         .await?
         .iter()
-        .any(|p| p.id == batch.pocket_id)
+        .any(|p| p.id == batch.pocket_id && active_mem(&g.mems, p.owner_membership_id).is_some())
     {
-        return Ok(fail(409, "The staged pocket is no longer available."));
+        return Ok(fail(
+            409,
+            "Choose an active pocket owner before confirming this import.",
+        ));
     }
     let payload = load_payload(&g, &batch).await?;
     // No unsafe-import policy is authorized: every extraction warning blocks
@@ -420,9 +444,9 @@ pub async fn confirm(mut req: Request, ctx: RouteContext<App>) -> worker::Result
         return Ok(fail(409, "Resolve extraction warnings and missing IDs by re-extracting and importing again. Nothing was committed."));
     }
     let guard = format!("confirming:{}", token()?);
-    let chunks = row_chunks(&g, &payload).await?;
+    let chunks = row_chunks(&g, batch.pocket_id, &payload).await?;
     let cas = g.app.db.prepare(
-        "UPDATE import_batches SET status=?3 WHERE id=?1 AND org_id=?2 AND status='ready' AND EXISTS(SELECT 1 FROM pockets WHERE id=import_batches.pocket_id AND org_id=?2)"
+        "UPDATE import_batches SET status=?3 WHERE id=?1 AND org_id=?2 AND status='ready' AND EXISTS(SELECT 1 FROM pockets p JOIN memberships m ON m.id=p.owner_membership_id AND m.org_id=p.org_id AND m.removed_at IS NULL WHERE p.id=import_batches.pocket_id AND p.org_id=?2)"
     ).bind(&[i(id),i(g.org.id),s(&guard)])?;
     let mut statements = vec![cas];
     // Guarded by the unguessable status token and pushed BEFORE the staged

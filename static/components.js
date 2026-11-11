@@ -306,9 +306,141 @@
     };
     state.focus = focusDay;
   }
+  /* Free-text field with suggestion listbox (statement labels). The input
+     stays visible and remains the submitted value; suggestions come from the
+     selected pocket's imported labels and any text is accepted. */
+  function combobox(source) {
+    if (getComputedStyle(document.documentElement).getPropertyValue('--pt-components').trim() !== 'ready') return;
+    if (controls.has(source) || source.readOnly) return;
+    const cloned = source.closest('.pt-control');
+    if (cloned) { cloned.before(source); cloned.remove(); }
+    const wrap = make('span', 'pt-control');
+    const popup = make('div', 'pt-popover pt-options');
+    popup.id = `pt-popup-${++serial}`;
+    popup.popover = 'auto';
+    popup.setAttribute('role', 'listbox');
+    const labelIds = Array.from(source.labels || [], label => {
+      if (!label.id) label.id = `pt-label-${++serial}`;
+      return label.id;
+    });
+    if (labelIds.length) popup.setAttribute('aria-labelledby', labelIds.join(' '));
+    else popup.setAttribute('aria-label', source.getAttribute('aria-label') || 'Suggestions');
+    source.setAttribute('role', 'combobox');
+    source.setAttribute('aria-haspopup', 'listbox');
+    source.setAttribute('aria-expanded', 'false');
+    source.setAttribute('aria-controls', popup.id);
+    source.setAttribute('aria-autocomplete', 'list');
+    source.autocomplete = 'off';
+    source.before(wrap);
+    wrap.append(source, popup);
+    controls.set(source, true);
+    const selector = source.getAttribute('data-combobox-source');
+    const suggestions = () => {
+      const select = selector && document.querySelector(selector);
+      const option = select && select.selectedOptions && select.selectedOptions[0];
+      try { return JSON.parse(option?.getAttribute('data-imported-labels') || '[]'); }
+      catch (_) { return []; }
+    };
+    const position = () => {
+      const rect = source.getBoundingClientRect();
+      popup.style.width = `${Math.min(Math.max(rect.width, 180), innerWidth - 24)}px`;
+      popup.style.left = `${Math.max(12, Math.min(rect.left, innerWidth - popup.offsetWidth - 12))}px`;
+      popup.style.maxHeight = `${innerHeight - 24}px`;
+      const below = Math.max(0, innerHeight - 12 - rect.bottom - 6);
+      const above = Math.max(0, rect.top - 18);
+      const down = popup.offsetHeight <= below || below >= above;
+      popup.style.maxHeight = `${Math.max(1, down ? below : above)}px`;
+      popup.style.top = `${down ? rect.bottom + 6 : rect.top - popup.offsetHeight - 6}px`;
+    };
+    const items = () => Array.from(popup.querySelectorAll('[role="option"]'));
+    const setActive = index => {
+      const opts = items();
+      opts.forEach(el => el.classList.remove('pt-option--cursor'));
+      if (!opts.length) { source.removeAttribute('aria-activedescendant'); return; }
+      const next = opts[Math.max(0, Math.min(opts.length - 1, index))];
+      next.classList.add('pt-option--cursor');
+      source.setAttribute('aria-activedescendant', next.id);
+      next.scrollIntoView({ block: 'nearest' });
+    };
+    const close = () => {
+      if (popup.matches(':popover-open')) popup.hidePopover();
+      source.setAttribute('aria-expanded', 'false');
+    };
+    let committing = false;
+    const commit = value => {
+      committing = true;
+      source.value = value;
+      source.dispatchEvent(new Event('input', { bubbles: true }));
+      source.dispatchEvent(new Event('change', { bubbles: true }));
+      close();
+      committing = false;
+    };
+    const render = () => {
+      const query = source.value.trim().toLocaleLowerCase();
+      const labels = suggestions();
+      const matches = query ? labels.filter(label => label.toLocaleLowerCase().includes(query)) : labels;
+      popup.replaceChildren();
+      matches.forEach((label, index) => {
+        const item = make('div', 'pt-option', label);
+        item.id = `${popup.id}-opt-${index}`;
+        item.setAttribute('role', 'option');
+        item.setAttribute('aria-selected', String(label === source.value));
+        item.tabIndex = -1;
+        item.addEventListener('mousedown', event => event.preventDefault());
+        item.addEventListener('click', () => commit(label));
+        popup.append(item);
+      });
+      if (!matches.length) popup.append(make('p', 'pt-combobox-note', labels.length
+        ? 'No imported label matches. Any statement label is still accepted.'
+        : 'No imported labels for this pocket yet. Type any statement label.'));
+      source.removeAttribute('aria-activedescendant');
+    };
+    const open = () => {
+      if (committing || source.matches(':disabled')) return;
+      render();
+      if (!popup.matches(':popover-open')) popup.showPopover();
+      source.setAttribute('aria-expanded', 'true');
+      position();
+    };
+    source.addEventListener('input', open);
+    source.addEventListener('click', () => { if (!popup.matches(':popover-open')) open(); });
+    source.addEventListener('keydown', event => {
+      const isOpen = popup.matches(':popover-open');
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (!isOpen) { open(); setActive(event.key === 'ArrowDown' ? 0 : items().length - 1); return; }
+        const opts = items();
+        if (!opts.length) return;
+        const current = opts.findIndex(el => el.id === source.getAttribute('aria-activedescendant'));
+        setActive(current + (event.key === 'ArrowDown' ? 1 : -1));
+      } else if (event.key === 'Enter' && isOpen) {
+        event.preventDefault();
+        const id = source.getAttribute('aria-activedescendant');
+        const target = id && document.getElementById(id);
+        if (target) commit(target.textContent);
+        else close();
+      } else if (event.key === 'Escape' && isOpen) {
+        event.preventDefault();
+        close();
+      } else if (event.key === 'Tab') close();
+    });
+    popup.addEventListener('toggle', () => {
+      source.setAttribute('aria-expanded', String(popup.matches(':popover-open')));
+      if (!popup.matches(':popover-open')) source.removeAttribute('aria-activedescendant');
+    });
+    wrap.addEventListener('focusout', () => setTimeout(() => {
+      if (!wrap.contains(document.activeElement)) close();
+    }));
+    if (selector) {
+      const select = document.querySelector(selector);
+      select?.addEventListener('change', () => { if (popup.matches(':popover-open')) open(); });
+    }
+  }
   function initialize(root = document) {
     if (root.matches?.('select,input[type="date"]')) enhance(root);
+    if (root.matches?.('input[data-combobox]')) combobox(root);
     root.querySelectorAll?.('select,input[type="date"]').forEach(enhance);
+    root.querySelectorAll?.('input[data-combobox]').forEach(combobox);
   }
   document.addEventListener('load', event => {
     if (event.target.matches?.('link[rel="stylesheet"]')) initialize();

@@ -45,7 +45,8 @@ const pages = JSON.parse(execFileSync('cargo', ['run', '--quiet', '--example', '
       await page.setViewportSize({ width, height: 900 });
       await page.goto('http://pockettrail.test/settings-populated');
       for (const text of ['View transactions', 'No permissions · no access', 'Former member',
-        'No role', 'Community pocket', 'Main Pocket', '2026-01-01', '3 pending items', 'Synthetic reminder']) {
+        'No role', 'Community pocket', 'Main Pocket', '2026-01-01', '3 pending items', 'Synthetic reminder',
+        'Owner: Synthetic organizer', 'Owner: organization creator', 'Income routing', 'Organizer']) {
         assert(await page.locator('.settings-config').getByText(text, { exact: false }).first().isVisible(), text);
       }
       assert.equal(await page.locator('dialog:visible').count(), 0);
@@ -56,7 +57,7 @@ const pages = JSON.parse(execFileSync('cargo', ['run', '--quiet', '--example', '
         path: `${process.env.DELTA_SCRATCH_DIR}/settings-${width}.png`, fullPage: true,
       });
       const ids = await page.locator('.settings-config [data-dialog-open]').evaluateAll(nodes => nodes.map(n => n.dataset.dialogOpen));
-      assert.equal(ids.length, 5);
+      assert.equal(ids.length, 6);
       for (const id of ids) {
         const trigger = page.locator(`[data-dialog-open="${id}"]`);
         await trigger.click();
@@ -102,10 +103,67 @@ const pages = JSON.parse(execFileSync('cargo', ['run', '--quiet', '--example', '
     assert.equal(await page.locator('#cutoff').inputValue(), '2026-02-02');
     await uniqueIds(page);
     await page.keyboard.press('Escape');
+    // Pocket ownership: per-pocket owner forms with active-member selects.
+    await page.locator('[data-dialog-open="pockets"]').click();
+    assert.equal(await page.locator('#pocket-owner').inputValue(), '', 'Add-pocket owner defaults to organization creator');
+    assert.equal(await page.locator('#pocket-owner-1').inputValue(), '1');
+    assert.equal(await page.locator('#pocket-owner-2').inputValue(), '');
+    for (const form of await page.locator('#pockets-dialog form[action$="/owner"]').all()) {
+      assert(/\/settings\/pockets\/\d+\/owner$/.test(await form.getAttribute('action')));
+      const names = await form.evaluate(el =>
+        Array.from(el.elements).filter(el => el.name).map(el => el.name));
+      assert.deepEqual(names, ['csrf_token', 'owner_membership_id'], 'Owner forms carry only scope fields');
+    }
+    await uniqueIds(page);
+    await page.keyboard.press('Escape');
+    // Mapping form: pocket scope + searchable editable combobox on the statement label.
+    await page.locator('[data-dialog-open="mappings"]').click();
+    await page.locator('#mappings-dialog details.accordion summary').click();
+    const pattern = page.locator('#mapping-pattern');
+    assert.equal(await pattern.getAttribute('role'), 'combobox');
+    assert.equal(await pattern.getAttribute('aria-autocomplete'), 'list');
+    assert.equal(await pattern.getAttribute('maxlength'), '300');
+    const listbox = page.locator(`#${await pattern.getAttribute('aria-controls')}`);
+    assert.equal(await pattern.getAttribute('aria-expanded'), 'false');
+    await pattern.click();
+    assert.equal(await pattern.getAttribute('aria-expanded'), 'true');
+    assert.equal(await listbox.locator('.pt-option').count(), 3, 'Selected pocket supplies the suggestions');
+    await pattern.fill('comm');
+    assert.equal(await listbox.locator('.pt-option').count(), 1);
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    assert.equal(await pattern.inputValue(), 'Community pocket');
+    assert.equal(await pattern.getAttribute('aria-expanded'), 'false', 'Popover closed after commit');
+    await pattern.fill('Brand new label');
+    assert.equal(await pattern.inputValue(), 'Brand new label', 'Plain text accepted without suggestions');
+    await page.keyboard.press('Escape');
+    await page.locator('#mapping-pocket').evaluate(el => { el.value = '2'; el.dispatchEvent(new Event('change', { bubbles: true })); });
+    await pattern.click();
+    assert(await listbox.locator('.pt-combobox-note').isVisible(), 'Empty first-import pocket teaches instead of empty listbox');
+    await pattern.fill('');
+    await page.locator('#mapping-pocket').evaluate(el => { el.value = '1'; el.dispatchEvent(new Event('change', { bubbles: true })); });
+    await uniqueIds(page);
+    await page.keyboard.press('Escape');
+    assert(await pattern.evaluate(el => document.activeElement === el || el.contains(document.activeElement)), 'Mapping dialog closed to its own content');
+    await page.keyboard.press('Escape');
+    // Income routing: role selector posts the exact server contract.
+    await page.locator('[data-dialog-open="income"]').click();
+    assert(await page.locator('#income-dialog').evaluate(el => el.matches(':modal')));
+    assert.equal(await page.locator('#income-role').inputValue(), '1');
+    const incomeForm = page.locator('#income-dialog form');
+    assert.equal(await incomeForm.getAttribute('action'), '/org/demo/settings/income-role');
+    const incomeNames = await incomeForm.evaluate(el =>
+      Array.from(el.elements).filter(el => el.name).map(el => el.name));
+    assert.deepEqual(incomeNames, ['csrf_token', 'income_explanation_role_id']);
+    await page.locator('#income-role').evaluate(el => { el.value = ''; el.dispatchEvent(new Event('change', { bubbles: true })); });
+    assert.equal(await page.locator('#income-role').inputValue(), '', 'No-role option keeps pocket-owner fallback');
+    await page.locator('#income-role').evaluate(el => { el.value = '1'; el.dispatchEvent(new Event('change', { bubbles: true })); });
+    await uniqueIds(page);
+    await page.keyboard.press('Escape');
     await page.goto('http://pockettrail.test/settings-readonly');
     assert.equal(await page.locator('main [data-dialog-open], main form, main [data-dialog-panel]').count(), 0);
     for (const text of ['View transactions', 'Former member', 'Community pocket', 'Main Pocket', '2026-01-01',
-      'Requires notification management permission.']) {
+      'Requires notification management permission.', 'Owner: Synthetic organizer', 'Income routing', 'Organizer']) {
       assert(await page.locator('.settings-config').getByText(text, { exact: false }).first().isVisible(), text);
     }
     const fallback = await browser.newPage({ javaScriptEnabled: false, viewport: { width: 320, height: 900 } });
@@ -114,9 +172,21 @@ const pages = JSON.parse(execFileSync('cargo', ['run', '--quiet', '--example', '
     await fallback.locator('[data-dialog-open="pockets"]').click();
     assert.equal(new URL(fallback.url()).hash, '#pockets');
     assert(await fallback.locator('#pocket-name').isVisible());
+    assert(await fallback.locator('#pocket-owner').isVisible(), 'Owner selector works without JS');
     assert(await fallback.locator('.settings-config').getByText('View transactions').isVisible());
+    await fallback.goto('http://pockettrail.test/settings-populated#mappings');
+    await fallback.locator('#mappings details.accordion summary').click();
+    assert(await fallback.locator('#mapping-pocket').isVisible(), 'Pocket scope select works without JS');
+    const patternNoJs = fallback.locator('#mapping-pattern');
+    assert.equal(await patternNoJs.getAttribute('role'), null, 'Combobox degrades to a plain labeled input');
+    assert.equal(await patternNoJs.getAttribute('aria-expanded'), null);
+    await patternNoJs.fill('Main Pocket');
+    assert.equal(await patternNoJs.inputValue(), 'Main Pocket');
+    assert(await fallback.locator('#mapping-member').isVisible());
+    await fallback.goto('http://pockettrail.test/settings-populated#income');
+    assert(await fallback.locator('#income-role').isVisible(), 'Income role selector works without JS');
     await uniqueIds(fallback);
     assert.deepEqual(errors, []);
-    console.log('PASS Settings: compiled details-first templates, 1440/320/390/800 layouts/screenshots, five action-only dialogs, unique IDs, readonly configuration/no editors, CSRF/endpoints/revocation/restore/default no-role, actual HTMX cutoff preview GET/hash/reopen/token refresh, no-JS anchor forms. No POST/DB/mail/cloud.');
+    console.log('PASS Settings: compiled details-first templates, 1440/320/390/800 layouts/screenshots, six action-only dialogs, unique IDs, readonly configuration/no editors, pocket owners (per-pocket active-member selects), pocket-scoped statement-label combobox (filter/commit/free-text/empty-import note), income routing role contract, CSRF/endpoints/revocation/restore/default no-role, actual HTMX cutoff preview GET/hash/reopen/token refresh, no-JS anchor forms. No POST/DB/mail/cloud.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

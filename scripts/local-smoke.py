@@ -139,6 +139,10 @@ def fixture_database(root):
         "SELECT is_synthetic FROM organizations WHERE slug='demo-jakarta'"
     ).fetchone()
     if row == (1,):
+        owner = db.execute("SELECT owner_membership_id FROM pockets WHERE id=1 AND org_id=1").fetchone()
+        assert owner == (1,), "Synthetic Main Pocket must belong to Alice; use fresh migrated fixtures."
+        assert db.execute("SELECT creator_membership_id FROM organizations WHERE id=1").fetchone() == (1,)
+        assert db.execute("SELECT COUNT(*) FROM actor_mappings WHERE org_id=1 AND pocket_id=1").fetchone()[0] >= 2
         return db
     db.close()
     raise AssertionError(

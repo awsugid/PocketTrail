@@ -49,8 +49,22 @@ or constitute approval.
 _Avoid_: Reminder-only suppression, completion, or approval.
 
 **Pocket owner**:
-The person to whom pocket-label counterparties, such as Main Pocket, are mapped.
-_Avoid_: Organization owner, which implies a separate administrative role.
+An active organization member responsible for a pocket's unmapped expenses and
+income explanations when no active income-responsibility role members exist.
+_Avoid_: Bank account owner or organization owner; neither defines this responsibility.
+
+**Actor mapping**:
+A pocket-specific association between a statement source/destination label and
+an expense's responsible member. Multiple labels can identify the same member.
+_Avoid_: Bank account identity, which a label mapping does not establish.
+
+**Income-responsibility role**:
+The organization role whose active members share responsibility for explaining
+income; any one of those members can supply the explanation.
+
+**Income explanation**:
+Member-authored notes identifying incoming funds' sender or source, including an
+explanation when unknown. Supporting documents are optional; approval is not required.
 
 **Commitment fee**:
 A participant payment associated with an event ticket; its refund eligibility

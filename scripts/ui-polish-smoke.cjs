@@ -99,6 +99,7 @@ const pages = JSON.parse(execFileSync('cargo', ['run', '--quiet', '--example', '
         await page.evaluate(() => document.dispatchEvent(new Event('htmx:load')));
         const transaction = name.startsWith('transaction-') || name === 'transaction';
         const settings = name.startsWith('settings');
+        const income = transaction && name.includes('income');
         const panelIds = await page.locator('section[data-dialog-panel]').evaluateAll(panels => panels.map(panel => panel.id));
         if (transaction || (settings && name !== 'settings-readonly') || name === 'inventory') {
           assert(panelIds.length, `${name}: expected action dialogs`);
@@ -116,9 +117,29 @@ const pages = JSON.parse(execFileSync('cargo', ['run', '--quiet', '--example', '
             for (const id of ['bank-facts', 'purposes', 'documents', 'review', 'discussion']) {
               assert(await page.locator(`#${id}`).isVisible(), `${id} is visible without a click`);
             }
-            assert(await page.locator('#purposes').getByText('Synthetic venue and catering for the community meetup.', { exact: true }).isVisible());
-            assert(await page.locator('#discussion').getByText('Synthetic discussion. Does not change financial details.', { exact: true }).isVisible());
-            assert(await page.getByText('Synthetic review note: confirm the allocation.', { exact: true }).isVisible());
+            if (income) {
+              assert(await page.locator('.transaction-head__summary').getByText('Income', { exact: true }).isVisible(),
+                'Income transactions are labeled without review-status badges');
+              assert(await page.locator('.transaction-actions').getByText('income notes', { exact: false }).first().isVisible(),
+                'Routing notes action visible');
+              assert.equal(await page.locator('form[action$="/approve"], form[action$="/request-changes"], #edit-details').count(), 0,
+                'Income carries no approval or general-purpose editing');
+              const incomeNames = await page.locator('#income-notes form').evaluate(el =>
+                Array.from(el.elements).filter(el => el.name).map(el => el.name));
+              assert.deepEqual([...new Set(incomeNames)], ['csrf_token', 'revision', 'explanation'],
+                'Income notes form exposes only routing fields');
+              assert(await page.getByText('Documents are optional', { exact: false }).first().isVisible(),
+                'Documents stay optional for income');
+              if (name.endsWith('complete')) {
+                assert(await page.locator('#purposes').getByText('DEMO: quarterly sponsor payment covering the June meetup venue.', { exact: true }).isVisible());
+              } else {
+                assert(await page.locator('.transaction-head__summary').getByText('Notes needed').isVisible());
+              }
+            } else {
+              assert(await page.locator('#purposes').getByText('Synthetic venue and catering for the community meetup.', { exact: true }).isVisible());
+              assert(await page.locator('#discussion').getByText('Synthetic discussion. Does not change financial details.', { exact: true }).isVisible());
+              assert(await page.getByText('Synthetic review note: confirm the allocation.', { exact: true }).isVisible());
+            }
             assert.equal(await page.locator('form[action$="/approve"]').count(), 0, 'No self approval');
           }
         }
@@ -262,7 +283,9 @@ const pages = JSON.parse(execFileSync('cargo', ['run', '--quiet', '--example', '
         }
         if (transaction) {
           assert.equal(await page.locator('#bank-facts .bank-facts dt').count(), 9, 'Every bank fact stays on the overview');
-          assert.equal(await page.locator('#bank-facts dd.cell--mono').textContent(), 'SYNTHETIC-REF_2026-01-01_COMPLETE');
+          assert.equal(await page.locator('#bank-facts dd.cell--mono').textContent(),
+            name === 'transaction-income' || name === 'transaction-income-complete'
+              ? 'SYNTHETIC-REF_2026-01-04_INCOME' : 'SYNTHETIC-REF_2026-01-01_COMPLETE');
         }
         if (process.env.POCKETTRAIL_SCREENSHOTS) {
           await page.evaluate(() => {

@@ -9,18 +9,24 @@
   <p class="page-head__sub">{% if txn.counterparty_display and txn.counterparty_display.bank_account %}<span class="transaction-head__bank">{{ txn.counterparty_display.bank_account }}</span>{% endif %}{% if txn.date %}{{ txn.date }}{% if txn.time %} {{ txn.time }}{% endif %}{% endif %}{% if txn.transaction_type %} · {{ txn.transaction_type }}{% endif %}</p>
   <div class="transaction-head__summary">
     <strong class="transaction-head__amount">{{ txn.amount_minor | money }}</strong>
+    {% if txn.is_income %}
+    <span class="badge badge--neutral">Income</span>
+    {% if not txn.income_complete %}<span class="badge badge--needs">Notes needed</span>{% endif %}
+    {% else %}
     {% if txn.status == 'pending' %}<span class="badge badge--pending">Pending review</span>
     {% elif txn.status == 'approved' %}<span class="badge badge--approved">Approved</span>
     {% elif txn.status == 'changes_requested' %}<span class="badge badge--changes">Changes requested</span>
     {% else %}<span class="badge badge--neutral">{{ txn.status }}</span>{% endif %}
     {% if txn.needs_details %}<span class="badge badge--needs">Needs details</span>{% endif %}
+    {% endif %}
     {% if txn.suppressed %}<span class="badge badge--suppressed">Suppressed</span>{% endif %}
-    <span class="transaction-head__responsible">Responsible: {{ txn.responsible_name or "Unassigned" }}</span>
+    {% if not txn.is_income %}<span class="transaction-head__responsible">Responsible: {{ txn.responsible_name or "Unassigned" }}</span>{% endif %}
   </div>
 </div>
 
 <nav class="transaction-actions" aria-label="Transaction actions">
   {% if can.edit %}<a class="btn" href="#edit-details" data-dialog-open="edit-details">Edit details</a>{% endif %}
+  {% if can.income_notes %}<a class="btn" href="#income-notes" data-dialog-open="income-notes">{% if txn.income_complete %}Edit income notes{% else %}Add income notes{% endif %}</a>{% endif %}
   {% if can.upload %}<a class="btn" href="#upload-document" data-dialog-open="upload-document">Add document</a>{% endif %}
   {% if can.submit or can.approve or can.suppress %}<a class="btn" href="#review-actions" data-dialog-open="review-actions">Review actions</a>{% endif %}
   {% if can.comment %}<a class="btn" href="#add-comment" data-dialog-open="add-comment">Add comment</a>{% endif %}
@@ -41,11 +47,16 @@
     {% if txn.bank_id %}<div class="bank-facts__wide"><dt>Bank reference</dt><dd class="cell--mono">{{ txn.bank_id }}</dd></div>{% endif %}
     {% if txn.notes %}<div class="bank-facts__wide"><dt>Bank note</dt><dd>{{ txn.notes }}</dd></div>{% endif %}
     <div class="bank-facts__wide"><dt>Status</dt><dd>
+      {% if txn.is_income %}
+      <span class="badge badge--neutral">Income</span>
+      {% if not txn.income_complete %}<span class="badge badge--needs">Notes needed</span>{% endif %}
+      {% else %}
       {% if txn.status == 'pending' %}<span class="badge badge--pending">Pending review</span>
       {% elif txn.status == 'approved' %}<span class="badge badge--approved">Approved</span>
       {% elif txn.status == 'changes_requested' %}<span class="badge badge--changes">Changes requested</span>
       {% else %}<span class="badge badge--neutral">{{ txn.status }}</span>{% endif %}
       {% if txn.needs_details %}<span class="badge badge--needs">Needs details</span>{% endif %}
+      {% endif %}
       {% if txn.suppressed %}<span class="badge badge--suppressed">Suppressed</span>{% endif %}
     </dd></div>
   </dl>
@@ -53,14 +64,19 @@
 
 <section class="panel" id="purposes" aria-labelledby="purposes-title">
   <h2 class="panel__title" id="purposes-title">Explanation &amp; purposes</h2>
+  {% if txn.is_income %}
+  <p class="panel__sub">Notes explain the incoming funds. Supporting documents are optional, and no approval decision is required.</p>
+  {% if not txn.income_complete %}<div class="notice notice--warning">Add the required income notes. Documents are optional.</div>{% endif %}
+  {% else %}
   <p class="panel__sub">One movement can cover several purposes. Bank notes are context, not a substitute for the spender's explanation.</p>
   {% if txn.needs_details %}
   <div class="notice notice--warning">Complete the explanation, responsible member, and purposes. Spending also needs <a href="#documents">supporting documents</a> or a document-unavailable reason.</div>
   {% endif %}
-  {% if txn.responsible_inactive %}
+  {% endif %}
+  {% if not txn.is_income and txn.responsible_inactive %}
   <div class="notice notice--warning">The responsible member has left this organization. Historical attribution is retained. Reassign the documentation task or use authorized notification suppression in <a href="#review">Review &amp; approval</a>.</div>
   {% endif %}
-  {% if txn.explanation %}<p class="comment__body">{{ txn.explanation }}</p>{% else %}<p class="hint">No explanation recorded yet. The responsible member must supply one.</p>{% endif %}
+  {% if txn.explanation %}<p class="comment__body">{{ txn.explanation }}</p>{% elif txn.is_income %}<p class="hint">No income notes recorded yet.</p>{% else %}<p class="hint">No explanation recorded yet. The responsible member must supply one.</p>{% endif %}
   {% if splits %}
   <div class="table-scroll">
     <table class="table">
@@ -153,6 +169,25 @@
 </section>
   {% endif %}
 
+  {% if can.income_notes %}
+<section class="panel" id="income-notes" data-dialog-panel aria-labelledby="income-notes-title">
+  <h2 class="panel__title" id="income-notes-title">Income notes</h2>
+  <p class="panel__sub">Notes are required for incoming funds. Documents are optional, and no approval decision is required.</p>
+  <form method="post" action="/org/{{ org.slug }}/transactions/{{ txn.id }}/details">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="revision" value="{{ txn.revision }}">
+    <div class="field">
+      <label for="income-explanation">Income notes <span class="req" aria-hidden="true">*</span></label>
+      <textarea class="textarea" id="income-explanation" name="explanation" required placeholder="Where did these funds come from? Which event or program do they cover?">{{ txn.explanation }}</textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn--primary" type="submit">Save income notes</button>
+    </div>
+    <p class="hint">Only the notes change here. Documents are added separately under Documents.</p>
+  </form>
+</section>
+  {% endif %}
+
 
 <section class="panel" id="documents" aria-labelledby="documents-title">
   <h2 class="panel__title" id="documents-title">Documents</h2>
@@ -175,7 +210,11 @@
   </div>
   {% endfor %}
   {% else %}
+  {% if txn.is_income %}
+  <div class="notice notice--muted">No supporting documents. Documents are optional for income; add receipts or confirmations when available.</div>
+  {% else %}
   <div class="notice notice--warning">No supporting documents. Spending requires evidence, or an explicit document-unavailable explanation saved in <a href="#purposes">Explanation &amp; purposes</a>.</div>
+  {% endif %}
   {% endif %}
   {% if txn.evidence_unavailable_reason %}
   <dl class="facts"><dt>Document-unavailable reason</dt><dd>{{ txn.evidence_unavailable_reason }}</dd></dl>
@@ -207,16 +246,21 @@
 
 <section class="panel" id="review" aria-labelledby="review-title">
   <h2 class="panel__title" id="review-title">Review &amp; approval</h2>
+  {% if txn.is_income %}
+  <p class="panel__sub">Incoming funds record notes and optional documents. No independent approval decision is required.</p>
+  {% if not txn.income_complete %}<div class="notice notice--warning">Income notes are still required.</div>{% else %}<div class="notice notice--info">Income notes are recorded. Documents stay optional.</div>{% endif %}
+  {% else %}
   <p class="panel__sub">Approval covers the whole transaction, including every purpose. A member responsible for any part cannot approve it; without another eligible approver it stays pending.</p>
   <p>Check <a href="#purposes">Explanation &amp; purposes</a> and <a href="#documents">Documents</a> before recording a decision.</p>
-  {% if txn.status == 'changes_requested' %}
+  {% endif %}
+  {% if not txn.is_income %}{% if txn.status == 'changes_requested' %}
   <div class="notice notice--warning">Changes were requested. The transaction is back with the responsible member; saving details or evidence sends it for review again. Comments do not.</div>
   {% elif txn.status == 'approved' %}
   <div class="notice notice--info">Transaction approved. Changes to details or evidence require review again; discussion comments do not.</div>
   {% elif txn.status == 'pending' and txn.needs_details is defined and not txn.needs_details %}
   <div class="notice notice--info">Awaiting independent review. Documentation is complete. A member with approval permission who is not responsible for any part must review this transaction.</div>
-  {% endif %}
-  {% if approval and approval.ineligible_reason %}<p class="hint">You cannot approve this transaction: {{ approval.ineligible_reason }}</p>{% endif %}
+  {% endif %}{% endif %}
+  {% if not txn.is_income and approval and approval.ineligible_reason %}<p class="hint">You cannot approve this transaction: {{ approval.ineligible_reason }}</p>{% endif %}
   {% if review_decision %}
   <p class="hint">{% if txn.status == 'pending' %}Previous decision{% else %}Last decision{% endif %}: {{ review_decision.status | replace("_", " ") }} · {{ review_decision.author_name }} · {{ review_decision.created_at }}</p>
   {% if review_decision.note %}<p class="comment__body">{{ review_decision.note }}</p>{% endif %}

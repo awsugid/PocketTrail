@@ -24,8 +24,12 @@ EMPIRICAL_NAME = "c39df11d115a63b5a1fb4d4e3d043486bac6b4837d60e71b772a967a59f0bb
 def seed(path):
     db = sqlite3.connect(path)
     db.executescript(
-        "CREATE TABLE organizations (id INTEGER PRIMARY KEY, slug TEXT UNIQUE, is_synthetic INTEGER);"
-        "INSERT INTO organizations (slug, is_synthetic) VALUES ('demo-jakarta', 1);"
+        "CREATE TABLE organizations (id INTEGER PRIMARY KEY, slug TEXT UNIQUE, is_synthetic INTEGER, creator_membership_id INTEGER);"
+        "INSERT INTO organizations (slug, is_synthetic, creator_membership_id) VALUES ('demo-jakarta', 1, 1);"
+        "CREATE TABLE pockets (id INTEGER PRIMARY KEY, org_id INTEGER, owner_membership_id INTEGER);"
+        "INSERT INTO pockets VALUES (1, 1, 1);"
+        "CREATE TABLE actor_mappings (org_id INTEGER, pocket_id INTEGER);"
+        "INSERT INTO actor_mappings VALUES (1, 1), (1, 1);"
     )
     db.commit()
     db.close()

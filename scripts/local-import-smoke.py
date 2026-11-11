@@ -89,6 +89,8 @@ def main():
     assert db.execute("SELECT COUNT(*) FROM transactions WHERE org_id=1").fetchone()[0] == initial_count, "Preview created bank records"
     alice.request(first + "/confirm", [], expected=(303,))
     assert db.execute("SELECT COUNT(*) FROM transactions WHERE org_id=1").fetchone()[0] == initial_count + 2
+    assert db.execute("SELECT responsible_membership_id FROM transactions WHERE org_id=1 AND pocket_id=1 AND bank_id=?", (f"SYNTHETIC-{run}-IN",)).fetchone() == (None,), "Income used expense actor mapping"
+    assert db.execute("SELECT responsible_membership_id FROM transactions WHERE org_id=1 AND pocket_id=1 AND bank_id=?", (bank_id,)).fetchone() == (1,), "Expense lost pocket-scoped mapping"
     txn_id = db.execute("SELECT id FROM transactions WHERE org_id=1 AND pocket_id=1 AND bank_id=?", (bank_id,)).fetchone()[0]
     txn = org + f"/transactions/{txn_id}"
     alice.request(txn)

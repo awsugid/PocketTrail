@@ -122,9 +122,10 @@ pub async fn create(mut req: Request, ctx: RouteContext<App>) -> worker::Result<
                 .app
                 .db
                 .prepare(&format!(
-                    "INSERT INTO pockets (org_id, name, opening_balance_minor) VALUES ({org_id}, 'Main Pocket', 0)",
+                    "INSERT INTO pockets (org_id, name, opening_balance_minor, owner_membership_id) SELECT {org_id}, 'Main Pocket', 0, id FROM memberships WHERE org_id={org_id} AND user_id=?2",
                 ))
-                .bind(&[db::s(&slug)])?,
+                .bind(&[db::s(&slug), db::s(&login.user.id)])?,
+            login.app.db.prepare(&format!("UPDATE organizations SET creator_membership_id=(SELECT id FROM memberships WHERE org_id={org_id} AND user_id=?2) WHERE id={org_id}")).bind(&[db::s(&slug),db::s(&login.user.id)])?,
             login
                 .app
                 .db

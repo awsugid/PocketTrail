@@ -72,7 +72,7 @@ POST **/org/{org}/transactions/new**: `pocket_id`, `date`, `time`,
 Context: `txn {id, date, time, counterparty, transaction_type, amount_minor,
 balance_minor?, pocket_name?, bank_id?, notes?, status, explanation,
 responsible_member_id?, responsible_name, suppressed, suppressed_reason?,
-needs_details}`,
+needs_details, revision, is_income?, income_complete?}`,
 `splits [{label, amount_minor, responsible_member_id?, responsible_name}]`,
 `totals {split_total_minor, amount_minor, balanced}` (optional),
 `evidence [{filename, url?, size?, size_display?, note}]` (when `url` is
@@ -82,7 +82,16 @@ present the filename links to an authenticated download route),
 `approval {eligible, ineligible_reason}` (optional),
 `review_decision {status, author_name, created_at, note}` (optional, latest
 review decision from retained audit history),
-`can {edit, approve, request_changes?, comment, suppress, upload}`.
+`can {edit, approve, request_changes?, comment, suppress, upload,
+income_notes?}`.
+
+**Income transactions** (`txn.is_income`, positive amount) record required
+routing notes and optional documents; no approval decision exists. The income
+UI renders Income/Notes-needed badges instead of review statuses and hides the
+responsible-member line. `can.income_notes` (DocumentTransactions permission or
+current recipient) opens the Income notes dialog; `can.edit`, `can.approve`, and
+`can.request_changes` are false and no spending-purpose controls render.
+`txn.income_complete` is true once the explanation is non-blank.
 
 Bank facts, explanation, purposes, documents, review context, and chronological
 discussion are visible read-only, regardless of edit permission. Only action
@@ -94,11 +103,11 @@ POST endpoints (org prefix + `/transactions/{id}/…`):
 
 | Path | Fields | Notes |
 |---|---|---|
-| `/details` | `explanation`, `responsible_member_id`, `split_label[]`, `split_amount[]` (minor, parallel), `split_member[]`, `evidence_unavailable_reason` | Editing returns an approved txn to review. `evidence_unavailable_reason` is expected when spending has no documents; the server validates |
-| `/approve` | `note` (optional) | Only when `can.approve` and `approval.eligible` |
+| `/details` | spending: `explanation`, `responsible_member_id`, `split_label[]`, `split_amount[]` (minor, parallel), `split_member[]`, `evidence_unavailable_reason`; income: `explanation` only | Both carry `revision`. Spending edits return an approved txn to review. `evidence_unavailable_reason` is expected when spending has no documents; the server validates. Income transactions submit only the required routing notes |
+| `/approve` | `note` (optional) | Only when `can.approve` and `approval.eligible`; never for income |
 | `/request-changes` | `note` (required) | Rendered for approvers; gated on `can.request_changes` falling back to `can.approve` |
 | `/comments` | `body` | Mentions parsed from `@` text; do not override suppression |
-| `/documents` | multipart `file`, `note` | Evidence retained; superseded never deleted |
+| `/documents` | multipart `file`, `note` | Evidence retained; superseded never deleted. Optional for income |
 | `/suppress` | `reason` (required) | Stops all notifications incl. mentions |
 | `/unsuppress` | — | Lifts suppression |
 
@@ -135,11 +144,19 @@ location_name, delta, result_qty, reason?}]`.
 
 ### settings.html — GET /org/{org}/settings
 
-Context: `mappings [{id, pattern, member_id, member_name}]`, `members [{id,
-name, email, role_id}]`, `roles [{id, name, permissions[]}]`, `permissions
-[{id, label}]`, `notifications {enabled, cutoff_date?}`, `outbox [{kind,
-to_name, subject, created_at}]`, `can {manage}`, `candidates [{id, name,
+Context: `mappings [{id, pocket_id, pattern, member_id, member_name}]`,
+`pockets [{id, name, opening_balance_minor, owner_membership_id?, owner_name?,
+imported_labels?: string[]}]`, `income_explanation_role_id?` (top-level),
+`members [{id, name, email, role_id, active}]`, `roles [{id, name,
+permissions[]}]`, `permissions [{id, label}]`, `notifications {enabled,
+cutoff_date?}`, `outbox [{kind, to_name, subject, created_at}]`,
+`can {roles, members, mappings, notifications}`, `candidates [{id, name,
 email}]` (optional — add-member select; text input fallback when absent).
+
+Mapping forms are pocket-scoped: the statement-label field is a searchable,
+editable combobox whose suggestions come from the selected pocket's
+`imported_labels`; any plain text is accepted (including before the first
+import), and several labels may map to the same member.
 
 POST endpoints (all under `/org/{org}/…`, forms rendered only when
 `can.manage`):
@@ -151,8 +168,11 @@ POST endpoints (all under `/org/{org}/…`, forms rendered only when
 | `/settings/members` | `user_id`, `role_id` |
 | `/settings/members/{id}/role` | `role_id` |
 | `/settings/members/{id}/remove` | — |
-| `/settings/mappings` | `pattern`, `member_id` |
+| `/settings/pockets` | `name`, `opening_balance`, `owner_membership_id` (optional; empty = active organization creator) |
+| `/settings/pockets/{id}/owner` | `owner_membership_id` (empty = organization creator) |
+| `/settings/mappings` | `pocket_id`, `pattern`, `member_id` |
 | `/settings/mappings/{id}/delete` | — |
+| `/settings/income-role` | `income_explanation_role_id` (empty clears; all active role members are notified about incoming funds, pocket owner fallback) |
 | `/settings/notifications` | `enabled` (checkbox; absent = off), `cutoff_date` |
 | `/notifications/digest` | — |
 
@@ -165,6 +185,12 @@ POST endpoints (all under `/org/{org}/…`, forms rendered only when
 ### Static assets
 
 - `/static/app.css`, `/static/app.js`, `/static/extraction.js` — the UI.
+- `/static/components.css` + `/static/components.js` — progressive select/date
+  enhancements and the statement-label combobox (`input[data-combobox]` with
+  `data-combobox-source` naming a select whose selected option carries a JSON
+  `data-imported-labels` attribute). The native input stays visible and remains
+  the submitted value; suggestions render in the shared popover pattern with
+  full keyboard support. Without JavaScript the input is a plain text field.
 - `/static/vendor/htmx.min.js` (htmx 1.9.12), `/static/vendor/pdf.min.mjs` +
   `pdf.worker.min.mjs` (pdfjs-dist **4.10.38** ESM, Apache-2.0, patched for
   CVE-2024-4367; always loaded with `isEvalSupported: false`) — pinned local

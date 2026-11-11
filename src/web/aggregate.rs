@@ -22,6 +22,10 @@ pub struct OrgRow {
     #[serde(default)]
     pub notification_revision: i64,
     pub created_at: i64,
+    #[serde(default)]
+    pub creator_membership_id: Option<i64>,
+    #[serde(default)]
+    pub income_explanation_role_id: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -149,11 +153,13 @@ pub struct PocketRow {
     pub org_id: i64,
     pub name: String,
     pub opening_balance_minor: i64,
+    pub owner_membership_id: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct MappingRow {
     pub id: i64,
+    pub pocket_id: i64,
     pub pattern: String,
     pub membership_id: i64,
     pub member_name: String,
@@ -189,6 +195,9 @@ pub struct TxnListRow {
 impl TxnListRow {
     /// Documentation still owed by the responsible member (Draft/ChangesRequested).
     pub fn needs_details(&self) -> bool {
+        if self.amount_minor > 0 {
+            return self.explanation.trim().is_empty();
+        }
         let complete = !self.explanation.trim().is_empty() && self.evidence_count > 0
             || (!self.explanation.trim().is_empty()
                 && !self.evidence_unavailable_reason.trim().is_empty());
@@ -349,7 +358,11 @@ pub fn build_dom_txn(
     };
 
     // Completeness comes from domain validation, not ad-hoc field checks.
-    let complete = pockettrail_domain::validate_documentation(&dom).is_ok();
+    let complete = if txn.amount_minor > 0 {
+        !txn.explanation.trim().is_empty()
+    } else {
+        pockettrail_domain::validate_documentation(&dom).is_ok()
+    };
     dom.status = domain_map::runtime_status(&txn.status, complete);
 
     if db::flag(txn.suppressed) {
@@ -440,7 +453,7 @@ pub async fn pockets_of(db: &D1Database, org_id: i64) -> db::WResult<Vec<PocketR
 pub async fn mappings_of(db: &D1Database, org_id: i64) -> db::WResult<Vec<MappingRow>> {
     db::q_all(
         db,
-        "SELECT a.id, a.pattern, a.membership_id, u.name AS member_name FROM actor_mappings a JOIN memberships m ON m.id = a.membership_id JOIN users u ON u.id = m.user_id WHERE a.org_id = ?1 ORDER BY a.pattern",
+        "SELECT a.id, a.pocket_id, a.pattern, a.membership_id, u.name AS member_name FROM actor_mappings a JOIN memberships m ON m.id = a.membership_id JOIN users u ON u.id = m.user_id WHERE a.org_id = ?1 ORDER BY a.pattern",
         vec![db::i(org_id)],
     )
     .await
@@ -487,23 +500,17 @@ pub async fn txn_list_page(
 /// Best-effort actor mapping: exact, trimmed, case-insensitive label match.
 pub fn map_counterparty<'a>(
     mappings: &'a [MappingRow],
+    pocket_id: i64,
     counterparty: &str,
 ) -> Option<&'a MappingRow> {
     let want = counterparty.trim().to_lowercase();
     if let Some(exact) = mappings
         .iter()
-        .find(|m| m.pattern.trim().to_lowercase() == want)
+        .find(|m| m.pocket_id == pocket_id && m.pattern.trim().to_lowercase() == want)
     {
         return Some(exact);
     }
-    // Wrapped source cells may include a separate bank/account continuation.
-    // Only use an explicit exact name mapping, never fuzzy or substring matches.
-    let name = want.split(" / ").next()?.trim();
-    let mut matches = mappings
-        .iter()
-        .filter(|m| m.pattern.trim().to_lowercase() == name);
-    let first = matches.next()?;
-    matches.next().is_none().then_some(first)
+    None
 }
 
 /// Split rows from parallel form arrays. Returns None on shape mismatch.

@@ -26,6 +26,9 @@
 .pt-option:focus-visible{outline:2px solid var(--focus,#a15120);outline-offset:-2px}
 .pt-option[aria-selected=true]{font-weight:600}
 .pt-option[aria-selected=true]::after{content:"";position:absolute;right:12px;top:14px;width:9px;height:5px;border-bottom:1.8px solid currentColor;border-left:1.8px solid currentColor;transform:rotate(-45deg)}
+.pt-option.pt-option--cursor{background:#f4f4f5;outline:none}
+.pt-combobox-note{margin:0;padding:9px 10px;color:#62626b}
+.pt-control .input[aria-expanded=true]{border-color:#a1a1aa}
 .pt-option[aria-disabled=true]{color:#71717a;cursor:not-allowed;background:transparent}
 .pt-option-group{padding:9px 10px 4px;font-size:11px;font-weight:600;color:#62626b}
 .pt-calendar{padding:14px}

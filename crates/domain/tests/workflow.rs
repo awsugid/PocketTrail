@@ -85,6 +85,22 @@ fn user(name: &str) -> UserId {
 }
 
 #[test]
+fn income_complete_with_notes_without_purposes_evidence_or_approval() {
+    let mut txn = split_txn("org-1");
+    txn.direction = Direction::Inflow;
+    txn.purposes.clear();
+    txn.documentation = Documentation::new("Member income notes", Vec::new());
+    assert!(validate_documentation(&txn).is_ok());
+    assert_eq!(txn.status, DocumentationStatus::Draft);
+    txn.documentation.explanation = " \n\t".into();
+    txn.documentation.evidence.push("attachment".into());
+    assert_eq!(
+        validate_documentation(&txn),
+        Err(DomainError::IncompleteDocumentation("explanation"))
+    );
+}
+
+#[test]
 fn cross_organization_access_denied() {
     let org_a = org();
     let org_b = Organization::new("org-b", "Other Org");

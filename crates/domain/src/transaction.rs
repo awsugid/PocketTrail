@@ -160,6 +160,16 @@ pub struct Transaction {
 /// explanation plus evidence (or an explicit evidence-unavailable reason) are
 /// present. Membership checks live in the workflow functions.
 pub fn validate_documentation(txn: &Transaction) -> Result<(), DomainError> {
+    if txn.direction == Direction::Inflow {
+        if txn.amount <= 0 {
+            return Err(DomainError::InvalidAmount { amount: txn.amount });
+        }
+        return if txn.documentation.explanation.trim().is_empty() {
+            Err(DomainError::IncompleteDocumentation("explanation"))
+        } else {
+            Ok(())
+        };
+    }
     validate_parts(txn.amount, &txn.purposes, &txn.documentation)
 }
 

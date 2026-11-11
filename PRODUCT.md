@@ -35,8 +35,9 @@ do not assume an OAuth client secret is required or present.
 
 Removing membership immediately revokes that organization's access and stops
 notifications to the former member. Preserve historical attribution and flag
-unresolved assignments for reassignment or authorized notification suppression;
-do not transfer responsibility automatically.
+unresolved expense assignments for reassignment or authorized notification
+suppression; do not transfer expense responsibility automatically. Open income
+explanation requests follow current role membership and pocket-owner fallback.
 
 ## Product Purpose
 
@@ -64,12 +65,33 @@ Local `pdftotext -layout` successfully extracted text from all ten, covering
 one to seven pages, without passwords. Browser PDF.js extraction and complete
 parser accuracy still require validation.
 
-The user will configure mappings from statement source/destination labels to
-actors. Named counterparties map to actors; Main Pocket and other pocket labels
-map to the pocket owner. Configured mappings automatically assign the responsible
-member: organizer actors can map to themselves, and external counterparties
-map to an internal responsible member. Unknown counterparties remain unassigned
-in the importer's action list; external recipients are not emailed automatically.
+Statement-label mappings belong to a pocket. A searchable, editable dropdown
+suggests labels from that pocket's imported transactions and accepts new labels
+before the first import. Multiple labels can map to the same active responsible
+member; matching trims surrounding whitespace and ignores case. Conflicting
+mappings for the same label within a pocket are rejected.
+
+Each pocket has an active owner responsible for unmapped expenses. New pockets
+default to the organization creator when that member is active; otherwise an
+active owner must be selected explicitly. Ownership is application responsibility,
+not legal Jago account ownership. Import confirmation requires an active owner;
+owner deactivation requires transferring pocket ownership first. Explicit expense
+mappings take precedence over owner fallback. Changes affect future imports,
+not existing expense assignments; no transaction backfill is required.
+
+Income does not use expense mappings. An organization-configured income role's
+active members share an explanation request; any one can resolve it. Without a
+configured role or active recipients, the current pocket owner handles it. Open
+requests follow current routing and membership. Routing grants only the access
+needed to add income explanations and optional supporting documents, not unrelated
+transaction edits or approval. Former recipients lose routing-derived access.
+
+Income requires nonblank member-authored notes identifying sender/source, or
+explaining why unknown. Bank notes and attachments alone do not satisfy this
+requirement. Documents are encouraged but optional; income requires no approval.
+Missing notes never block import. Existing notification controls and reminder
+schedule apply until explained, preserving suppression and completed history.
+External recipients are not emailed automatically.
 
 Events can collect participant commitment fees. The exact attendance and refund
 policy remains to be clarified. Pretix is the ticketing system, and Midtrans is
@@ -139,8 +161,9 @@ Preserve complete IDs as opaque strings, never numeric values or prefixes.
 - Require a purpose and responsible organizer, plus supporting documents for
   spending or an explicit document-unavailable explanation. Imported bank notes
   provide context, not a substitute for the spender's explanation.
-- Require approval and support discussion of invoices and money within the
-  platform. Approval authority is granted through organization-scoped
+- Require expense approval and support discussion of invoices and money within
+  the platform. Income explanations require no approval. Approval authority is
+  granted through organization-scoped
   permissions. Approve the whole transaction, including all its purposes.
   Members responsible for any part cannot approve it themselves; without another
   eligible approver, the transaction remains pending. Changes to explanations,

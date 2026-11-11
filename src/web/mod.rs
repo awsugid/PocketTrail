@@ -238,6 +238,12 @@ pub async fn require_member(
     slug: &str,
     perm: Permission,
 ) -> Result<Ctx, Response> {
+    let g = require_active_member(app, req, slug).await?;
+    authorize(&g.dom_org, &g.uid(), perm).map_err(|e| fail(403, &e.to_string()))?;
+    Ok(g)
+}
+
+pub async fn require_active_member(app: App, req: &Request, slug: &str) -> Result<Ctx, Response> {
     let login = require_login(app, req).await?;
     let Some(org) = org_by_slug(&login.app.db, slug).await.map_err(werr)? else {
         return Err(fail(404, "Unknown organization."));
@@ -246,8 +252,8 @@ pub async fn require_member(
     let roles = roles_of_org(&login.app.db, org.id).await.map_err(werr)?;
     let dom_org = build_dom_org(&org, &roles, &mems);
     let uid = UserId::new(login.user.id.clone());
-    if let Err(e) = authorize(&dom_org, &uid, perm) {
-        return Err(fail(403, &e.to_string()));
+    if !dom_org.member_is_active(&uid) {
+        return Err(fail(403, "Active organization membership required."));
     }
     Ok(Ctx {
         session: login.session,
@@ -368,7 +374,10 @@ fn router(app: App) -> Router<'static, App> {
         .get_async("/invitations/accept", invitations::accept_page)
         .post_async("/invitations/accept", invitations::accept_link)
         .post_async("/invitations/:id/accept", invitations::accept)
-        .post_async("/org/:org/settings/invitations/:id/resend", invitations::resend)
+        .post_async(
+            "/org/:org/settings/invitations/:id/resend",
+            invitations::resend,
+        )
         .post_async("/org/:org/settings/invitations", invitations::create)
         .post_async(
             "/org/:org/settings/invitations/:id/revoke",
@@ -407,6 +416,11 @@ fn router(app: App) -> Router<'static, App> {
         .get_async("/org/:org/settings", settings::page)
         .post_async("/org/:org/settings/mappings", settings::add_mapping)
         .post_async("/org/:org/settings/pockets", settings::add_pocket)
+        .post_async(
+            "/org/:org/settings/pockets/:id/owner",
+            settings::set_pocket_owner,
+        )
+        .post_async("/org/:org/settings/income-role", settings::save_income_role)
         .post_async(
             "/org/:org/settings/mappings/:id/delete",
             settings::delete_mapping,

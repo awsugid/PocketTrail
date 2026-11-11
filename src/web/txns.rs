@@ -11,6 +11,30 @@ use pockettrail_domain::{
     Transaction as DomTxn,
 };
 
+pub async fn income_recipients(g: &Ctx, t: &TxnRow) -> worker::Result<Vec<i64>> {
+    let pocket: Option<PocketRow> = db::q_one(
+        &g.app.db,
+        "SELECT * FROM pockets WHERE id=?1 AND org_id=?2",
+        vec![db::i(t.pocket_id), db::i(g.org.id)],
+    )
+    .await?;
+    let members: Vec<_> = g
+        .mems
+        .iter()
+        .map(|m| (m.id, m.role_id, m.active()))
+        .collect();
+    Ok(crate::domain_map::income_recipients(
+        g.org.income_explanation_role_id,
+        pocket.and_then(|p| p.owner_membership_id),
+        &members,
+    ))
+}
+
+async fn may_document(g: &Ctx, t: &TxnRow) -> worker::Result<bool> {
+    Ok(g.can(Permission::DocumentTransactions)
+        || (t.amount_minor > 0 && income_recipients(g, t).await?.contains(&g.me().id)))
+}
+
 async fn load_full(
     db: &D1Database,
     org: &OrgRow,
@@ -334,10 +358,15 @@ pub async fn detail(req: Request, ctx: RouteContext<App>) -> worker::Result<Resp
     let app = ctx.data.clone();
     let slug = path_param(&ctx, "org");
     let txn_id: i64 = path_param(&ctx, "id").parse().unwrap_or(0);
-    let g = try_resp!(require_member(app, &req, &slug, Permission::ViewTransactions).await);
+    let g = try_resp!(require_active_member(app, &req, &slug).await);
     let Some((t, splits, comments, evidence)) = load_full(&g.app.db, &g.org, txn_id).await? else {
         return Ok(fail(404, "Transaction not found."));
     };
+    let income_access = t.amount_minor > 0 && income_recipients(&g, &t).await?.contains(&g.me().id);
+    if !g.can(Permission::ViewTransactions) && !income_access {
+        return Ok(fail(403, "Transaction access denied."));
+    }
+    let can_document = g.can(Permission::DocumentTransactions) || income_access;
     let pocket: Option<PocketRow> = db::q_one(
         &g.app.db,
         "SELECT * FROM pockets WHERE id = ?1",
@@ -381,10 +410,16 @@ pub async fn detail(req: Request, ctx: RouteContext<App>) -> worker::Result<Resp
     let docs_complete = pockettrail_domain::validate_documentation(&dom).is_ok()
         && validate_responsibles_active(&t, &splits, &g.mems).is_ok()
         && active_mem(&g.mems, t.responsible_membership_id).is_some();
-    let needs_details = crate::domain_map::documentation_owed(&t.status, docs_complete);
+    let needs_details = if t.amount_minor > 0 {
+        !crate::domain_map::income_complete(&t.explanation)
+    } else {
+        crate::domain_map::documentation_owed(&t.status, docs_complete)
+    };
     let txn_json = serde_json::json!({
         "id": t.id,
         "revision": t.revision,
+        "is_income": t.amount_minor > 0,
+        "income_complete": crate::domain_map::income_complete(&t.explanation),
         "date": t.txn_date,
         "time": t.txn_time.clone().unwrap_or_default(),
         "counterparty": t.counterparty,
@@ -475,12 +510,13 @@ pub async fn detail(req: Request, ctx: RouteContext<App>) -> worker::Result<Resp
         "details":a.details,"author_name":a.author_name,"created_at":crate::fmt::fmt_ts(a.created_at)
     })).collect::<Vec<_>>());
     body["can"] = serde_json::json!({
-        "edit": g.can(Permission::DocumentTransactions),
-        "approve": g.can(Permission::ApproveTransactions),
-        "request_changes": g.can(Permission::ApproveTransactions),
+        "edit": t.amount_minor <= 0 && g.can(Permission::DocumentTransactions),
+        "income_notes": t.amount_minor > 0 && can_document,
+        "approve": t.amount_minor <= 0 && g.can(Permission::ApproveTransactions),
+        "request_changes": t.amount_minor <= 0 && g.can(Permission::ApproveTransactions),
         "comment": g.can(Permission::CommentTransactions),
         "suppress": g.can(Permission::SuppressNotifications),
-        "upload": g.can(Permission::DocumentTransactions),
+        "upload": can_document,
         "submit": g.can(Permission::DocumentTransactions) && docs_complete
             && t.status=="changes_requested",
     });
@@ -595,24 +631,63 @@ fn audit_event(g: &Ctx, id: i64, action: &str, token: &str) -> worker::Result<D1
 pub async fn save_details(mut req: Request, ctx: RouteContext<App>) -> worker::Result<Response> {
     let slug = path_param(&ctx, "org");
     let id = path_param(&ctx, "id").parse().unwrap_or(0);
-    let g = try_resp!(
-        require_member(
-            ctx.data.clone(),
-            &req,
-            &slug,
-            Permission::DocumentTransactions
-        )
-        .await
-    );
+    let g = try_resp!(require_active_member(ctx.data.clone(), &req, &slug).await);
     let form = try_resp!(form_post(&g, &mut req).await);
     let Some((t, old_splits, _, evidence)) = load_full(&g.app.db, &g.org, id).await? else {
         return Ok(fail(404, "Transaction not found."));
     };
+    if !may_document(&g, &t).await? {
+        return Ok(fail(403, "Documentation access denied."));
+    }
     try_resp!(require_revision(&form, &t));
     let explanation = form_str(&form, "explanation")
         .unwrap_or_default()
         .trim()
         .to_string();
+    if t.amount_minor > 0 {
+        if explanation.is_empty() || explanation.len() > 16000 {
+            return Ok(fail(400, "Supply income notes of up to 16,000 characters."));
+        }
+        if !g.can(Permission::DocumentTransactions)
+            && [
+                "responsible_member_id",
+                "split_label[]",
+                "split_amount[]",
+                "split_member[]",
+                "evidence_unavailable_reason",
+            ]
+            .iter()
+            .any(|key| form.get(key).is_some())
+        {
+            return Ok(fail(
+                403,
+                "Income recipients may add notes and attachments only.",
+            ));
+        }
+        let token = random_token()?;
+        let update = g.app.db.prepare("UPDATE transactions SET explanation=?1,updated_at=?2,revision=revision+1,mutation_token=?3 WHERE id=?4 AND org_id=?5 AND revision=?6")
+            .bind(&[db::s(&explanation), db::i(db::now_ms()), db::s(&token), db::i(id), db::i(g.org.id), db::i(t.revision)])?;
+        let audit = audit_statement(
+            &g,
+            &t,
+            "income_notes_updated",
+            &t.status,
+            serde_json::json!({"before":t.explanation,"after":explanation}),
+            &token,
+        )?;
+        let event = audit_event(&g, id, "transaction.income_notes_updated", &token)?;
+        if !commit_mutation(&g, id, &token, vec![update, audit, event]).await? {
+            return Ok(fail(
+                409,
+                "Transaction changed. Reload before saving income notes.",
+            ));
+        }
+        return Ok(destination(
+            &g,
+            id,
+            "Income notes saved; no approval required",
+        ));
+    }
     let reason = form_str(&form, "evidence_unavailable_reason")
         .unwrap_or_default()
         .trim()
@@ -734,6 +809,9 @@ pub async fn submit(mut req: Request, ctx: RouteContext<App>) -> worker::Result<
     let Some((t, splits, comments, evidence)) = load_full(&g.app.db, &g.org, id).await? else {
         return Ok(fail(404, "Transaction not found."));
     };
+    if t.amount_minor > 0 {
+        return Ok(fail(400, "Income notes require no submission or approval."));
+    }
     try_resp!(require_revision(&form, &t));
     if let Err(message) = validate_responsibles_active(&t, &splits, &g.mems) {
         return Ok(fail(400, &message));
@@ -757,7 +835,18 @@ pub async fn submit(mut req: Request, ctx: RouteContext<App>) -> worker::Result<
         serde_json::json!({}),
         &token,
     )?;
-    if !commit_mutation(&g, id, &token, vec![update, audit, audit_event(&g, id, "transaction.submitted", &token)?]).await? {
+    if !commit_mutation(
+        &g,
+        id,
+        &token,
+        vec![
+            update,
+            audit,
+            audit_event(&g, id, "transaction.submitted", &token)?,
+        ],
+    )
+    .await?
+    {
         return Ok(fail(
             409,
             "The transaction changed during submission. Reload and try again.",
@@ -801,6 +890,12 @@ async fn review(
     let Some((t, splits, comments, evidence)) = load_full(&g.app.db, &g.org, id).await? else {
         return Ok(fail(404, "Transaction not found."));
     };
+    if t.amount_minor > 0 {
+        return Ok(fail(
+            400,
+            "Income notes require no approval or change request.",
+        ));
+    }
     try_resp!(require_revision(&form, &t));
     if !changes {
         if let Err(message) = validate_responsibles_active(&t, &splits, &g.mems) {
@@ -842,7 +937,18 @@ async fn review(
         serde_json::json!({"note":note}),
         &token,
     )?;
-    if !commit_mutation(&g, id, &token, vec![update, audit, audit_event(&g, id, &format!("transaction.{status}"), &token)?]).await? {
+    if !commit_mutation(
+        &g,
+        id,
+        &token,
+        vec![
+            update,
+            audit,
+            audit_event(&g, id, &format!("transaction.{status}"), &token)?,
+        ],
+    )
+    .await?
+    {
         return Ok(fail(
             409,
             "The transaction changed during review. Reload before deciding.",
@@ -959,7 +1065,11 @@ async fn set_suppression(
         serde_json::json!({"reason":reason}),
         &token,
     )?;
-    let mut statements = vec![update, audit, audit_event(&g, id, &format!("transaction.{action}"), &token)?];
+    let mut statements = vec![
+        update,
+        audit,
+        audit_event(&g, id, &format!("transaction.{action}"), &token)?,
+    ];
     if suppress {
         statements.push(g.app.db.prepare(
             "UPDATE notification_outbox SET cancelled_at=?1 WHERE org_id=?2 AND cancelled_at IS NULL AND (transaction_id=?3 OR kind='digest') AND EXISTS(SELECT 1 FROM transactions WHERE id=?3 AND mutation_token=?4)"
@@ -985,19 +1095,14 @@ async fn set_suppression(
 pub async fn upload_document(mut req: Request, ctx: RouteContext<App>) -> worker::Result<Response> {
     let slug = path_param(&ctx, "org");
     let id = path_param(&ctx, "id").parse().unwrap_or(0);
-    let g = try_resp!(
-        require_member(
-            ctx.data.clone(),
-            &req,
-            &slug,
-            Permission::DocumentTransactions
-        )
-        .await
-    );
+    let g = try_resp!(require_active_member(ctx.data.clone(), &req, &slug).await);
     let form = try_resp!(form_post(&g, &mut req).await);
     let Some(t) = txn_by_id(&g.app.db, g.org.id, id).await? else {
         return Ok(fail(404, "Transaction not found."));
     };
+    if !may_document(&g, &t).await? {
+        return Ok(fail(403, "Documentation access denied."));
+    }
     let Some(file) = form_file(&form, "file") else {
         return Ok(fail(400, "Choose a supporting document."));
     };
@@ -1030,7 +1135,7 @@ pub async fn upload_document(mut req: Request, ctx: RouteContext<App>) -> worker
     bucket.put(&key, bytes.clone()).execute().await?;
     let now = db::now_ms();
     let update=g.app.db.prepare(
-        "UPDATE transactions SET status='pending',approved_at=NULL,approved_by_membership_id=NULL,approval_note='',updated_at=?1,revision=revision+1,mutation_token=?2 WHERE id=?3 AND org_id=?4 AND revision=?5"
+        "UPDATE transactions SET status=CASE WHEN amount_minor>0 THEN status ELSE 'pending' END,approved_at=CASE WHEN amount_minor>0 THEN approved_at ELSE NULL END,approved_by_membership_id=CASE WHEN amount_minor>0 THEN approved_by_membership_id ELSE NULL END,approval_note=CASE WHEN amount_minor>0 THEN approval_note ELSE '' END,updated_at=?1,revision=revision+1,mutation_token=?2 WHERE id=?3 AND org_id=?4 AND revision=?5"
     ).bind(&[db::i(now),db::s(&token),db::i(id),db::i(g.org.id),db::i(t.revision)])?;
     let insert=g.app.db.prepare(
         "INSERT INTO documents(org_id,transaction_id,kind,r2_key,filename,content_type,size_bytes,note,uploaded_by_membership_id,created_at) SELECT ?1,?2,'evidence',?3,?4,?5,?6,?7,?8,?9 WHERE EXISTS(SELECT 1 FROM transactions WHERE id=?2 AND mutation_token=?10)"
@@ -1040,11 +1145,23 @@ pub async fn upload_document(mut req: Request, ctx: RouteContext<App>) -> worker
         &g,
         &t,
         "evidence_attached",
-        "pending",
+        if t.amount_minor > 0 { &t.status } else { "pending" },
         serde_json::json!({"filename":file.name(),"note":note}),
         &token,
     )?;
-    if !commit_mutation(&g, id, &token, vec![update, insert, audit, audit_event(&g, id, "transaction.evidence_attached", &token)?]).await? {
+    if !commit_mutation(
+        &g,
+        id,
+        &token,
+        vec![
+            update,
+            insert,
+            audit,
+            audit_event(&g, id, "transaction.evidence_attached", &token)?,
+        ],
+    )
+    .await?
+    {
         // Retain the unattached private object for recovery rather than delete evidence.
         return Ok(fail(
             409,
@@ -1054,19 +1171,28 @@ pub async fn upload_document(mut req: Request, ctx: RouteContext<App>) -> worker
     Ok(destination(
         &g,
         id,
-        "Evidence retained; transaction requires review",
+        if t.amount_minor > 0 { "Income attachment retained; no approval required" } else { "Evidence retained; transaction requires review" },
     ))
 }
 
 pub async fn download_document(req: Request, ctx: RouteContext<App>) -> worker::Result<Response> {
     let slug = path_param(&ctx, "org");
     let id = path_param(&ctx, "id").parse().unwrap_or(0);
-    let g = try_resp!(
-        require_member(ctx.data.clone(), &req, &slug, Permission::ViewTransactions).await
-    );
+    let g = try_resp!(require_active_member(ctx.data.clone(), &req, &slug).await);
     let Some(document) = doc_by_id(&g.app.db, g.org.id, id).await? else {
         return Ok(fail(404, "Document not found."));
     };
+    if !g.can(Permission::ViewTransactions) {
+        let Some(txn_id) = document.transaction_id else {
+            return Ok(fail(403, "Document access denied."));
+        };
+        let Some(t) = txn_by_id(&g.app.db, g.org.id, txn_id).await? else {
+            return Ok(fail(404, "Transaction not found."));
+        };
+        if t.amount_minor <= 0 || !income_recipients(&g, &t).await?.contains(&g.me().id) {
+            return Ok(fail(403, "Document access denied."));
+        }
+    }
     let Some(bucket) = &g.app.r2 else {
         return Ok(fail(503, "Private document storage unavailable."));
     };
