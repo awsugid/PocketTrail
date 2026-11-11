@@ -263,7 +263,8 @@ mod tests {
             .next()
             .unwrap();
         assert!(overview.contains("Responsible: Unassigned"));
-        assert!(overview.contains("Pending review"));
+        // A pending transaction owing details shows one status truth, not two.
+        assert!(overview.contains("Needs details") && !overview.contains("Pending review"));
         assert!(!overview.contains("Complete transaction details"));
         for (id, label) in [
             ("bank-facts", "Bank details"),
@@ -330,9 +331,9 @@ mod tests {
                         .split("</section>")
                         .next()
                         .unwrap();
-                    assert!(review.contains("href=\"#purposes\""));
-                    assert!(review.contains("href=\"#documents\""));
                     assert!(review.contains("A member responsible for any part cannot approve it"));
+                    // Internal state names never reach organizers.
+                    assert!(!body.contains("found Draft") && !body.contains("status Submitted"));
                     let evidence_url = env()
                         .render_str("{{ url }}", minijinja::context!(url => "/private/receipt"))
                         .unwrap();
@@ -370,22 +371,29 @@ mod tests {
                     "created_at":"2026-01-01","previous_status":"approved","new_status":"pending",
                     "details":"Previous <explanation>"}]);
                 let body = render("transaction", ctx).unwrap();
-                let review = body
-                    .split("id=\"review-actions\"")
+                // Suppression lives in its own dialog, apart from approval decisions.
+                let notifications = body
+                    .split("id=\"notification-settings\"")
                     .nth(1)
-                    .unwrap()
-                    .split("</section>")
-                    .next()
-                    .unwrap();
+                    .map(|rest| rest.split("</section>").next().unwrap())
+                    .unwrap_or("");
+                assert_eq!(!notifications.is_empty(), can_suppress);
                 assert_eq!(
-                    review.contains("/1/unsuppress\""),
+                    notifications.contains("/1/unsuppress\""),
                     suppressed && can_suppress
                 );
                 assert_eq!(
-                    review.contains("/1/suppress\""),
+                    notifications.contains("/1/suppress\""),
                     !suppressed && can_suppress
                 );
+                let review_actions = body
+                    .split("id=\"review-actions\"")
+                    .nth(1)
+                    .map(|rest| rest.split("</section>").next().unwrap())
+                    .unwrap_or("");
+                assert!(!review_actions.contains("/1/suppress\""));
                 if suppressed {
+                    let review = body.split("id=\"review\"").nth(1).unwrap().split("</section>").next().unwrap();
                     assert!(review.contains("Historical &lt;reason&gt;"));
                     assert!(review.contains("Suppression is not approval"));
                 }

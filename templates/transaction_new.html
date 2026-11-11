@@ -3,11 +3,9 @@
 {% block title %}New transaction · {{ org.name }}{% endblock %}
 
 {% block content %}
+<a class="back-link" href="/org/{{ org.slug }}/transactions">Back to transactions</a>
 <div class="page-head">
   <h1>Record transaction</h1>
-  <div class="page-head__actions">
-    <a class="btn btn--small" href="/org/{{ org.slug }}/transactions">Back to transactions</a>
-  </div>
   <p class="page-head__sub">Manual entry for movements that did not come from a statement import, such as opening balances. Bank movements should be imported so their Jago transaction ID is retained.</p>
 </div>
 
@@ -48,18 +46,26 @@
       <legend class="form-section__title">Amounts &amp; responsibility</legend>
       <div class="form-grid">
       <div class="field">
-        <label for="amount">Amount (minor units) <span class="req" aria-hidden="true">*</span></label>
-        <input class="input" type="number" id="amount" name="amount_minor" min="0" step="1" inputmode="numeric" required>
-        <p class="hint">Rp&nbsp;1 = 100 minor units (Rp&nbsp;15.000.000 = 1500000000).</p>
+        <label for="direction">Direction <span class="req" aria-hidden="true">*</span></label>
+        <select class="select" id="direction" name="direction" required>
+          <option value="out">Money out (spending, transfer out)</option>
+          <option value="in">Money in (income, refund, opening balance)</option>
+        </select>
       </div>
       <div class="field">
-        <label for="balance">Balance after (minor units)</label>
-        <input class="input" type="number" id="balance" name="balance_minor" step="1" inputmode="numeric">
+        <label for="amount">Amount (IDR) <span class="req" aria-hidden="true">*</span></label>
+        <input class="input" type="number" id="amount" name="amount" min="0.01" step="0.01" inputmode="decimal" required placeholder="e.g. 150000" aria-describedby="amount-hint" data-money-preview="#amount-preview">
+        <p class="hint" id="amount-hint">Rupiah without thousands separators: 150000 means Rp 150.000. <output id="amount-preview" for="amount" aria-live="polite"></output></p>
+      </div>
+      <div class="field">
+        <label for="balance">Pocket balance after (IDR)</label>
+        <input class="input" type="number" id="balance" name="balance" step="0.01" inputmode="decimal" placeholder="e.g. 8500000" data-money-preview="#balance-preview" aria-describedby="balance-hint">
+        <p class="hint" id="balance-hint">Pocket balance after this movement, if known. <output id="balance-preview" for="balance" aria-live="polite"></output></p>
       </div>
       <div class="field">
         <label for="responsible">Responsible member <span class="req" aria-hidden="true">*</span></label>
         <select class="select" id="responsible" name="responsible_member_id" required>
-          <option value="">Unassigned</option>
+          <option value="">Choose a member…</option>
           {% if members %}{% for m in members %}
           <option value="{{ m.id }}">{{ m.name }}</option>
           {% endfor %}{% endif %}
@@ -80,6 +86,7 @@
     </fieldset>
     <div class="form-actions">
       <button class="btn btn--primary" type="submit">Save transaction</button>
+      <a class="btn" href="/org/{{ org.slug }}/transactions">Cancel</a>
     </div>
   </form>
 </div>

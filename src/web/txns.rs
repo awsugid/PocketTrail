@@ -197,7 +197,9 @@ fn build_dom_from_rows(
 pub async fn list(req: Request, ctx: RouteContext<App>) -> worker::Result<Response> {
     let app = ctx.data.clone();
     let slug = path_param(&ctx, "org");
-    let status = query_param(&req, "status").filter(|s| !s.is_empty() && s != "all");
+    // Only the filter options the UI offers; anything else means "all".
+    let status = query_param(&req, "status")
+        .filter(|s| matches!(s.as_str(), "needs_details" | "pending" | "approved" | "changes_requested"));
     let g = try_resp!(require_member(app, &req, &slug, Permission::ViewTransactions).await);
     let page_number = query_param(&req, "page")
         .and_then(|n| n.parse::<i64>().ok())
@@ -241,6 +243,7 @@ pub async fn list(req: Request, ctx: RouteContext<App>) -> worker::Result<Respon
     body["page_number"] = serde_json::json!(page_number);
     body["has_next"] = serde_json::json!(has_next);
     body["can_import"] = serde_json::json!(g.can(Permission::ImportStatements));
+    body["can_record"] = serde_json::json!(g.can(Permission::DocumentTransactions));
     Ok(page(&g.app, "transactions", body))
 }
 
@@ -299,21 +302,28 @@ pub async fn create(mut req: Request, ctx: RouteContext<App>) -> worker::Result<
     if counterparty.is_empty() {
         return Ok(fail(400, "Counterparty is required."));
     }
-    let amount = match form_str(&form, "amount_minor")
+    // Forms speak IDR with an explicit direction; signed minor units stay internal.
+    let magnitude = form_str(&form, "amount")
         .as_deref()
-        .and_then(crate::fmt::parse_minor)
-    {
-        Some(v) if v != 0 => v,
+        .and_then(crate::fmt::parse_rupiah)
+        .filter(|v| *v > 0);
+    let amount = match (magnitude, form_str(&form, "direction").as_deref()) {
+        (Some(v), Some("out")) => -v,
+        (Some(v), Some("in")) => v,
         _ => {
             return Ok(fail(
                 400,
-                "Amount (minor units) must be a nonzero integer; negative = outflow.",
+                "Amount must be a positive IDR value such as 150000, with a direction of money in or money out.",
             ))
         }
     };
-    let balance = form_str(&form, "balance_minor")
-        .as_deref()
-        .and_then(crate::fmt::parse_minor);
+    let balance = match form_str(&form, "balance").as_deref().map(str::trim) {
+        None | Some("") => None,
+        Some(raw) => match crate::fmt::parse_rupiah(raw) {
+            Some(v) => Some(v),
+            None => return Ok(fail(400, "Balance after must be an IDR value such as 8500000.")),
+        },
+    };
     let responsible: Option<i64> =
         form_str(&form, "responsible_member_id").and_then(|s| s.parse().ok());
     if let Some(id) = responsible {
@@ -389,7 +399,7 @@ pub async fn detail(req: Request, ctx: RouteContext<App>) -> worker::Result<Resp
     let mut probe = dom.clone();
     let approval = match approve_transaction(&g.dom_org, &mut probe, &g.uid()) {
         Ok(()) => serde_json::json!({"eligible": true}),
-        Err(e) => serde_json::json!({"eligible": false, "ineligible_reason": e.to_string()}),
+        Err(e) => serde_json::json!({"eligible": false, "ineligible_reason": crate::domain_map::user_message(&e)}),
     };
 
     let split_total = splits.iter().map(|s| s.amount_minor as i128).sum::<i128>();
@@ -415,7 +425,16 @@ pub async fn detail(req: Request, ctx: RouteContext<App>) -> worker::Result<Resp
     } else {
         crate::domain_map::documentation_owed(&t.status, docs_complete)
     };
+
+    // What the "Still needed" notice should actually list.
+    let mut missing: Vec<&str> = Vec::new();
+    if t.explanation.trim().is_empty() { missing.push("an explanation"); }
+    if active_mem(&g.mems, t.responsible_membership_id).is_none() { missing.push("an active responsible member"); }
+    if splits.is_empty() { missing.push("at least one purpose"); }
+    else if splits.iter().map(|s| s.amount_minor as i128).sum::<i128>() != bank_abs as i128 { missing.push("purposes that add up to the bank amount"); }
+    if evidence.is_empty() && t.evidence_unavailable_reason.trim().is_empty() { missing.push("supporting documents or a document-unavailable reason"); }
     let txn_json = serde_json::json!({
+        "missing": missing,
         "id": t.id,
         "revision": t.revision,
         "is_income": t.amount_minor > 0,
@@ -500,14 +519,20 @@ pub async fn detail(req: Request, ctx: RouteContext<App>) -> worker::Result<Resp
             serde_json::from_str(&decision.details).unwrap_or_default();
         body["review_decision"] = serde_json::json!({
             "status": decision.new_status,
+            "status_label": crate::domain_map::status_label(&decision.new_status),
             "author_name": decision.author_name,
             "created_at": crate::fmt::fmt_ts(decision.created_at),
             "note": details.get("note").and_then(|v| v.as_str()).unwrap_or_default(),
         });
     }
+    let member_name = |id: i64| g.mem_name(Some(id));
     body["audit"]=serde_json::json!(audit.iter().map(|a|serde_json::json!({
-        "action":a.action,"previous_status":a.previous_status,"new_status":a.new_status,
-        "details":a.details,"author_name":a.author_name,"created_at":crate::fmt::fmt_ts(a.created_at)
+        "action":a.action,"action_label":crate::audit_rules::action_label(&a.action),
+        "previous_status":a.previous_status,"new_status":a.new_status,
+        "previous_label":crate::domain_map::status_label(&a.previous_status),
+        "new_label":crate::domain_map::status_label(&a.new_status),
+        "facts":crate::domain_map::history_facts(&a.details, &member_name),
+        "author_name":a.author_name,"created_at":crate::fmt::fmt_ts(a.created_at)
     })).collect::<Vec<_>>());
     body["can"] = serde_json::json!({
         "edit": t.amount_minor <= 0 && g.can(Permission::DocumentTransactions),
@@ -822,7 +847,7 @@ pub async fn submit(mut req: Request, ctx: RouteContext<App>) -> worker::Result<
         return Ok(destination(&g, id, "Documentation is ready for review"));
     }
     if let Err(error) = submit_transaction(&g.dom_org, &mut dom, &g.uid()) {
-        return Ok(fail(400, &error.to_string()));
+        return Ok(fail(400, &format!("This transaction cannot be submitted: {}.", crate::domain_map::user_message(&error))));
     }
     let token = random_token()?;
     let update=g.app.db.prepare("UPDATE transactions SET status='pending',revision=revision+1,updated_at=?1,mutation_token=?2 WHERE id=?3 AND org_id=?4 AND revision=?5")
@@ -915,7 +940,7 @@ async fn review(
         } else {
             400
         };
-        return Ok(fail(status, &error.to_string()));
+        return Ok(fail(status, &format!("This decision cannot be recorded: {}.", crate::domain_map::user_message(&error))));
     }
     let token = random_token()?;
     let status = if changes {

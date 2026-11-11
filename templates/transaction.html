@@ -13,24 +13,33 @@
     <span class="badge badge--neutral">Income</span>
     {% if not txn.income_complete %}<span class="badge badge--needs">Notes needed</span>{% endif %}
     {% else %}
-    {% if txn.status == 'pending' %}<span class="badge badge--pending">Pending review</span>
+    {% if txn.status == 'pending' and txn.needs_details %}<span class="badge badge--needs">Needs details</span>
+    {% elif txn.status == 'pending' %}<span class="badge badge--pending">Pending review</span>
     {% elif txn.status == 'approved' %}<span class="badge badge--approved">Approved</span>
     {% elif txn.status == 'changes_requested' %}<span class="badge badge--changes">Changes requested</span>
     {% else %}<span class="badge badge--neutral">{{ txn.status }}</span>{% endif %}
-    {% if txn.needs_details %}<span class="badge badge--needs">Needs details</span>{% endif %}
+    {% if txn.needs_details and txn.status != 'pending' %}<span class="badge badge--needs">Needs details</span>{% endif %}
     {% endif %}
     {% if txn.suppressed %}<span class="badge badge--suppressed">Suppressed</span>{% endif %}
     {% if not txn.is_income %}<span class="transaction-head__responsible">Responsible: {{ txn.responsible_name or "Unassigned" }}</span>{% endif %}
   </div>
 </div>
 
+{% set primary = '' %}
+{% if can.income_notes and not txn.income_complete %}{% set primary = 'income-notes' %}
+{% elif can.edit and txn.needs_details %}{% set primary = 'edit-details' %}
+{% elif can.submit %}{% set primary = 'review-actions' %}
+{% elif can.approve and approval and approval.eligible %}{% set primary = 'review-actions' %}
+{% elif can.upload and not evidence and not txn.evidence_unavailable_reason %}{% set primary = 'upload-document' %}
+{% endif %}
 <nav class="transaction-actions" aria-label="Transaction actions">
-  {% if can.edit %}<a class="btn" href="#edit-details" data-dialog-open="edit-details">Edit details</a>{% endif %}
-  {% if can.income_notes %}<a class="btn" href="#income-notes" data-dialog-open="income-notes">{% if txn.income_complete %}Edit income notes{% else %}Add income notes{% endif %}</a>{% endif %}
-  {% if can.upload %}<a class="btn" href="#upload-document" data-dialog-open="upload-document">Add document</a>{% endif %}
-  {% if can.submit or can.approve or can.suppress %}<a class="btn" href="#review-actions" data-dialog-open="review-actions">Review actions</a>{% endif %}
+  {% if can.edit %}<a class="btn{% if primary == 'edit-details' %} btn--primary{% endif %}" href="#edit-details" data-dialog-open="edit-details">{% if txn.needs_details %}Complete details{% else %}Edit details{% endif %}</a>{% endif %}
+  {% if can.income_notes %}<a class="btn{% if primary == 'income-notes' %} btn--primary{% endif %}" href="#income-notes" data-dialog-open="income-notes">{% if txn.income_complete %}Edit income notes{% else %}Add income notes{% endif %}</a>{% endif %}
+  {% if can.upload %}<a class="btn{% if primary == 'upload-document' %} btn--primary{% endif %}" href="#upload-document" data-dialog-open="upload-document">Add document</a>{% endif %}
+  {% if can.submit or can.approve %}<a class="btn{% if primary == 'review-actions' %} btn--primary{% endif %}" href="#review-actions" data-dialog-open="review-actions">{% if can.submit %}Resubmit for review{% else %}Review transaction{% endif %}</a>{% endif %}
   {% if can.comment %}<a class="btn" href="#add-comment" data-dialog-open="add-comment">Add comment</a>{% endif %}
-  <a class="btn" href="#history" data-dialog-open="history">View history</a>
+  {% if can.suppress %}<a class="btn" href="#notification-settings" data-dialog-open="notification-settings">{% if txn.suppressed %}Suppressed notifications{% else %}Notifications{% endif %}</a>{% endif %}
+  <a class="btn" href="#history" data-dialog-open="history">History</a>
 </nav>
 
 <div class="transaction-overview">
@@ -46,19 +55,6 @@
     {% if txn.balance_minor is defined and txn.balance_minor is not none %}<div><dt>Balance after</dt><dd>{{ txn.balance_minor | money }}</dd></div>{% endif %}
     {% if txn.bank_id %}<div class="bank-facts__wide"><dt>Bank reference</dt><dd class="cell--mono">{{ txn.bank_id }}</dd></div>{% endif %}
     {% if txn.notes %}<div class="bank-facts__wide"><dt>Bank note</dt><dd>{{ txn.notes }}</dd></div>{% endif %}
-    <div class="bank-facts__wide"><dt>Status</dt><dd>
-      {% if txn.is_income %}
-      <span class="badge badge--neutral">Income</span>
-      {% if not txn.income_complete %}<span class="badge badge--needs">Notes needed</span>{% endif %}
-      {% else %}
-      {% if txn.status == 'pending' %}<span class="badge badge--pending">Pending review</span>
-      {% elif txn.status == 'approved' %}<span class="badge badge--approved">Approved</span>
-      {% elif txn.status == 'changes_requested' %}<span class="badge badge--changes">Changes requested</span>
-      {% else %}<span class="badge badge--neutral">{{ txn.status }}</span>{% endif %}
-      {% if txn.needs_details %}<span class="badge badge--needs">Needs details</span>{% endif %}
-      {% endif %}
-      {% if txn.suppressed %}<span class="badge badge--suppressed">Suppressed</span>{% endif %}
-    </dd></div>
   </dl>
 </section>
 
@@ -70,7 +66,7 @@
   {% else %}
   <p class="panel__sub">One movement can cover several purposes. Bank notes are context, not a substitute for the spender's explanation.</p>
   {% if txn.needs_details %}
-  <div class="notice notice--warning">Complete the explanation, responsible member, and purposes. Spending also needs <a href="#documents">supporting documents</a> or a document-unavailable reason.</div>
+  <div class="notice notice--warning">Still needed: {% for m in txn.missing %}{{ m }}{% if not loop.last %}{% if loop.revindex == 2 %} and {% else %}, {% endif %}{% endif %}{% else %}nothing else; resubmit for review{% endfor %}.</div>
   {% endif %}
   {% endif %}
   {% if not txn.is_income and txn.responsible_inactive %}
@@ -79,10 +75,10 @@
   {% if txn.explanation %}<p class="comment__body">{{ txn.explanation }}</p>{% elif txn.is_income %}<p class="hint">No income notes recorded yet.</p>{% else %}<p class="hint">No explanation recorded yet. The responsible member must supply one.</p>{% endif %}
   {% if splits %}
   <div class="table-scroll">
-    <table class="table">
+    <table class="table card-table" role="table">
       <caption class="visually-hidden">Purpose allocation</caption>
-      <thead><tr><th scope="col">Purpose</th><th scope="col" class="cell--num">Amount</th><th scope="col">Responsible</th></tr></thead>
-      <tbody>{% for s in splits %}<tr><td>{{ s.label }}</td><td class="cell--num">{{ s.amount_minor | money }}</td><td>{{ s.responsible_name or "Unassigned" }}</td></tr>{% endfor %}</tbody>
+      <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Purpose</th><th role="columnheader" scope="col" class="cell--num">Amount</th><th role="columnheader" scope="col">Responsible</th></tr></thead>
+      <tbody role="rowgroup">{% for s in splits %}<tr role="row"><td role="cell">{{ s.label }}</td><td role="cell" data-label="Amount" class="cell--num">{{ s.amount_minor | money }}</td><td role="cell" data-label="Responsible">{{ s.responsible_name or "Unassigned" }}</td></tr>{% endfor %}</tbody>
     </table>
   </div>
   {% if totals %}<p class="hint">Allocated {{ totals.split_total_minor | money }} of {{ totals.amount_minor | money }} · {% if totals.balanced %}Balanced{% else %}Not fully allocated{% endif %}</p>{% endif %}
@@ -100,13 +96,13 @@
     </div>
     <div class="field">
       <label for="responsible">Responsible member <span class="req" aria-hidden="true">*</span></label>
-      <select class="select" id="responsible" name="responsible_member_id" required>
-        <option value="">Unassigned</option>
+      <select class="select" id="responsible" name="responsible_member_id" required aria-describedby="responsible-hint">
+        <option value="">Choose a member…</option>
         {% if members %}{% for m in members %}
         <option value="{{ m.id }}"{% if txn.responsible_member_id and txn.responsible_member_id == m.id %} selected{% endif %}>{{ m.name }}</option>
         {% endfor %}{% endif %}
       </select>
-      <p class="hint">The member accountable for this explanation and its evidence. Actor mappings may have suggested this assignment.</p>
+      <p class="hint" id="responsible-hint">The member accountable for this explanation and its evidence. Actor mappings may have suggested this assignment.</p>
     </div>
     <fieldset>
       <legend>Purpose allocation</legend>
@@ -114,7 +110,7 @@
         {% if splits %}{% for s in splits %}
         <div class="row-grid" data-row>
           <input class="input" name="split_label[]" value="{{ s.label }}" aria-label="Purpose label">
-          <input class="input" type="number" name="split_amount[]" value="{{ s.amount_rupiah }}" min="0.01" step="0.01" inputmode="decimal" aria-label="Amount in IDR" data-amount-input>
+          <input class="input" type="number" name="split_amount[]" value="{{ s.amount_rupiah }}" min="0.01" step="0.01" inputmode="decimal" aria-label="Amount in IDR" aria-describedby="split-hint" data-amount-input>
           <select class="select" name="split_member[]" aria-label="Responsible member for this purpose">
             <option value="">Unassigned</option>
             {% if members %}{% for m in members %}
@@ -126,7 +122,7 @@
         {% endfor %}{% else %}
         <div class="row-grid" data-row>
           <input class="input" name="split_label[]" placeholder="e.g. Monthly meetup food" aria-label="Purpose label">
-          <input class="input" type="number" name="split_amount[]" min="0.01" step="0.01" inputmode="decimal" placeholder="Amount in IDR" aria-label="Amount in IDR" data-amount-input>
+          <input class="input" type="number" name="split_amount[]" min="0.01" step="0.01" inputmode="decimal" placeholder="Amount in IDR" aria-label="Amount in IDR" aria-describedby="split-hint" data-amount-input>
           <select class="select" name="split_member[]" aria-label="Responsible member for this purpose">
             <option value="">Unassigned</option>
             {% if members %}{% for m in members %}
@@ -140,7 +136,7 @@
       <template id="split-template">
         <div class="row-grid" data-row>
           <input class="input" name="split_label[]" placeholder="Purpose label" aria-label="Purpose label">
-          <input class="input" type="number" name="split_amount[]" min="0.01" step="0.01" inputmode="decimal" placeholder="Amount in IDR" aria-label="Amount in IDR" data-amount-input>
+          <input class="input" type="number" name="split_amount[]" min="0.01" step="0.01" inputmode="decimal" placeholder="Amount in IDR" aria-label="Amount in IDR" aria-describedby="split-hint" data-amount-input>
           <select class="select" name="split_member[]" aria-label="Responsible member for this purpose">
             <option value="">Unassigned</option>
             {% if members %}{% for m in members %}
@@ -151,15 +147,15 @@
         </div>
       </template>
       <p class="alloc-total" id="alloc-total" aria-live="polite"></p>
-      <p class="hint">Enter IDR without thousands separators: 15000000 means Rp 15.000.000. Allocations must add up to the transaction amount.</p>
+      <p class="hint" id="split-hint">Enter IDR without thousands separators: 15000000 means Rp 15.000.000. Allocations must add up to the transaction amount.</p>
       <div class="form-actions">
         <button class="btn" type="button" data-add-row="#split-template" data-row-list="#split-rows">Add purpose</button>
       </div>
     </fieldset>
     <div class="field">
       <label for="evidence-unavailable">Document-unavailable reason</label>
-      <input class="input" id="evidence-unavailable" name="evidence_unavailable_reason" value="{{ txn.evidence_unavailable_reason }}" placeholder="e.g. Cash purchase, no receipt issued">
-      <p class="hint">Required when spending has no supporting documents: explains why evidence is missing. The server validates this.</p>
+      <input class="input" id="evidence-unavailable" name="evidence_unavailable_reason" value="{{ txn.evidence_unavailable_reason }}" placeholder="e.g. Cash purchase, no receipt issued" aria-describedby="evidence-unavailable-hint">
+      <p class="hint" id="evidence-unavailable-hint">Required when spending has no supporting documents: explains why evidence is missing. The server validates this.</p>
     </div>
     <div class="form-actions">
       <button class="btn btn--primary" type="submit">Save details</button>
@@ -193,27 +189,28 @@
   <h2 class="panel__title" id="documents-title">Documents</h2>
   <p class="panel__sub">Invoices, receipts, and other evidence. Files are retained; superseded evidence is never deleted.</p>
   {% if evidence %}
-  <div class="list-row">
-    <span class="list-row__main">File</span>
-    <span class="list-row__meta">Size</span>
-    <span class="list-row__meta">Note</span>
+  <div class="table-scroll">
+    <table class="table card-table" role="table">
+      <caption class="visually-hidden">Supporting documents</caption>
+      <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">File</th><th role="columnheader" scope="col">Size</th><th role="columnheader" scope="col">Note</th></tr></thead>
+      <tbody role="rowgroup">
+      {% for e in evidence %}
+      <tr role="row">
+        <td role="cell" class="cell--mono">{% if e.url %}<a href="{{ e.url }}">{{ e.filename }}</a>{% else %}{{ e.filename }}{% endif %}</td>
+        <td role="cell" data-label="Size" class="cell--nowrap cell__muted">{% if e.size_display %}{{ e.size_display }}{% elif e.size %}{{ e.size }} bytes{% endif %}</td>
+        <td role="cell" data-label="Note">{{ e.note }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
   </div>
-  {% for e in evidence %}
-  <div class="list-row">
-    {% if e.url %}
-    <a class="list-row__main cell--mono" href="{{ e.url }}">{{ e.filename }}</a>
-    {% else %}
-    <span class="list-row__main cell--mono">{{ e.filename }}</span>
-    {% endif %}
-    <span class="list-row__meta">{% if e.size_display %}{{ e.size_display }}{% elif e.size %}{{ e.size }} bytes{% endif %}</span>
-    <span class="list-row__meta">{{ e.note }}</span>
-  </div>
-  {% endfor %}
   {% else %}
   {% if txn.is_income %}
   <div class="notice notice--muted">No supporting documents. Documents are optional for income; add receipts or confirmations when available.</div>
+  {% elif txn.evidence_unavailable_reason %}
+  <p class="hint">No supporting documents; a document-unavailable reason is recorded below.</p>
   {% else %}
-  <div class="notice notice--warning">No supporting documents. Spending requires evidence, or an explicit document-unavailable explanation saved in <a href="#purposes">Explanation &amp; purposes</a>.</div>
+  <div class="notice notice--warning">No supporting documents. Spending requires evidence, or a document-unavailable reason saved with the explanation.</div>
   {% endif %}
   {% endif %}
   {% if txn.evidence_unavailable_reason %}
@@ -223,12 +220,13 @@
   {% if can.upload %}
 <section class="panel" id="upload-document" data-dialog-panel aria-labelledby="upload-document-title">
   <h2 class="panel__title" id="upload-document-title">Add document</h2>
-  <form method="post" action="/org/{{ org.slug }}/transactions/{{ txn.id }}/documents" enctype="multipart/form-data" hx-encoding="multipart/form-data" style="margin-top: 14px;">
+  <p class="panel__sub">Attaching or replacing evidence returns an approved transaction to review.</p>
+  <form method="post" action="/org/{{ org.slug }}/transactions/{{ txn.id }}/documents" enctype="multipart/form-data" hx-encoding="multipart/form-data">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="revision" value="{{ txn.revision }}">
     <div class="form-grid form-grid--paired">
     <div class="field">
-      <label for="evidence-file">Add document <span class="req" aria-hidden="true">*</span></label>
+      <label for="evidence-file">File <span class="req" aria-hidden="true">*</span></label>
       <input class="input" type="file" id="evidence-file" name="file" required>
     </div>
     <div class="field">
@@ -237,9 +235,8 @@
     </div>
     </div>
     <div class="form-actions">
-      <button class="btn" type="submit">Attach document</button>
+      <button class="btn btn--primary" type="submit">Attach document</button>
     </div>
-    <p class="hint">Attaching or replacing evidence returns an approved transaction to review.</p>
   </form>
 </section>
   {% endif %}
@@ -250,39 +247,41 @@
   <p class="panel__sub">Incoming funds record notes and optional documents. No independent approval decision is required.</p>
   {% if not txn.income_complete %}<div class="notice notice--warning">Income notes are still required.</div>{% else %}<div class="notice notice--info">Income notes are recorded. Documents stay optional.</div>{% endif %}
   {% else %}
-  <p class="panel__sub">Approval covers the whole transaction, including every purpose. A member responsible for any part cannot approve it; without another eligible approver it stays pending.</p>
-  <p>Check <a href="#purposes">Explanation &amp; purposes</a> and <a href="#documents">Documents</a> before recording a decision.</p>
-  {% endif %}
-  {% if not txn.is_income %}{% if txn.status == 'changes_requested' %}
-  <div class="notice notice--warning">Changes were requested. The transaction is back with the responsible member; saving details or evidence sends it for review again. Comments do not.</div>
+  <p class="panel__sub">Approval covers the whole transaction, including every purpose. A member responsible for any part cannot approve it; substantive edits reopen review, comments do not.</p>
+  {% if txn.status == 'changes_requested' %}
+  <div class="notice notice--warning">Changes were requested. The responsible member must save details or evidence to send it for review again.</div>
   {% elif txn.status == 'approved' %}
-  <div class="notice notice--info">Transaction approved. Changes to details or evidence require review again; discussion comments do not.</div>
-  {% elif txn.status == 'pending' and txn.needs_details is defined and not txn.needs_details %}
-  <div class="notice notice--info">Awaiting independent review. Documentation is complete. A member with approval permission who is not responsible for any part must review this transaction.</div>
-  {% endif %}{% endif %}
-  {% if not txn.is_income and approval and approval.ineligible_reason %}<p class="hint">You cannot approve this transaction: {{ approval.ineligible_reason }}</p>{% endif %}
+  <div class="notice notice--info">Approved.</div>
+  {% elif txn.status == 'pending' and txn.needs_details %}
+  <div class="notice notice--warning">Not ready for review: details are still missing.</div>
+  {% elif txn.status == 'pending' %}
+  <div class="notice notice--info">Awaiting independent review by a member with approval permission who is not responsible for any part.</div>
+  {% endif %}
+  {% if approval and approval.ineligible_reason and can.approve %}<p class="hint">You cannot approve this transaction: {{ approval.ineligible_reason }}.</p>{% endif %}
+  {% endif %}
   {% if review_decision %}
-  <p class="hint">{% if txn.status == 'pending' %}Previous decision{% else %}Last decision{% endif %}: {{ review_decision.status | replace("_", " ") }} · {{ review_decision.author_name }} · {{ review_decision.created_at }}</p>
+  <p class="hint">{% if txn.status == 'pending' %}Previous decision{% else %}Last decision{% endif %}: {{ review_decision.status_label }} · {{ review_decision.author_name }} · {{ review_decision.created_at }}</p>
   {% if review_decision.note %}<p class="comment__body">{{ review_decision.note }}</p>{% endif %}
   {% endif %}
-  {% if txn.suppressed %}<p class="hint"><strong>Notifications suppressed.</strong> {{ txn.suppressed_reason }}. All notifications and summaries are stopped, including mentions. Suppression is not approval and does not imply evidence exists.</p>{% endif %}
+  {% if txn.suppressed %}<p class="notice notice--muted"><strong>Notifications suppressed.</strong> {{ txn.suppressed_reason }}. No reminders, summaries, or mentions are sent for this transaction. Suppression is not approval and does not mean evidence exists.</p>{% endif %}
 </section>
-{% if can.submit or can.approve or can.suppress %}
+{% if can.submit or can.approve %}
 <section class="panel" id="review-actions" data-dialog-panel aria-labelledby="review-actions-title">
-  <h2 class="panel__title" id="review-actions-title">Review actions</h2>
-  <p class="panel__sub">Approval covers every purpose. A member responsible for any part cannot approve it.</p>
-  <p class="panel__sub">Check the explanation, purposes, and documents on the overview before deciding. Close this dialog to return to those details.</p>
+  <h2 class="panel__title" id="review-actions-title">{% if can.submit %}Resubmit for review{% else %}Review transaction{% endif %}</h2>
+  <p class="panel__sub">The explanation and documents are repeated here so you can decide without leaving this dialog.</p>
+  <h3>Explanation</h3>
   <p class="comment__body">{{ txn.explanation or "No explanation recorded yet." }}</p>
+  <h3>Documents</h3>
   {% for e in evidence %}
   <p>{% if e.url %}<a href="{{ e.url }}" target="_blank" rel="noopener">{{ e.filename }} (opens in new tab)</a>{% else %}{{ e.filename }}{% endif %}{% if e.note %} · {{ e.note }}{% endif %}</p>
   {% else %}
-  <p class="hint">No supporting documents.{% if txn.evidence_unavailable_reason %} {{ txn.evidence_unavailable_reason }}{% endif %}</p>
+  <p class="hint">No supporting documents.{% if txn.evidence_unavailable_reason %} Reason given: {{ txn.evidence_unavailable_reason }}{% endif %}</p>
   {% endfor %}
   {% if can.submit %}
   <form method="post" action="/org/{{ org.slug }}/transactions/{{ txn.id }}/submit">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="revision" value="{{ txn.revision }}">
-    <button class="btn btn--primary" type="submit">Resubmit for review</button>
+    <div class="form-actions"><button class="btn btn--primary" type="submit">Resubmit for review</button></div>
   </form>
   {% endif %}
   {% if can.approve %}
@@ -299,9 +298,8 @@
       </div>
     </form>
     {% elif approval and approval.ineligible_reason %}
-    <div class="notice notice--info">You cannot approve this transaction: {{ approval.ineligible_reason }}</div>
+    <div class="notice notice--info">Approval is not available to you here; you can still request changes.</div>
     {% endif %}
-    {% if can.request_changes or can.approve %}
     <form method="post" action="/org/{{ org.slug }}/transactions/{{ txn.id }}/request-changes" style="margin-top: 14px;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <input type="hidden" name="revision" value="{{ txn.revision }}">
@@ -313,49 +311,55 @@
         <button class="btn" type="submit">Request changes</button>
       </div>
     </form>
-    {% endif %}
-  {% else %}
-  <p class="hint">Approval authority is granted through organization roles. Members responsible for a part of this transaction cannot approve it.</p>
   {% endif %}
+</section>
+{% endif %}
+{% if can.suppress %}
+<section class="panel" id="notification-settings" data-dialog-panel aria-labelledby="notification-settings-title">
+  <h2 class="panel__title" id="notification-settings-title">Transaction notifications</h2>
+  <p class="panel__sub">Suppression stops every reminder, summary, and mention for this transaction. It is for historical items and departed members; it is not approval and does not mean evidence exists.</p>
   {% if txn.suppressed %}
-  <div class="notice notice--muted">
-    <strong>Notifications suppressed.</strong> Reason: {{ txn.suppressed_reason }}. All notifications and summaries for this transaction are stopped, including mentions. Suppression is not approval and does not imply evidence exists.
-    {% if can.suppress %}
-    <form method="post" action="/org/{{ org.slug }}/transactions/{{ txn.id }}/unsuppress">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <input type="hidden" name="revision" value="{{ txn.revision }}">
-      <div class="form-actions"><button class="btn btn--small" type="submit">Lift suppression</button></div>
-    </form>
-    {% endif %}
-  </div>
-  {% elif can.suppress %}
-  <details class="accordion">
-    <summary>Notification suppression</summary>
-    <div class="accordion__body">
-      <p class="panel__sub">For historical items and departed members. Requires a reason, is recorded against your name, and stays until an authorized member lifts it.</p>
-      <form method="post" action="/org/{{ org.slug }}/transactions/{{ txn.id }}/suppress">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <input type="hidden" name="revision" value="{{ txn.revision }}">
-        <div class="field">
-          <label for="suppress-reason">Reason <span class="req" aria-hidden="true">*</span></label>
-          <input class="input" id="suppress-reason" name="reason" required placeholder="e.g. Settled outside PocketTrail before import">
-          <p class="hint">Suppression covers all notifications and summaries, including explicit mentions. It does not imply approval or that proof exists.</p>
-        </div>
-        <div class="form-actions">
-          <button class="btn btn--danger" type="submit">Suppress notifications</button>
-        </div>
-      </form>
+  <div class="notice notice--muted"><strong>Currently suppressed.</strong> Reason: {{ txn.suppressed_reason }}</div>
+  <form method="post" action="/org/{{ org.slug }}/transactions/{{ txn.id }}/unsuppress" hx-confirm="Lift suppression? Reminders, summaries, and mentions for this transaction resume.">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="revision" value="{{ txn.revision }}">
+    <div class="form-actions"><button class="btn" type="submit">Lift suppression</button></div>
+  </form>
+  {% else %}
+  <form method="post" action="/org/{{ org.slug }}/transactions/{{ txn.id }}/suppress" hx-confirm="Suppress all notifications for this transaction? Mentions stop too. The reason is recorded against your name until an authorized member lifts it.">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="revision" value="{{ txn.revision }}">
+    <div class="field">
+      <label for="suppress-reason">Reason <span class="req" aria-hidden="true">*</span></label>
+      <input class="input" id="suppress-reason" name="reason" required placeholder="e.g. Settled outside PocketTrail before import">
     </div>
-  </details>
+    <div class="form-actions">
+      <button class="btn btn--danger" type="submit">Suppress notifications</button>
+    </div>
+  </form>
   {% endif %}
 </section>
 {% endif %}
 
 <section class="panel" id="discussion" aria-labelledby="discussion-title">
-  <h2 class="panel__title" id="discussion-title">Discussion</h2>
+  <h2 class="panel__title" id="discussion-title">Discussion{% if comments %} <span class="panel__count">({{ comments | length }})</span>{% endif %}</h2>
   <p class="panel__sub">One chronological thread. Comments do not change formal explanations, evidence, or approval.</p>
   {% if comments %}
-  {% for c in comments %}
+  {% set older = comments | length - 5 %}
+  {% if older > 0 %}
+  <details class="accordion">
+    <summary>Show {{ older }} earlier comment{% if older != 1 %}s{% endif %}</summary>
+    <div class="accordion__body">
+    {% for c in comments %}{% if loop.index <= older %}
+    <div class="comment">
+      <div class="comment__head"><span class="comment__author">{{ c.author_name }}</span><span class="comment__time">{{ c.created_at }}</span></div>
+      <p class="comment__body">{{ c.body }}</p>
+    </div>
+    {% endif %}{% endfor %}
+    </div>
+  </details>
+  {% endif %}
+  {% for c in comments %}{% if loop.index > older %}
   <div class="comment">
     <div class="comment__head">
       <span class="comment__author">{{ c.author_name }}</span>
@@ -363,7 +367,7 @@
     </div>
     <p class="comment__body">{{ c.body }}</p>
   </div>
-  {% endfor %}
+  {% endif %}{% endfor %}
   {% else %}
   <p class="hint">No comments yet.</p>
   {% endif %}
@@ -371,13 +375,12 @@
   {% if can.comment %}
 <section class="panel" id="add-comment" data-dialog-panel aria-labelledby="add-comment-title">
   <h2 class="panel__title" id="add-comment-title">Add comment</h2>
-  <p class="panel__sub">Comments do not change formal explanations, evidence, or approval.</p>
-  <form method="post" action="/org/{{ org.slug }}/transactions/{{ txn.id }}/comments" style="margin-top: 14px;">
+  <form method="post" action="/org/{{ org.slug }}/transactions/{{ txn.id }}/comments">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="field">
-      <label for="comment-body">Add comment <span class="req" aria-hidden="true">*</span></label>
-      <textarea class="textarea" id="comment-body" name="body" required style="scroll-margin-top: 88px;"></textarea>
-      <p class="hint">Type @ to mention a member. Mentions notify them unless notifications are suppressed for this transaction.</p>
+      <label for="comment-body">Comment <span class="req" aria-hidden="true">*</span></label>
+      <textarea class="textarea" id="comment-body" name="body" required aria-describedby="comment-body-hint"></textarea>
+      <p class="hint" id="comment-body-hint">Type @ to mention a member. Mentions notify them unless notifications are suppressed for this transaction.</p>
     </div>
     {% if members %}
     <div class="chips" aria-label="Mention a member">
@@ -387,7 +390,7 @@
     </div>
     {% endif %}
     <div class="form-actions">
-      <button class="btn" type="submit">Post comment</button>
+      <button class="btn btn--primary" type="submit">Post comment</button>
     </div>
   </form>
 </section>
@@ -400,10 +403,10 @@
   {% if audit %}
   {% for entry in audit %}
   <details class="accordion">
-    <summary>{{ entry.action | replace("_", " ") }} · {{ entry.author_name }} · {{ entry.created_at }}</summary>
+    <summary>{{ entry.action_label }} · {{ entry.author_name }} · {{ entry.created_at }}</summary>
     <div class="accordion__body">
-      <p>{{ entry.previous_status }} → {{ entry.new_status }}</p>
-      <pre class="history-details">{{ entry.details }}</pre>
+      {% if entry.previous_status != entry.new_status %}<p>Status: {{ entry.previous_label }} <span aria-hidden="true">→</span><span class="visually-hidden">to</span> {{ entry.new_label }}</p>{% endif %}
+      {% if entry.facts %}<dl class="facts history-facts">{% for f in entry.facts %}<dt>{{ f[0] }}</dt><dd>{{ f[1] }}</dd>{% endfor %}</dl>{% elif entry.details %}<pre class="history-details">{{ entry.details }}</pre>{% else %}<p class="hint">No further detail recorded.</p>{% endif %}
     </div>
   </details>
   {% endfor %}

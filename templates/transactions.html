@@ -6,6 +6,9 @@
 <div class="page-head transactions-head">
   <h1>Transactions</h1>
   <div class="page-head__actions">
+    {% if can_record %}
+    <a class="btn" href="/org/{{ org.slug }}/transactions/new">Record transaction</a>
+    {% endif %}
     {% if can_import %}
     <a class="btn btn--primary" href="/org/{{ org.slug }}/imports">Import statement</a>
     {% endif %}
@@ -14,65 +17,75 @@
 </div>
 
 <div class="panel panel--flush transactions-filters">
-  <form class="toolbar" method="get" action="/org/{{ org.slug }}/transactions">
+  <form class="toolbar" method="get" action="/org/{{ org.slug }}/transactions" data-autosubmit>
     <div class="field">
       <label for="filter-status">Status</label>
       <select class="select" id="filter-status" name="status">
         <option value="all"{% if not filters or not filters.status or filters.status == 'all' %} selected{% endif %}>All statuses</option>
+        <option value="needs_details"{% if filters and filters.status == 'needs_details' %} selected{% endif %}>Needs details</option>
         <option value="pending"{% if filters and filters.status == 'pending' %} selected{% endif %}>Pending review</option>
         <option value="approved"{% if filters and filters.status == 'approved' %} selected{% endif %}>Approved</option>
         <option value="changes_requested"{% if filters and filters.status == 'changes_requested' %} selected{% endif %}>Changes requested</option>
       </select>
     </div>
     <div class="form-actions">
-      <button class="btn" type="submit">Apply filters</button>
-      <a class="btn" href="/org/{{ org.slug }}/transactions">Clear</a>
+      <button class="btn" type="submit" data-autosubmit-fallback>Apply</button>
+      {% if filters and filters.status and filters.status != 'all' %}<a class="btn" href="/org/{{ org.slug }}/transactions">Clear</a>{% endif %}
     </div>
+    <p class="toolbar__count" data-result-count>{{ txns | length }}{% if has_next %}+{% endif %} transaction{% if txns | length != 1 %}s{% endif %}{% if page_number and page_number > 1 %} · page {{ page_number }}{% endif %}</p>
   </form>
 </div>
 
 {% if txns %}
 <div class="panel">
-  <div class="table-scroll" role="region" aria-label="Transactions" tabindex="0">
+  <div class="table-scroll">
     <table class="table transaction-table" role="table">
       <caption class="visually-hidden">Bank movements with amounts, pocket balances, and review responsibility</caption>
       <thead role="rowgroup">
         <tr role="row">
-          <th scope="col">Date</th>
-          <th scope="col">Counterparty</th>
-          <th scope="col" class="cell--num">Amount</th>
-          <th scope="col" class="cell--num">Pocket balance after</th>
-          <th scope="col">Status</th>
+          <th role="columnheader" scope="col">Counterparty</th>
+          <th role="columnheader" scope="col">Date</th>
+          <th role="columnheader" scope="col" class="cell--num">Amount</th>
+          <th role="columnheader" scope="col" class="cell--num">Balance after</th>
+          <th role="columnheader" scope="col">Status</th>
+          <th role="columnheader" scope="col">Responsible</th>
         </tr>
       </thead>
       <tbody role="rowgroup">
         {% for t in txns %}
         <tr role="row">
-          <td role="cell" class="cell--nowrap" data-label="Date">{{ t.date }}<span class="cell__sub">{{ t.time }}</span></td>
-          <td role="cell" class="transaction-table__identity" data-label="Counterparty"><a href="/org/{{ org.slug }}/transactions/{{ t.id }}">{{ t.counterparty_display.name if t.counterparty_display else t.counterparty }}</a>{% if t.counterparty_display and t.counterparty_display.bank_account %}<span class="cell__sub">{{ t.counterparty_display.bank_account }}</span>{% endif %}<span class="cell__sub">{{ t.pocket_name }} · {{ t.transaction_type }}</span></td>
-          <td role="cell" class="cell--num cell--nowrap" data-label="Amount">{{ t.amount_minor | money }}</td>
+          <td role="cell" class="transaction-table__identity"><a href="/org/{{ org.slug }}/transactions/{{ t.id }}">{{ t.counterparty_display.name if t.counterparty_display else t.counterparty }}</a>{% if t.counterparty_display and t.counterparty_display.bank_account %}<span class="cell__sub">{{ t.counterparty_display.bank_account }}</span>{% endif %}<span class="cell__sub">{{ t.transaction_type }}{% if t.pocket_name and t.pocket_name != t.counterparty %}{% if t.transaction_type %} · {% endif %}{{ t.pocket_name }}{% endif %}</span></td>
+          <td role="cell" class="cell--nowrap" data-label="Date">{{ t.date }}{% if t.time %} <span class="cell__muted">{{ t.time }}</span>{% endif %}</td>
+          <td role="cell" class="cell--num cell--nowrap{% if t.amount_minor > 0 %} amount--in{% endif %}" data-label="Amount">{{ t.amount_minor | money }}</td>
           <td role="cell" class="cell--num cell--nowrap" data-label="Balance after">{{ t.balance_minor | money }}</td>
           <td role="cell" class="transaction-table__status" data-label="Status">
-            {% if t.status == 'pending' %}<span class="badge badge--pending">Pending review</span>
+            {% if t.status == 'pending' and t.needs_details %}<span class="badge badge--needs">Needs details</span>
+            {% elif t.status == 'pending' %}<span class="badge badge--pending">Pending review</span>
             {% elif t.status == 'approved' %}<span class="badge badge--approved">Approved</span>
             {% elif t.status == 'changes_requested' %}<span class="badge badge--changes">Changes requested</span>
             {% else %}<span class="badge badge--neutral">{{ t.status }}</span>{% endif %}
-            {% if t.needs_details %}<span class="badge badge--needs">Needs details</span>{% endif %}
+            {% if t.needs_details and t.status != 'pending' %}<span class="badge badge--needs">Needs details</span>{% endif %}
             {% if t.suppressed %}<span class="badge badge--suppressed">Suppressed</span>{% endif %}
-            <span class="cell__sub">Responsible: {{ t.responsible_name or "Unassigned" }}</span>
           </td>
+          <td role="cell" class="transaction-table__responsible" data-label="Responsible">{{ t.responsible_name or "Unassigned" }}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-  {% if page_number %}
-  <nav class="form-actions" aria-label="Transaction pages">
-    {% if page_number > 1 %}<a class="btn" href="?page={{ page_number - 1 }}&status={{ filters.status }}">Previous page</a>{% endif %}
+  {% if page_number and (page_number > 1 or has_next) %}
+  <nav class="pagination" aria-label="Transaction pages">
+    {% if page_number > 1 %}<a class="btn btn--small" href="?page={{ page_number - 1 }}{% if filters and filters.status and filters.status != 'all' %}&status={{ filters.status }}{% endif %}">Previous page</a>{% endif %}
     <span>Page {{ page_number }}</span>
-    {% if has_next %}<a class="btn" href="?page={{ page_number + 1 }}&status={{ filters.status }}">Next page</a>{% endif %}
+    {% if has_next %}<a class="btn btn--small" href="?page={{ page_number + 1 }}{% if filters and filters.status and filters.status != 'all' %}&status={{ filters.status }}{% endif %}">Next page</a>{% endif %}
   </nav>
   {% endif %}
+</div>
+{% elif page_number and page_number > 1 %}
+<div class="empty">
+  <h2 class="empty__title">No more transactions on this page</h2>
+  <p class="empty__body">You have gone past the last page of results.</p>
+  <a class="btn" href="/org/{{ org.slug }}/transactions{% if filters and filters.status and filters.status != 'all' %}?status={{ filters.status }}{% endif %}">Back to the first page</a>
 </div>
 {% elif filters and filters.status and filters.status != 'all' %}
 <div class="empty">
@@ -83,9 +96,12 @@
 {% else %}
 <div class="empty">
   <h2 class="empty__title">No transactions yet</h2>
-  <p class="empty__body">Import a Jago statement PDF to bring in bank movements.</p>
+  <p class="empty__body">Import a Jago statement PDF to bring in bank movements, or record an opening balance manually.</p>
   {% if can_import %}
   <a class="btn btn--primary" href="/org/{{ org.slug }}/imports">Import statement</a>
+  {% endif %}
+  {% if can_record %}
+  <a class="btn" href="/org/{{ org.slug }}/transactions/new">Record transaction</a>
   {% endif %}
 </div>
 {% endif %}

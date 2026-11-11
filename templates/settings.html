@@ -5,31 +5,55 @@
 {% block content %}
 <div class="page-head settings-head">
   <h1>Settings</h1>
-  <p class="page-head__sub">{{ org.name }} · Organization configuration</p>
+  <p class="page-head__sub">{{ org.name }} · Roles, members, pockets, actor mappings, and notification delivery.</p>
 </div>
+<nav class="section-nav" aria-label="Settings sections">
+  <a href="#roles-config">Roles</a>
+  <a href="#pockets-config">Pockets</a>
+  <a href="#members-config">Memberships</a>
+  <a href="#mappings-config">Actor mappings</a>
+  <a href="#income-config">Income routing</a>
+  <a href="#notifications-config">Notifications</a>
+  {% if can.members %}<a href="#audit">Audit log</a>{% endif %}
+</nav>
 
 <div class="settings-config">
-<section class="panel" aria-labelledby="roles-config-title">
+<div class="settings-config__column">
+<section class="panel" id="roles-config" aria-labelledby="roles-config-title">
   <header class="settings-config__head">
     <h2 class="panel__title" id="roles-config-title">Roles</h2>
     {% if can.roles %}<a class="btn btn--small" href="#roles" data-dialog-open="roles">Manage roles</a>{% endif %}
   </header>
+  <p class="panel__sub">Permission bundles assigned to members. Enforced on the server.</p>
   {% for r in roles %}
-  <div class="settings-config__row">
-    <strong>{{ r.name }}</strong>
+  <details class="settings-config__row settings-role"{% if loop.first %} open{% endif %}>
+    <summary><strong>{{ r.name }}</strong><span class="cell__sub">{% if r.permissions %}{{ r.permissions | length }} permission{% if r.permissions | length != 1 %}s{% endif %}{% else %}No permissions · no access{% endif %}</span></summary>
     <ul class="settings-permissions">
       {% for p in permissions %}{% if p.id in r.permissions %}<li>{{ p.label }}</li>{% endif %}{% endfor %}
-      {% if not r.permissions %}<li>No permissions · no access</li>{% endif %}
     </ul>
-  </div>
+  </details>
   {% else %}<p class="hint">No roles defined yet.</p>{% endfor %}
 </section>
 
-<section class="panel" aria-labelledby="members-config-title">
+<section class="panel" id="pockets-config" aria-labelledby="pockets-config-title">
+  <header class="settings-config__head">
+    <h2 class="panel__title" id="pockets-config-title">Pockets</h2>
+    {% if can.mappings %}<a class="btn btn--small" href="#pockets" data-dialog-open="pockets">Manage pockets</a>{% endif %}
+  </header>
+  <p class="panel__sub">Bank pockets whose statements are imported here.</p>
+  {% for pocket in pockets %}
+  <div class="settings-config__row"><strong>{{ pocket.name }}</strong><span class="cell__sub">Opening balance <span class="cell--num">{{ pocket.opening_balance_minor | money }}</span></span><span class="cell__sub">Owner: {% if pocket.owner_name %}{{ pocket.owner_name }}{% else %}Not set — choose an active owner{% endif %}</span></div>
+  {% else %}<p class="hint">No pockets yet.</p>{% endfor %}
+</section>
+</div>
+
+<div class="settings-config__column">
+<section class="panel" id="members-config" aria-labelledby="members-config-title">
   <header class="settings-config__head">
     <h2 class="panel__title" id="members-config-title">Memberships</h2>
     {% if can.members %}<a class="btn btn--small" href="#members" data-dialog-open="members">Manage members</a>{% endif %}
   </header>
+  <p class="panel__sub">Invite-based access. Former members keep historical attribution.</p>
   {% for m in members %}
   <div class="settings-config__row">
     <strong>{{ m.name }}</strong>
@@ -40,27 +64,19 @@
   {% else %}<p class="hint">No members yet. Sign-in alone grants no access.</p>{% endfor %}
 </section>
 
-<section class="panel" aria-labelledby="pockets-config-title">
-  <header class="settings-config__head">
-    <h2 class="panel__title" id="pockets-config-title">Pockets</h2>
-    {% if can.mappings %}<a class="btn btn--small" href="#pockets" data-dialog-open="pockets">Manage pockets</a>{% endif %}
-  </header>
-  {% for pocket in pockets %}
-  <div class="settings-config__row"><strong>{{ pocket.name }}</strong><span class="cell__sub">Opening balance <span class="cell--num">{{ pocket.opening_balance_minor | money }}</span></span><span class="cell__sub">Owner: {% if pocket.owner_name %}{{ pocket.owner_name }}{% else %}Not set — choose an active owner{% endif %}</span></div>
-  {% else %}<p class="hint">No pockets yet.</p>{% endfor %}
-</section>
-
-<section class="panel" aria-labelledby="mappings-config-title">
+<section class="panel" id="mappings-config" aria-labelledby="mappings-config-title">
   <header class="settings-config__head">
     <h2 class="panel__title" id="mappings-config-title">Actor mappings</h2>
     {% if can.mappings %}<a class="btn btn--small" href="#mappings" data-dialog-open="mappings">Manage mappings</a>{% endif %}
   </header>
+  <p class="panel__sub">Automatically assign imported statement labels to responsible organizers.</p>
   {% for mp in mappings %}
   <div class="settings-config__row"><strong>{{ mp.pattern }}</strong><span class="cell__sub">Responsible: {{ mp.member_name or "Unassigned" }}</span><span class="cell__sub">Pocket: {% if mp.pocket_id %}{% for p in pockets %}{% if p.id == mp.pocket_id %}{{ p.name }}{% endif %}{% endfor %}{% else %}—{% endif %}</span></div>
   {% else %}<p class="hint">No mappings yet. Unknown counterparties stay unassigned.</p>{% endfor %}
 </section>
+</div>
 
-<section class="panel" aria-labelledby="income-config-title">
+<section class="panel" id="income-config" aria-labelledby="income-config-title">
   <header class="settings-config__head">
     <h2 class="panel__title" id="income-config-title">Income routing</h2>
     {% if can.roles %}<a class="btn btn--small" href="#income" data-dialog-open="income">Edit income routing</a>{% endif %}
@@ -78,7 +94,7 @@
   {% endif %}
 </section>
 
-<section class="panel settings-config__wide" aria-labelledby="notifications-config-title">
+<section class="panel settings-config__wide" id="notifications-config" aria-labelledby="notifications-config-title">
   <header class="settings-config__head">
     <h2 class="panel__title" id="notifications-config-title">Notifications</h2>
     {% if can.notifications %}<a class="btn btn--small" href="#notifications" data-dialog-open="notifications">Edit notifications</a>{% endif %}
@@ -90,15 +106,19 @@
   </dl>
   {% if notification_preview %}
   {% for recipient in notification_preview.recipients %}
-  <div class="settings-config__row">{{ recipient.name }} <span class="cell__sub">{{ recipient.pending }} pending items</span></div>
+  <div class="settings-config__row">{{ recipient.name }} <span class="cell__sub">{{ recipient.pending }} pending item{% if recipient.pending != 1 %}s{% endif %}</span></div>
   {% else %}<p class="hint">No assigned items need reminders for this cutoff.</p>{% endfor %}
   {% if notification_preview.limited %}<p class="notice notice--warning">This preview is limited to the latest 500 transactions.</p>{% endif %}
   {% endif %}
   {% if outbox %}
-  <h3>Notification outbox</h3>
-  {% for n in outbox %}
-  <div class="settings-config__row"><strong>{{ n.to_name }}</strong> · {{ n.kind }}<span class="cell__sub">{{ n.created_at }} · {{ n.subject }}</span></div>
-  {% endfor %}
+  <details class="accordion" open>
+    <summary>Notification outbox ({{ outbox | length }})</summary>
+    <div class="accordion__body">
+    {% for n in outbox %}
+    <div class="settings-config__row"><strong>{{ n.to_name }}</strong> · {{ n.kind }}<span class="cell__sub">{{ n.created_at }} · {{ n.subject }}</span></div>
+    {% endfor %}
+    </div>
+  </details>
   {% endif %}
 </section>
 </div>
@@ -149,11 +169,11 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="field">
       <label for="role-template">Copy role template</label>
-      <select class="select" id="role-template" name="template_id" required>
+      <select class="select" id="role-template" name="template_id" required aria-describedby="role-template-hint">
         <option value="" selected>Choose a template…</option>
         {% for t in role_templates %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
       </select>
-      <p class="hint">Copying creates a separate role in this workspace; later template edits never change it.</p>
+      <p class="hint" id="role-template-hint">Copying creates a separate role in this workspace; later template edits never change it.</p>
     </div>
     <div class="form-actions"><button class="btn" type="submit">Copy template</button></div>
   </form>
@@ -185,12 +205,15 @@
 <section class="panel" id="members" data-dialog-panel aria-labelledby="members-heading">
   <header>
   <h2 class="panel__title" id="members-heading">Manage members</h2>
+  <p class="panel__sub">Invitations are the normal way in. The invitee signs in with the matching Google account and accepts from Organizations.</p>
   <form method="post" action="/org/{{ org.slug }}/settings/invitations">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <div class="field"><label for="invite-email">Invite by email</label><input class="input" id="invite-email" name="email" type="email" required maxlength="254"></div>
-    <div class="field"><label for="invite-role">Invitation role</label><select class="select" id="invite-role" name="role_id" required>{% for r in roles %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}</select></div>
-    <p class="hint">Expires after 7 days. Matching Google account must accept. Recipients can accept from Organizations; delivery status appears below once the mail service records an attempt.</p>
-    <button class="btn" type="submit">Create invitation</button>
+    <div class="form-grid form-grid--paired">
+    <div class="field"><label for="invite-email">Invite by email <span class="req" aria-hidden="true">*</span></label><input class="input" id="invite-email" name="email" type="email" required maxlength="254"></div>
+    <div class="field"><label for="invite-role">Role on acceptance <span class="req" aria-hidden="true">*</span></label><select class="select" id="invite-role" name="role_id" required>{% for r in roles %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}</select></div>
+    </div>
+    <div class="form-actions"><button class="btn btn--primary" type="submit">Send invitation</button></div>
+    <p class="hint">Expires after 7 days. Delivery status appears below once the mail service records an attempt.</p>
   </form>
   {% for i in invitations %}
   <div class="list-row">
@@ -208,30 +231,30 @@
       <button class="btn btn--small" type="submit" aria-label="Resend invitation email to {{ i.email }}">Resend email</button>
     </form>
     {% endif %}
-    <form method="post" action="/org/{{ org.slug }}/settings/invitations/{{ i.id }}/revoke">
+    <form method="post" action="/org/{{ org.slug }}/settings/invitations/{{ i.id }}/revoke" hx-confirm="Revoke the invitation for {{ i.email }}? Their link stops working immediately; you can send a new one later.">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <button class="btn btn--danger btn--small" type="submit" aria-label="Revoke invitation for {{ i.email }}">Revoke invitation</button>
     </form>
   </div>
   {% endfor %}
-  <p class="panel__sub">Removal revokes access and notifications immediately. History is retained; reassign or suppress unresolved assignments.</p>
   </header>
   <div>
   {% if members %}
   <div class="table-scroll">
-    <table class="table">
-      <thead>
-        <tr>
-          <th scope="col">Member</th>
-          <th scope="col">Role</th>
-          {% if can.members %}<th scope="col"><span class="visually-hidden">Actions</span></th>{% endif %}
+    <table class="table card-table members-table" role="table">
+      <caption class="visually-hidden">Members and roles</caption>
+      <thead role="rowgroup">
+        <tr role="row">
+          <th role="columnheader" scope="col">Member</th>
+          <th role="columnheader" scope="col">Role</th>
+          {% if can.members %}<th role="columnheader" scope="col"><span class="visually-hidden">Actions</span></th>{% endif %}
         </tr>
       </thead>
-      <tbody>
+      <tbody role="rowgroup">
         {% for m in members %}
-        <tr>
-          <td>{{ m.name }}{% if not m.active %} <span class="badge badge--suppressed">Former member</span>{% endif %}<span class="cell__sub">{{ m.email }} · @{{ m.handle }}</span></td>
-          <td>
+        <tr role="row">
+          <td role="cell">{{ m.name }}{% if not m.active %} <span class="badge badge--suppressed">Former member</span>{% endif %}<span class="cell__sub">{{ m.email }} · @{{ m.handle }}</span></td>
+          <td role="cell" data-label="Role">
             {% if can.members %}
             <form method="post" action="/org/{{ org.slug }}/settings/members/{{ m.id }}/role">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -251,9 +274,9 @@
             {% endif %}
           </td>
           {% if can.members %}
-          <td>
+          <td role="cell" data-label="Actions">
             {% if m.active %}
-            <form method="post" action="/org/{{ org.slug }}/settings/members/{{ m.id }}/remove">
+            <form method="post" action="/org/{{ org.slug }}/settings/members/{{ m.id }}/remove" hx-confirm="Remove {{ m.name }} from {{ org.name }}? They lose access and stop receiving notifications immediately. Their history stays, and you can restore them later.">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <button class="btn btn--danger btn--small" type="submit" aria-label="Remove {{ m.name }} from this organization">Remove</button>
             </form>
@@ -274,9 +297,11 @@
   <p class="hint">No members yet. Membership is invite-based; sign-in alone grants no access.</p>
   {% endif %}
   {% if can.members %}
+  <p class="hint">Removing a member revokes access and notifications immediately. History is retained; reassign or suppress their unresolved assignments.</p>
   <details class="accordion"{% if not members %} open{% endif %}>
-    <summary>Add member</summary>
+    <summary>Add an existing PocketTrail user without an invitation</summary>
     <div class="accordion__body">
+  <p class="hint">Exceptional path: grants access immediately to someone who has already signed in to PocketTrail. Prefer an invitation.</p>
   <form method="post" action="/org/{{ org.slug }}/settings/members" style="margin-top: 14px;">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="form-grid">
@@ -289,8 +314,8 @@
           {% endfor %}
         </select>
         {% else %}
-        <input class="input" id="member-user" name="user_id" required placeholder="Email or user ID">
-        <p class="hint">The person must first sign in with Google. Membership is granted explicitly; sign-in alone gives no organization access.</p>
+        <input class="input" id="member-user" name="user_id" required placeholder="Email or user ID" aria-describedby="member-user-hint">
+        <p class="hint" id="member-user-hint">The person must first sign in with Google. Membership is granted explicitly; sign-in alone gives no organization access.</p>
         {% endif %}
       </div>
       <div class="field">
@@ -374,24 +399,25 @@
   <div>
   {% if mappings %}
   <div class="table-scroll">
-    <table class="table">
-      <thead>
-        <tr>
-          <th scope="col">Pocket</th>
-          <th scope="col">Statement label</th>
-          <th scope="col">Responsible member</th>
-          {% if can.mappings %}<th scope="col"><span class="visually-hidden">Actions</span></th>{% endif %}
+    <table class="table card-table mappings-table" role="table">
+      <caption class="visually-hidden">Actor mappings from pocket statement labels to responsible members</caption>
+      <thead role="rowgroup">
+        <tr role="row">
+          <th role="columnheader" scope="col">Pocket</th>
+          <th role="columnheader" scope="col">Statement label</th>
+          <th role="columnheader" scope="col">Responsible member</th>
+          {% if can.mappings %}<th role="columnheader" scope="col"><span class="visually-hidden">Actions</span></th>{% endif %}
         </tr>
       </thead>
-      <tbody>
+      <tbody role="rowgroup">
         {% for mp in mappings %}
-        <tr>
-          <td>{% if mp.pocket_id %}{% for p in pockets %}{% if p.id == mp.pocket_id %}{{ p.name }}{% endif %}{% endfor %}{% else %}—{% endif %}</td>
-          <td class="cell--mono">{{ mp.pattern }}</td>
-          <td>{{ mp.member_name or "—" }}</td>
+        <tr role="row">
+          <td role="cell" data-label="Pocket">{% if mp.pocket_id %}{% for p in pockets %}{% if p.id == mp.pocket_id %}{{ p.name }}{% endif %}{% endfor %}{% else %}—{% endif %}</td>
+          <td role="cell" data-label="Statement label" class="cell--mono">{{ mp.pattern }}</td>
+          <td role="cell" data-label="Responsible member">{{ mp.member_name or "—" }}</td>
           {% if can.mappings %}
-          <td>
-            <form method="post" action="/org/{{ org.slug }}/settings/mappings/{{ mp.id }}/delete">
+          <td role="cell" data-label="Actions">
+            <form method="post" action="/org/{{ org.slug }}/settings/mappings/{{ mp.id }}/delete" hx-confirm="Delete the mapping for “{{ mp.pattern }}”? Future imports with this label will stay unassigned. This cannot be undone.">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <button class="btn btn--danger btn--small" type="submit" aria-label="Delete actor mapping {{ mp.pattern }}">Delete mapping</button>
             </form>
@@ -497,13 +523,14 @@
     <label class="check"><input type="checkbox" name="enabled" value="1"{% if notifications and notifications.enabled %} checked{% endif %}> Enable notifications for this organization</label>
     <div class="field" style="max-width: 240px;">
       <label for="cutoff">Transaction-date cutoff <span class="req" aria-hidden="true">*</span></label>
-      <input class="input" type="date" id="cutoff" name="cutoff_date" value="{{ notification_preview_cutoff }}" readonly>
-      <p class="hint">Items dated before the cutoff stay visible without generating reminders unless included.</p>
+      <input class="input" type="date" id="cutoff" name="cutoff_date" value="{{ notification_preview_cutoff }}" readonly aria-describedby="cutoff-hint">
+      <p class="hint" id="cutoff-hint">Mirrors the previewed cutoff above so you save exactly what you previewed. Items dated before it stay visible without generating reminders.</p>
     </div>
     <div class="form-actions">
       <button class="btn btn--primary" type="submit">Save notification settings</button>
     </div>
   </form>
+  {% if local_mode %}
   <hr class="menu__rule" style="margin: 16px 0;">
   <form method="post" action="/org/{{ org.slug }}/notifications/digest">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -513,27 +540,32 @@
     <p class="hint">Delivers to the local outbox while testing; financial details and attachments stay out of emails.</p>
   </form>
   {% endif %}
+  {% endif %}
 </div>
 </section>
 {% endif %}
 {% if can.members %}
-<section class="panel" aria-labelledby="audit-heading">
+<section class="panel" id="audit" aria-labelledby="audit-heading">
   <h2 class="panel__title" id="audit-heading">Organization audit log</h2>
-  <p class="panel__sub">Platform-scope events stay with platform administrators. Newest first, 50 per page.</p>
+  <p class="panel__sub">Who changed what in this workspace, newest first. Platform-scope events stay with platform administrators.</p>
   {% if audit_events %}
-  <div class="table-scroll"><table class="table">
-    <thead><tr><th scope="col">When</th><th scope="col">Actor</th><th scope="col">Action</th><th scope="col">Target</th><th scope="col">Outcome</th></tr></thead>
-    <tbody>
+  <div class="table-scroll"><table class="table card-table audit-table" role="table">
+    <caption class="visually-hidden">Organization audit events</caption>
+    <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">When</th><th role="columnheader" scope="col">Who</th><th role="columnheader" scope="col">What</th><th role="columnheader" scope="col">Outcome</th></tr></thead>
+    <tbody role="rowgroup">
     {% for e in audit_events %}
-    <tr><td class="cell--nowrap">{{ e.created_at | ts }}</td><td>{{ e.actor_id or "Unauthenticated" }}</td><td class="cell--mono">{{ e.action }}</td><td class="cell--mono">{{ e.target }}</td><td>{{ e.outcome }}</td></tr>
+    <tr role="row"><td role="cell" data-label="When" class="cell--nowrap">{{ e.created_at | ts }}</td><td role="cell" data-label="Who">{{ e.actor_name or e.actor_id or "Not signed in" }}</td><td role="cell" data-label="What">{{ e.action_label }}<span class="cell__sub">{{ e.target_label }}</span></td><td role="cell" data-label="Outcome">{% if e.outcome == 'denied' or e.outcome == 'failed' %}<span class="badge badge--error">{{ e.outcome_label }}</span>{% else %}{{ e.outcome_label }}{% endif %}</td></tr>
     {% endfor %}
     </tbody>
   </table></div>
   <nav class="pagination" aria-label="Audit log pagination">
-    {% if audit_page and audit_page > 1 %}<a class="btn btn--small" href="/org/{{ org.slug }}/settings?page={{ audit_page - 1 }}">Previous</a>{% endif %}
+    {% if audit_page and audit_page > 1 %}<a class="btn btn--small" href="/org/{{ org.slug }}/settings?page={{ audit_page - 1 }}#audit">Previous</a>{% endif %}
     {% if audit_page %}<span>Page {{ audit_page }}</span>{% endif %}
-    {% if audit_has_more or audit_events | length == 50 %}<a class="btn btn--small" href="/org/{{ org.slug }}/settings?page={% if audit_page %}{{ audit_page + 1 }}{% else %}2{% endif %}">Next</a>{% endif %}
+    {% if audit_has_more %}<a class="btn btn--small" href="/org/{{ org.slug }}/settings?page={% if audit_page %}{{ audit_page + 1 }}{% else %}2{% endif %}#audit">Next</a>{% endif %}
   </nav>
+  {% elif audit_page and audit_page > 1 %}
+  <p class="hint">No more events on this page.</p>
+  <nav class="pagination" aria-label="Audit log pagination"><a class="btn btn--small" href="/org/{{ org.slug }}/settings#audit">Back to the first page</a></nav>
   {% else %}<p class="hint">No events recorded yet.</p>{% endif %}
 </section>
 {% endif %}

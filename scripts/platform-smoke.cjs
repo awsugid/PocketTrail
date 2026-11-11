@@ -64,6 +64,7 @@ async function isAdminPage(page) {
       const [name, ...rest] = cookie.split('=');
       await ctx.addCookies([{ name, value: rest.join('='), domain: hostname, path: '/' }]);
       const boss = await ctx.newPage();
+      boss.on('dialog', modal => modal.accept());
       await boss.goto(`${base}/platform`);
       if ((await boss.locator('h1').textContent()) !== 'Global settings') {
         await ctx.close();
@@ -85,6 +86,8 @@ async function isAdminPage(page) {
     }
 
     const alice = await browser.newPage();
+    // Platform access changes ask for confirmation (hx-confirm); accept them.
+    alice.on('dialog', modal => modal.accept());
     const failedPhotos = []; // collect avatar requests to prove they fail
     await alice.route('**lh3.googleusercontent.com/**', route => {
       failedPhotos.push(route.request().url());
@@ -135,14 +138,15 @@ async function isAdminPage(page) {
       const bobRow = users.locator('tr', { hasText: 'Bob (fixture)' });
       await bobRow.getByText('Platform admin').waitFor({ timeout: 10_000 });
       assert(await bobRow.getByText('Platform admin').isVisible(), 'grant applied');
-      await alice.locator('section:has(h2#audit-title)').getByText('platform.admin').first().waitFor({ timeout: 10_000 });
-      assert(await alice.locator('section:has(h2#audit-title)').getByText('platform.admin').first().isVisible(), 'audit row recorded');
+      await alice.locator('section:has(h2#audit-title)').getByText('Platform access changed').first().waitFor({ timeout: 10_000 });
+      assert(await alice.locator('section:has(h2#audit-title)').getByText('Platform access changed').first().isVisible(), 'audit row recorded');
 
       // Mutual demotion race: with a third (untouched) administrator both
       // demotions may legitimately apply, so every request must end in
       // 303/403/409 and never 5xx; afterwards the platform still answers an
       // administrator with the page.
       const bob = await browser.newPage();
+      bob.on('dialog', modal => modal.accept());
       {
         const ctx = bob.context();
         const cookie = await fixtureCookie(ctx.request, 'Bob (fixture)');
@@ -222,6 +226,8 @@ async function isAdminPage(page) {
       const copied = rolesPanel.locator('.settings-config__row', { hasText: templateName });
       await copied.waitFor({ timeout: 10_000 });
       assert(!(await copied.textContent()).includes('Comment on transactions'), 'copy isolated from template edits');
+      // Role rows are collapsed summaries; expand to read the permission list.
+      if (!(await copied.evaluate(el => el.open))) await copied.locator('summary').click();
       assert(await copied.getByText('Update stock').isVisible());
 
       assert.equal(await alice.locator('dialog:visible').count(), 0);

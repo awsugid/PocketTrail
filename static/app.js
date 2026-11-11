@@ -12,16 +12,194 @@
   if (window.PocketTrailUIReady) return;
   window.PocketTrailUIReady = true;
 
-  // Keep native disclosure toggling and Tab order; Escape is only a dismissal.
+  // One dismissal rule for every shell disclosure (nav drawer, account and
+  // organization menus): Escape, outside click, or focus leaving closes it.
+  var shellMenus = ".navdrawer[open], .menu[open]";
   document.addEventListener("keydown", function (event) {
     if (event.key !== "Escape" || event.defaultPrevented) return;
     if (document.querySelector("dialog[open]")) return;
-    var drawer = document.querySelector(".navdrawer[open]");
-    if (!drawer) return;
-    drawer.open = false;
-    drawer.querySelector("summary").focus();
+    var menu = document.querySelector(shellMenus);
+    if (!menu) return;
+    menu.open = false;
+    menu.querySelector("summary").focus();
     event.preventDefault();
   });
+  document.addEventListener("pointerdown", function (event) {
+    document.querySelectorAll(shellMenus).forEach(function (menu) {
+      if (!menu.contains(event.target)) menu.open = false;
+    });
+  });
+  document.addEventListener("focusin", function (event) {
+    document.querySelectorAll(shellMenus).forEach(function (menu) {
+      if (!menu.contains(event.target)) menu.open = false;
+    });
+  });
+
+  // One rule for invalid submissions: every invalid field (native or enhanced)
+  // shows a persistent inline message with aria-invalid, and focus goes to the
+  // first invalid control in DOM order. Enhanced controls hide their native
+  // field, so the browser's own first-invalid focus cannot be trusted.
+  var invalidBatch = null;
+  document.addEventListener("invalid", function (event) {
+    var field = event.target;
+    if (!field.form) return;
+    if (!field.closest(".pt-control")) {
+      field.setAttribute("aria-invalid", "true");
+      var id = field.id ? field.id + "-validation" : null;
+      var note = id && document.getElementById(id);
+      if (!note) {
+        note = document.createElement("p");
+        note.className = "field-validation";
+        note.setAttribute("role", "alert");
+        if (id) note.id = id;
+        field.after(note);
+        if (id) field.setAttribute("aria-describedby", [field.getAttribute("aria-describedby"), id].filter(Boolean).join(" "));
+      }
+      note.textContent = field.validationMessage;
+      event.preventDefault();
+    }
+    if (!invalidBatch) {
+      invalidBatch = [];
+      // Each invalid event gets its own microtask checkpoint; a macrotask sees them all.
+      setTimeout(function () {
+        var fields = invalidBatch; invalidBatch = null;
+        var first = fields.sort(function (a, b) { return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1; })[0];
+        if (!first) return;
+        if (first.closest(".pt-control")) { first.dispatchEvent(new CustomEvent("pt:surface-invalid")); return; }
+        first.scrollIntoView({ block: "center" });
+        first.focus({ preventScroll: true });
+      }, 0);
+    }
+    invalidBatch.push(field);
+  }, true);
+  document.addEventListener("input", function (event) {
+    var field = event.target;
+    if (field.getAttribute && field.getAttribute("aria-invalid") === "true" && field.checkValidity && field.checkValidity() && !field.closest(".pt-control")) {
+      field.removeAttribute("aria-invalid");
+      var note = field.id && document.getElementById(field.id + "-validation");
+      if (note) note.textContent = "";
+    }
+  });
+
+  // Destructive forms carry hx-confirm; htmx owns that prompt.
+
+  // Filter toolbars submit on change; the button stays as the no-JS fallback.
+  // After the boosted navigation, focus returns to the control that changed and
+  // the result count is announced, so keyboard users keep their place.
+  var pendingFilterFocus = null;
+  document.addEventListener("change", function (event) {
+    var form = event.target.closest("form[data-autosubmit]");
+    if (!form) return;
+    pendingFilterFocus = event.target.id;
+    form.requestSubmit();
+  });
+  function hideAutosubmitButtons() {
+    document.querySelectorAll("[data-autosubmit-fallback]").forEach(function (button) { button.hidden = true; });
+    if (!pendingFilterFocus) return;
+    var field = document.getElementById(pendingFilterFocus);
+    pendingFilterFocus = null;
+    if (!field) return;
+    var control = field.closest(".pt-control");
+    var trigger = control && control.querySelector(".pt-trigger");
+    (trigger || field).focus({ preventScroll: true });
+    var count = field.closest("form") && field.closest("form").querySelector("[data-result-count]");
+    if (count) {
+      var live = document.getElementById("filter-announce");
+      if (!live) {
+        live = document.createElement("p");
+        live.id = "filter-announce";
+        live.className = "visually-hidden";
+        live.setAttribute("role", "status");
+        document.body.append(live);
+      }
+      live.textContent = "Filter applied. " + count.textContent.trim() + ".";
+    }
+  }
+  document.addEventListener("DOMContentLoaded", hideAutosubmitButtons);
+  document.addEventListener("htmx:afterSettle", hideAutosubmitButtons);
+  if (document.readyState !== "loading") hideAutosubmitButtons();
+
+  // Anchor targets must clear whatever is sticky: banners + topbar + section nav.
+  function updateStickyOffset() {
+    var topbar = document.querySelector(".topbar");
+    var nav = document.querySelector(".section-nav");
+    var offset = 16;
+    if (topbar && getComputedStyle(topbar).position === "sticky") {
+      var topbarHeight = topbar.getBoundingClientRect().height;
+      offset += topbarHeight;
+      document.documentElement.style.setProperty("--topbar-height", Math.round(topbarHeight) + "px");
+    }
+    if (nav && getComputedStyle(nav).position === "sticky") offset += nav.getBoundingClientRect().height;
+    document.documentElement.style.setProperty("--sticky-offset", Math.round(offset) + "px");
+  }
+  document.addEventListener("DOMContentLoaded", updateStickyOffset);
+  document.addEventListener("htmx:afterSettle", updateStickyOffset);
+  window.addEventListener("resize", updateStickyOffset);
+  if (document.readyState !== "loading") updateStickyOffset();
+
+  // Section navigation reflects the section currently in view.
+  function trackSectionNav() {
+    var nav = document.querySelector(".section-nav");
+    if (!nav || nav.dataset.tracked) return;
+    nav.dataset.tracked = "true";
+    var links = Array.from(nav.querySelectorAll("a[href^='#']"));
+    var targets = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); }).filter(Boolean);
+    if (!targets.length) return;
+    function setCurrent(ids) {
+      if (!Array.isArray(ids)) ids = [ids];
+      links.forEach(function (a) {
+        if (ids.indexOf(a.getAttribute("href").slice(1)) >= 0) a.setAttribute("aria-current", "true");
+        else a.removeAttribute("aria-current");
+      });
+    }
+    // Two-column layouts put several sections in the band at once: the topmost wins.
+    var visible = new Set();
+    var pinned = null; // the clicked target stays current until the user scrolls again
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) { if (entry.isIntersecting) visible.add(entry.target); else visible.delete(entry.target); });
+      if (pinned) { if (visible.has(pinned)) setCurrent(pinned.id); return; }
+      // Nearest section heading to the reading line (40% down the viewport):
+      // works for one column and for side-by-side panels at different heights.
+      // Side-by-side panels that start on the same grid row are read together,
+      // so both are current.
+      var line = innerHeight * 0.4;
+      var ranked = Array.from(visible).sort(function (a, b) {
+        return Math.abs(a.getBoundingClientRect().top - line) - Math.abs(b.getBoundingClientRect().top - line);
+      });
+      if (!ranked.length) return;
+      var bestTop = ranked[0].getBoundingClientRect().top;
+      setCurrent(ranked.filter(function (t) { return Math.abs(t.getBoundingClientRect().top - bestTop) < 8; }).map(function (t) { return t.id; }));
+    }, { rootMargin: "-40% 0px -55% 0px" });
+    window.addEventListener("wheel", function () { pinned = null; }, { passive: true });
+    window.addEventListener("touchmove", function () { pinned = null; }, { passive: true });
+    window.addEventListener("keydown", function (e) { if (/^(Arrow|Page|Home|End| )/.test(e.key)) pinned = null; });
+    targets.forEach(function (t) { observer.observe(t); });
+    // Initial state: the hash target, else the first section.
+    var initial = location.hash && document.getElementById(location.hash.slice(1));
+    setCurrent((targets.indexOf(initial) >= 0 ? initial : targets[0]).id);
+    // Overflow cue mirrors the table rule: show a fade while more links hide to the right.
+    function updateNavCue() {
+      var more = nav.scrollWidth - nav.clientWidth - nav.scrollLeft > 2;
+      nav.classList.toggle("section-nav--more", more);
+    }
+    nav.addEventListener("scroll", updateNavCue, { passive: true });
+    new ResizeObserver(updateNavCue).observe(nav);
+    updateNavCue();
+    // Keep the current link in view when it changes.
+    nav.addEventListener("click", function (event) {
+      var a = event.target.closest("a[href^='#']");
+      if (a) a.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+    nav.addEventListener("click", function (event) {
+      var a = event.target.closest("a[href^='#']");
+      if (!a) return;
+      pinned = document.getElementById(a.getAttribute("href").slice(1));
+      setCurrent(a.getAttribute("href").slice(1));
+    });
+  }
+  document.addEventListener("DOMContentLoaded", trackSectionNav);
+  document.addEventListener("htmx:load", trackSectionNav);
+  if (document.readyState !== "loading") trackSectionNav();
 
   // One overflow rule for every table, including HTMX-loaded and resized content.
   var tableCueId = 0;
@@ -147,6 +325,21 @@
       dialog.addEventListener("cancel", function (event) {
         event.preventDefault();
         requestDialogClose(dialog);
+      });
+      // Native modal cycling can land on <body> for one Tab press; wrap
+      // deterministically between the first and last focusable controls.
+      dialog.addEventListener("keydown", function (event) {
+        if (event.key !== "Tab") return;
+        var focusable = Array.from(dialog.querySelectorAll(
+          "a[href], button:not(:disabled), input:not(:disabled):not([type=hidden]), select:not(:disabled), textarea:not(:disabled), summary, [tabindex]:not([tabindex='-1'])"
+        )).filter(function (el) { return el.offsetParent !== null || el === document.activeElement; });
+        if (!focusable.length) return;
+        var first = focusable[0], last = focusable[focusable.length - 1];
+        if (event.shiftKey && (document.activeElement === first || document.activeElement === title)) {
+          event.preventDefault(); last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault(); first.focus();
+        }
       });
       // A drag out of the content must not count as a backdrop click.
       var backdropDown = false;
@@ -379,6 +572,16 @@
     return "Rp " + rupiah.toLocaleString("id-ID", opts);
   }
 
+  /* Formatted IDR preview beside manual-entry money fields. */
+  document.addEventListener("input", function (e) {
+    var input = e.target.closest("[data-money-preview]");
+    if (!input) return;
+    var out = document.querySelector(input.getAttribute("data-money-preview"));
+    if (!out) return;
+    var match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(input.value.trim());
+    out.textContent = match ? "= " + formatMinor(Number(match[1]) * 100 + Number(((match[2] || "") + "00").slice(0, 2))) : "";
+  });
+
   function updateAllocTotal(list) {
     var out = document.querySelector(list.getAttribute("data-alloc-total"));
     if (!out) return;
@@ -404,6 +607,47 @@
   document.addEventListener("DOMContentLoaded", initializeTotals);
   document.addEventListener("htmx:load", initializeTotals);
   if (document.readyState !== "loading") initializeTotals();
+
+  /* Stock change preview: "Current N → Result M" from option data-levels. */
+  function updateStockPreview(form) {
+    var out = form.querySelector("[data-stock-preview]");
+    var item = form.querySelector('[name="item_id"]');
+    var location = form.querySelector('[name="location_id"]');
+    var direction = form.querySelector('[name="direction"]');
+    var quantity = form.querySelector('[name="quantity"]');
+    if (!out || !item || !location || !direction || !quantity) return;
+    var option = item.options[item.selectedIndex];
+    var current = 0;
+    ((option && option.dataset.levels) || "").split(",").forEach(function (pair) {
+      var parts = pair.split(":");
+      if (parts[0] === location.value) current = parseInt(parts[1], 10) || 0;
+    });
+    var qty = parseInt(quantity.value, 10);
+    var text = "Current at this location: " + current;
+    if (qty > 0) {
+      var result = direction.value === "remove" ? current - qty : current + qty;
+      text += " \u2192 after change: " + result;
+      if (result < 0) text += " (not enough stock)";
+      quantity.setCustomValidity(result < 0 ? "Only " + current + " in stock at this location." : "");
+    } else {
+      quantity.setCustomValidity("");
+    }
+    out.textContent = text;
+  }
+  document.addEventListener("input", function (e) {
+    var form = e.target.closest("form[data-stock-form]");
+    if (form) updateStockPreview(form);
+  });
+  document.addEventListener("change", function (e) {
+    var form = e.target.closest("form[data-stock-form]");
+    if (form) updateStockPreview(form);
+  });
+  function initializeStockPreviews() {
+    document.querySelectorAll("form[data-stock-form]").forEach(updateStockPreview);
+  }
+  document.addEventListener("DOMContentLoaded", initializeStockPreviews);
+  document.addEventListener("htmx:load", initializeStockPreviews);
+  if (document.readyState !== "loading") initializeStockPreviews();
 
   /* Mention chips insert @Name at the cursor of the linked textarea. */
   document.addEventListener("click", function (e) {

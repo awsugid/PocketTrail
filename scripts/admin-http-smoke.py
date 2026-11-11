@@ -288,7 +288,7 @@ def main():
     # --- the same surface from bob's own organization (positive isolation)
     alice.request(indonesia + "/settings", expected=(403,))
     body = bob.request(indonesia + "/settings")
-    assert b"Create invitation" in body
+    assert b"Send invitation" in body
     iemail = f"invite-{uuid.uuid4().hex[:8]}@example.test"
     created_bob0 = count("invitation.created", "committed", actor="bob", org=2)
     revoked_bob0 = count("invitation.revoked", "committed", actor="bob", org=2)

@@ -9,7 +9,7 @@
 
   {% if google_configured and google_client_id %}
   <div class="field">
-    <div id="google-btn" aria-label="Sign in with Google"></div>
+    <div id="google-btn"></div>
     <noscript><p class="hint">Google sign-in needs JavaScript. Ask an organizer for a local invite if you cannot use it.</p></noscript>
   </div>
   {% elif google_configured %}
@@ -43,7 +43,7 @@
 </div>
 
 {% if google_configured and google_client_id %}
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://accounts.google.com/gsi/client?hl=en" async defer></script>
 <script>
   window.addEventListener("load", function () {
     if (!window.google || !google.accounts || !google.accounts.id) return;

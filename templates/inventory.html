@@ -7,7 +7,7 @@
   <h1>Inventory</h1>
   <p class="page-head__sub">Stock by item and location. Open an item for its change history.</p>
   {% if can.update_stock %}
-  <nav class="dialog-actions inventory-actions" aria-label="Inventory actions">
+  <nav class="inventory-actions" aria-label="Inventory actions">
     <a class="btn btn--primary" href="#stock-change" data-dialog-open="stock-change"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"/></svg>Stock change</a>
     <a class="btn" href="#add-item" data-dialog-open="add-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 5v10l9 4 9-4V8m-9 5v9"/></svg>Add item</a>
     <a class="btn" href="#add-location" data-dialog-open="add-location"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 11-8 11S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>Add location</a>
@@ -20,11 +20,12 @@
   <h2 class="panel__title">Stock by location</h2>
   <div class="table-scroll">
     <table class="table inventory-table" role="table">
+      <caption class="visually-hidden">Merchandise stock by item and location</caption>
       <thead role="rowgroup">
         <tr role="row">
-          <th scope="col">Item</th>
-          <th scope="col">Location</th>
-          <th scope="col" class="cell--num">Quantity</th>
+          <th role="columnheader" scope="col">Item</th>
+          <th role="columnheader" scope="col">Location</th>
+          <th role="columnheader" scope="col" class="cell--num">Quantity</th>
         </tr>
       </thead>
       <tbody role="rowgroup">
@@ -32,7 +33,7 @@
           {% if item.levels %}
           {% for lv in item.levels %}
           <tr role="row">
-            <td role="cell"><a href="/org/{{ org.slug }}/inventory/items/{{ item.id }}">{{ item.name }}</a><span class="cell__sub">{{ item.variant or "No variant" }} · <span class="inventory-table__total">Total {{ item.total_qty }}</span></span></td>
+            <td role="cell"><a href="/org/{{ org.slug }}/inventory/items/{{ item.id }}">{{ item.name }}</a><span class="cell__sub">{{ item.variant or "No variant" }} · <span class="inventory-table__total">{{ item.total_qty }} across {{ item.levels | length }} location{% if item.levels | length != 1 %}s{% endif %}</span></span></td>
             <td role="cell" data-label="Location">{{ lv.location_name }}</td>
             <td role="cell" data-label="Quantity" class="cell--num">{{ lv.qty }}</td>
           </tr>
@@ -52,25 +53,29 @@
 {% else %}
 <div class="empty">
   <h2 class="empty__title">No merchandise tracked yet</h2>
-  <p class="empty__body">Members with stock-update permission can add shirts, tumblers, or other merchandise and record where they are held.</p>
+  <p class="empty__body">Track leftover shirts, tumblers, and other merchandise by where they are held. Add an item and a location first, then record stock.</p>
+  {% if can.update_stock %}
+  <a class="btn btn--primary" href="#add-item" data-dialog-open="add-item">Add item</a>
+  <a class="btn" href="#add-location" data-dialog-open="add-location">Add location</a>
+  {% endif %}
 </div>
 {% endif %}
 
 {% if can.update_stock %}
 <section class="panel" id="stock-change" data-dialog-panel aria-labelledby="stock-change-heading">
   <h2 class="panel__title" id="stock-change-heading">Record stock change</h2>
-  <p class="panel__sub">Record the quantity added or removed. Changes retain who updated stock, when, and why.</p>
+  <p class="panel__sub">Changes retain who updated stock, when, and why. Stock cannot go below zero.</p>
   {% if not items or not locations %}
   <p class="notice notice--muted">Add an item and a location before recording stock.</p>
   {% endif %}
-  <form method="post" action="/org/{{ org.slug }}/inventory/stock">
+  <form method="post" action="/org/{{ org.slug }}/inventory/stock" data-stock-form>
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="form-grid form-grid--paired">
       <div class="field">
         <label for="stock-item">Item <span class="req" aria-hidden="true">*</span></label>
         <select class="select" id="stock-item" name="item_id" required>
           {% if items %}{% for item in items %}
-          <option value="{{ item.id }}">{{ item.name }}{% if item.variant %} ({{ item.variant }}){% endif %}</option>
+          <option value="{{ item.id }}" data-levels="{% for lv in item.levels %}{{ lv.location_id }}:{{ lv.qty }}{% if not loop.last %},{% endif %}{% endfor %}">{{ item.name }}{% if item.variant %} ({{ item.variant }}){% endif %}</option>
           {% endfor %}{% endif %}
         </select>
       </div>
@@ -83,9 +88,16 @@
         </select>
       </div>
       <div class="field">
-        <label for="stock-delta">Change <span class="req" aria-hidden="true">*</span></label>
-        <input class="input" type="number" id="stock-delta" name="delta" step="1" required placeholder="e.g. -2 or 5">
-        <p class="hint">Positive adds stock, negative removes it.</p>
+        <label for="stock-direction">Direction <span class="req" aria-hidden="true">*</span></label>
+        <select class="select" id="stock-direction" name="direction" required>
+          <option value="add">Add to stock</option>
+          <option value="remove">Remove from stock</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="stock-quantity">Quantity <span class="req" aria-hidden="true">*</span></label>
+        <input class="input" type="number" id="stock-quantity" name="quantity" min="1" step="1" inputmode="numeric" required placeholder="e.g. 2" aria-describedby="stock-preview">
+        <p class="hint" id="stock-preview" aria-live="polite" data-stock-preview>Pick an item and location to see the current quantity.</p>
       </div>
       <div class="field">
         <label for="stock-reason">Reason <span class="req" aria-hidden="true">*</span></label>

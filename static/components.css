@@ -1,59 +1,59 @@
 /* Scoped progressive controls; native fields work unchanged before enhancement. */
 :root{--pt-components:ready}
-.pt-control{position:relative;display:inline-flex;flex-wrap:wrap;vertical-align:middle;width:100%;min-width:0;color:#18181b;font:inherit}
-.pt-validation{width:100%;color:#b91c1c;font-size:12px;margin-top:4px}
+.pt-control{position:relative;display:inline-flex;flex-wrap:wrap;vertical-align:middle;width:100%;min-width:0;color:var(--text,#18181b);font:inherit}
+.pt-validation{width:100%;color:var(--danger,#b42318);font-size:12px;margin-top:4px}
 .pt-validation:empty{display:none}
 /* HTMX restores source class/style after insertion. Ownership is structural. */
 .pt-control>select,.pt-control>input[type=date]{visibility:hidden!important;pointer-events:none!important;position:absolute!important;width:1px!important;height:1px!important;min-height:0!important;padding:0!important;margin:0!important;border:0!important;overflow:hidden!important;clip-path:inset(50%)!important;white-space:nowrap!important}
-.pt-control .pt-trigger{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:40px;padding:9px 12px;border:1px solid #d4d4d8;border-radius:6px;background:#fff;color:#18181b;font:inherit;font-size:13px;text-align:left;cursor:pointer;box-shadow:0 1px 2px rgb(0 0 0 / .035)}
+.pt-control .pt-trigger{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:40px;padding:9px 12px;border:1px solid var(--control-border,#d4d4d8);border-radius:6px;background:var(--surface,#fff);color:var(--text,#18181b);font:inherit;font-size:13px;text-align:left;cursor:pointer;box-shadow:0 1px 2px rgb(0 0 0 / .035)}
 .pt-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pt-trigger svg{flex:none;width:16px;height:16px;fill:none;stroke:#71717a;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-.pt-control .pt-trigger:hover:not(:disabled){border-color:#a1a1aa;background:#fafafa}
-.pt-control .pt-trigger:disabled{cursor:not-allowed;color:#71717a;background:#f4f4f5}
-.pt-control .pt-trigger[aria-invalid=true]{border-color:#b91c1c}
+.pt-trigger svg{flex:none;width:16px;height:16px;fill:none;stroke:var(--text-secondary,#62626b);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.pt-control .pt-trigger:hover:not(:disabled){border-color:var(--border-strong,#a1a1aa);background:var(--bg,#fafafa)}
+.pt-control .pt-trigger:disabled{cursor:not-allowed;color:var(--text-secondary,#62626b);background:var(--surface-2,#f4f4f5)}
+.pt-control .pt-trigger[aria-invalid=true]{border-color:var(--danger,#b42318)}
 .pt-control .pt-trigger:focus-visible,.pt-popover :focus-visible{outline:2px solid var(--focus,#a15120);outline-offset:2px}
-.pt-popover{position:fixed;inset:auto;margin:0;box-sizing:border-box;padding:5px;border:1px solid #e4e4e7;border-radius:8px;background:#fff;color:#18181b;box-shadow:0 4px 8px rgb(0 0 0 / .06),0 12px 28px rgb(0 0 0 / .10);font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#d4d4d8 #fff}
+.pt-popover{position:fixed;inset:auto;margin:0;box-sizing:border-box;padding:5px;border:1px solid var(--border,#e4e4e7);border-radius:8px;background:var(--surface,#fff);color:var(--text,#18181b);box-shadow:0 4px 8px rgb(0 0 0 / .06),0 12px 28px rgb(0 0 0 / .10);font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--control-border,#d4d4d8) var(--surface,#fff)}
 /* Top-layer entry/exit follows native visibility; unsupported browsers stay instant. */
 @media(prefers-reduced-motion:no-preference){
 .pt-popover{opacity:0;transform:translateY(-3px);transition:opacity 120ms ease-out,transform 120ms ease-out,display 120ms allow-discrete,overlay 120ms allow-discrete}
 .pt-popover:popover-open{opacity:1;transform:translateY(0)}
 @starting-style{.pt-popover:popover-open{opacity:0;transform:translateY(-3px)}}
 }
-.pt-popover::selection,.pt-popover ::selection{background:#e4e4e7;color:#18181b}
+.pt-popover::selection,.pt-popover ::selection{background:var(--border,#e4e4e7);color:var(--text,#18181b)}
 .pt-options{max-height:320px}
 .pt-option{position:relative;border-radius:4px;padding:9px 30px 9px 10px;cursor:pointer;overflow-wrap:anywhere;min-height:36px;box-sizing:border-box}
-.pt-option:hover,.pt-option:focus{background:#f4f4f5;outline:none}
+.pt-option:hover,.pt-option:focus{background:var(--surface-2,#f4f4f5);outline:none}
 .pt-option:focus-visible{outline:2px solid var(--focus,#a15120);outline-offset:-2px}
 .pt-option[aria-selected=true]{font-weight:600}
 .pt-option[aria-selected=true]::after{content:"";position:absolute;right:12px;top:14px;width:9px;height:5px;border-bottom:1.8px solid currentColor;border-left:1.8px solid currentColor;transform:rotate(-45deg)}
-.pt-option.pt-option--cursor{background:#f4f4f5;outline:none}
-.pt-combobox-note{margin:0;padding:9px 10px;color:#62626b}
-.pt-control .input[aria-expanded=true]{border-color:#a1a1aa}
-.pt-option[aria-disabled=true]{color:#71717a;cursor:not-allowed;background:transparent}
-.pt-option-group{padding:9px 10px 4px;font-size:11px;font-weight:600;color:#62626b}
+.pt-option.pt-option--cursor{background:var(--surface-2,#f4f4f5);outline:none}
+.pt-combobox-note{margin:0;padding:9px 10px;color:var(--text-secondary,#62626b)}
+.pt-control .input[aria-expanded=true]{border-color:var(--border-strong,#a1a1aa)}
+.pt-option[aria-disabled=true]{color:var(--text-secondary,#62626b);cursor:not-allowed;background:transparent}
+.pt-option-group{padding:9px 10px 4px;font-size:11px;font-weight:600;color:var(--text-secondary,#62626b)}
 .pt-calendar{padding:14px}
 .pt-calendar-nav{display:flex;align-items:center;gap:6px}
-.pt-popover .pt-button{appearance:none;display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:7px 10px;border:1px solid #e4e4e7;border-radius:5px;background:#fff;color:#27272a;font:inherit;font-weight:500;cursor:pointer;box-shadow:none;line-height:1.3}
-.pt-popover .pt-button:hover{background:#f4f4f5}
+.pt-popover .pt-button{appearance:none;display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:7px 10px;border:1px solid var(--border,#e4e4e7);border-radius:5px;background:var(--surface,#fff);color:var(--primary,#27272a);font:inherit;font-weight:500;cursor:pointer;box-shadow:none;line-height:1.3}
+.pt-popover .pt-button:hover{background:var(--surface-2,#f4f4f5)}
 .pt-popover .pt-month-step{font-size:11px;padding:7px}
-.pt-calendar .pt-month-number,.pt-calendar .pt-year-number,.pt-calendar .pt-date-manual{box-sizing:border-box;min-width:0;height:36px;border:1px solid #d4d4d8;border-radius:5px;background:#fff;color:#18181b;font:inherit;padding:6px;caret-color:#27272a}
+.pt-calendar .pt-month-number,.pt-calendar .pt-year-number,.pt-calendar .pt-date-manual{box-sizing:border-box;min-width:0;height:36px;border:1px solid var(--control-border,#d4d4d8);border-radius:5px;background:var(--surface,#fff);color:var(--text,#18181b);font:inherit;padding:6px;caret-color:var(--primary,#27272a)}
 .pt-month-number{width:48px}.pt-year-number{flex:1;width:68px}
 .pt-calendar-heading{padding:14px 0 10px;font-weight:600;text-align:center}
 .pt-date-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}
-.pt-date-week>[role=columnheader]{padding:5px 0;text-align:center;color:#62626b;font-size:11px}
-.pt-calendar .pt-day{appearance:none;display:block;width:100%;aspect-ratio:1;min-height:34px;border:0;border-radius:5px;padding:0;background:#fff;color:#27272a;font:inherit;cursor:pointer;box-shadow:none}
-.pt-calendar .pt-day:hover,.pt-calendar .pt-day:focus-visible{background:#f4f4f5}
-.pt-calendar .pt-day-outside{color:#71717a}
-.pt-calendar .pt-day[aria-current=date]{box-shadow:inset 0 0 0 1px #a1a1aa}
-.pt-calendar .pt-day[aria-selected=true]{background:#27272a;color:#fff;font-weight:600}
-.pt-calendar .pt-day[aria-disabled=true]{color:#a1a1aa;text-decoration:line-through;cursor:not-allowed}
-.pt-date-hint{margin:12px 0 8px;font-size:11px;color:#62626b}
+.pt-date-week>[role=columnheader]{padding:5px 0;text-align:center;color:var(--text-secondary,#62626b);font-size:11px}
+.pt-calendar .pt-day{appearance:none;display:block;width:100%;aspect-ratio:1;min-height:34px;border:0;border-radius:5px;padding:0;background:var(--surface,#fff);color:var(--primary,#27272a);font:inherit;cursor:pointer;box-shadow:none}
+.pt-calendar .pt-day:hover,.pt-calendar .pt-day:focus-visible{background:var(--surface-2,#f4f4f5)}
+.pt-calendar .pt-day-outside{color:var(--text-secondary,#62626b)}
+.pt-calendar .pt-day[aria-current=date]{box-shadow:inset 0 0 0 1px var(--border-strong,#a1a1aa)}
+.pt-calendar .pt-day[aria-selected=true]{background:var(--primary,#27272a);color:var(--surface,#fff);font-weight:600}
+.pt-calendar .pt-day[aria-disabled=true]{color:var(--border-strong,#a1a1aa);text-decoration:line-through;cursor:not-allowed}
+.pt-date-hint{margin:12px 0 8px;font-size:11px;color:var(--text-secondary,#62626b)}
 .pt-date-label{display:block;font-size:12px;font-weight:500;margin:0 0 5px}
 .pt-calendar .pt-date-manual{width:100%;font-variant-numeric:tabular-nums}
-.pt-date-error{margin:5px 0;color:#b91c1c;font-size:12px}
+.pt-date-error{margin:5px 0;color:var(--danger,#b42318);font-size:12px}
 .pt-date-error:empty{display:none}
-.pt-date-actions{display:flex;gap:6px;margin-top:12px}
-.pt-date-actions .pt-button:last-child{margin-left:auto;background:#27272a;border-color:#27272a;color:#fff}
+.pt-date-actions{display:flex;gap:6px;margin-top:12px;position:sticky;bottom:0;padding:8px 0 2px;background:var(--surface,#fff);box-shadow:0 -8px 8px -8px rgb(0 0 0 / .12)}
+.pt-date-actions .pt-button:last-child{margin-left:auto;background:var(--primary,#27272a);border-color:var(--primary,#27272a);color:var(--surface,#fff)}
 @media(max-width:480px){.pt-control .pt-trigger{min-height:44px;font-size:16px}.pt-popover{font-size:14px}.pt-option{min-height:44px;padding-top:12px;padding-bottom:12px}.pt-calendar .pt-date-manual,.pt-calendar .pt-month-number,.pt-calendar .pt-year-number{font-size:16px;min-height:40px}.pt-popover .pt-button{min-height:40px}.pt-calendar .pt-day{min-height:38px}}
 @media(prefers-reduced-motion:reduce){.pt-control *,.pt-popover,.pt-popover *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 @media(forced-colors:active){.pt-option[aria-selected=true],.pt-calendar .pt-day[aria-selected=true]{outline:2px solid Highlight}.pt-popover{border:1px solid CanvasText}}

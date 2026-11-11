@@ -283,7 +283,7 @@ pub async fn create(mut req: Request, ctx: RouteContext<App>) -> worker::Result<
         statement_text: text,
     };
     if invalid_payload(&payload) {
-        return Ok(fail(400, "Statement must contain 1–2,000 rows with valid dates/times and money magnitudes at most 9,000,000,000,000,000 minor units."));
+        return Ok(fail(400, "Statement must contain between 1 and 2,000 rows with valid dates, times, and amounts. Re-extract the original PDF if rows look wrong."));
     }
     let bytes = file.bytes().await?;
     if bytes.len() > FILE_LIMIT || !bytes.starts_with(b"%PDF-") {

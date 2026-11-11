@@ -131,6 +131,142 @@ pub fn normalize_target(path: &str) -> String {
     }
 }
 
+/// Organizer-facing label for an audit action code. Codes are the stored
+/// truth; this is presentation only, so unknown codes fall back to themselves.
+pub fn action_label(action: &str) -> String {
+    // Transaction history stores bare codes; the audit log stores dotted ones.
+    let label = match action {
+        "details_updated" => "Details saved",
+        "documentation_submitted" => "Submitted for review",
+        "approved" => "Approved",
+        "changes_requested" => "Changes requested",
+        "evidence_attached" => "Document attached",
+        "notifications_suppressed" => "Notifications suppressed",
+        "notifications_resumed" => "Notifications resumed",
+        "commented" => "Comment posted",
+        "auth.login" => "Signed in",
+        "auth.logout" => "Signed out",
+        "http.post" => "Form submission",
+        "http.get" => "Page viewed",
+        "document.download" => "Document downloaded",
+        "import.staged" => "Import previewed",
+        "import.committed" => "Import confirmed",
+        "invitation.created" => "Invitation created",
+        "invitation.resent" => "Invitation email resent",
+        "invitation.revoked" => "Invitation revoked",
+        "invitation.accepted" => "Invitation accepted",
+        "mapping.created" => "Actor mapping added",
+        "mapping.deleted" => "Actor mapping deleted",
+        "member.added" => "Member added",
+        "member.removed" => "Member removed",
+        "member.restored" => "Member restored",
+        "member.role_changed" => "Member role changed",
+        "notifications.settings_changed" => "Notification settings changed",
+        "org.created" => "Organization created",
+        "org.roles" => "Roles changed",
+        "role.created" => "Role created",
+        "role.updated" => "Role updated",
+        "pocket.created" => "Pocket added",
+        "item.added" => "Inventory item added",
+        "location.added" => "Inventory location added",
+        "stock.changed" => "Stock changed",
+        "transaction.commented" => "Comment posted",
+        "transaction.details_updated" => "Transaction details saved",
+        "transaction.evidence_attached" => "Document attached",
+        "transaction.submitted" => "Submitted for review",
+        "transaction.approved" => "Transaction approved",
+        "transaction.changes_requested" => "Changes requested",
+        "transaction.notifications_suppressed" => "Transaction notifications suppressed",
+        "transaction.notifications_resumed" => "Transaction notifications resumed",
+        "transaction.created" => "Transaction recorded manually",
+        "platform.admin" => "Platform access changed",
+        "platform.template" => "Role template saved",
+        _ => return action.to_string(),
+    };
+    label.to_string()
+}
+
+/// Organizer-facing description of a normalized audit target. Route paths
+/// become the thing acted on; non-path targets (names, ids) pass through.
+pub fn target_label(target: &str) -> String {
+    // Handler-written targets: "kind:identifier", possibly several per line.
+    if !target.starts_with('/') && target.contains(':') {
+        let parts: Vec<String> = target
+            .split(' ')
+            .map(|piece| match piece.split_once(':') {
+                Some(("transaction", id)) => format!("Transaction #{id}"),
+                Some(("import_batch", id)) => format!("Import batch #{id}"),
+                Some(("document", id)) => format!("Document #{id}"),
+                Some(("membership", id)) => format!("Member {}", if id.bytes().all(|b| b.is_ascii_digit()) { format!("#{id}") } else { format!("@{id}") }),
+                Some(("organization", slug)) => format!("Organization /{slug}"),
+                Some(("item", rest)) => format!("Item {}", rest.replace(':', " · ")),
+                Some(("location", name)) => format!("Location {name}"),
+                Some(("delta", n)) => format!("change {n}"),
+                Some(("role", id)) => format!("Role {}", if id.bytes().all(|b| b.is_ascii_digit()) { format!("#{id}") } else { id.to_string() }),
+                Some(("mapping", id)) => format!("Actor mapping {id}"),
+                Some(("pocket", name)) => format!("Pocket {name}"),
+                Some(("session", _)) | None if piece == "session" => "Session".to_string(),
+                _ => piece.to_string(),
+            })
+            .collect();
+        return parts.join(" · ");
+    }
+    let seg: Vec<&str> = target.trim_start_matches('/').split('/').collect();
+    let rest: &[&str] = match seg.as_slice() {
+        ["org", _, rest @ ..] => rest,
+        other => other,
+    };
+    let id = |s: &str| format!("#{s}");
+    let text = match rest {
+        ["transactions"] => "Transactions".to_string(),
+        ["transactions", "new"] => "New transaction".to_string(),
+        ["transactions", n] => format!("Transaction {}", id(n)),
+        ["transactions", n, action] => format!("Transaction {} · {}", id(n), action.replace('-', " ")),
+        ["documents", n] => format!("Document {}", id(n)),
+        ["imports"] => "Statement import".to_string(),
+        ["imports", n] => format!("Import batch {}", id(n)),
+        ["imports", n, "confirm"] => format!("Import batch {} · confirm", id(n)),
+        ["inventory"] => "Inventory".to_string(),
+        ["inventory", "items"] => "Inventory items".to_string(),
+        ["inventory", "items", n] => format!("Inventory item {}", id(n)),
+        ["inventory", "locations"] => "Inventory locations".to_string(),
+        ["inventory", "stock"] => "Stock levels".to_string(),
+        ["settings"] => "Settings".to_string(),
+        ["settings", "roles"] => "Roles".to_string(),
+        ["settings", "roles", n] => format!("Role {}", id(n)),
+        ["settings", "role-templates"] => "Role templates".to_string(),
+        ["settings", "members"] => "Members".to_string(),
+        ["settings", "members", n, action] => format!("Member {} · {}", id(n), action),
+        ["settings", "mappings"] => "Actor mappings".to_string(),
+        ["settings", "mappings", n, "delete"] => format!("Actor mapping {} · delete", id(n)),
+        ["settings", "pockets"] => "Pockets".to_string(),
+        ["settings", "notifications"] => "Notification settings".to_string(),
+        ["settings", "invitations"] => "Invitations".to_string(),
+        ["settings", "invitations", _, action] => format!("Invitation · {action}"),
+        ["notifications", "digest"] => "Weekly digest".to_string(),
+        ["login", _] | ["logout"] | ["session"] => "Session".to_string(),
+        ["orgs"] => "Organizations".to_string(),
+        ["platform"] => "Global settings".to_string(),
+        ["platform", "users", "admin"] => "Platform access".to_string(),
+        ["platform", "role-templates"] => "Role templates".to_string(),
+        ["invitations", "accept"] => "Invitation acceptance".to_string(),
+        ["unrecognized"] => "Unrecognized address".to_string(),
+        _ => return target.to_string(),
+    };
+    text
+}
+
+/// Plain-English outcome for the audit table.
+pub fn outcome_label(outcome: &str) -> &str {
+    match outcome {
+        "committed" => "Done",
+        "denied" => "Denied",
+        "failed" => "Failed",
+        "attempt" | "attempted" => "Attempted",
+        other => other,
+    }
+}
+
 /// Outcome for a finished request, or `None` to record nothing.
 ///
 /// Success on an instrumented mutation returns `None`: the transaction that
@@ -228,6 +364,22 @@ pub fn page_offset(page: u32) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn labels_hide_route_syntax() {
+        assert_eq!(target_label("/org/:org/transactions/29/approve"), "Transaction #29 · approve");
+        assert_eq!(target_label("/org/:org/settings/members/3/remove"), "Member #3 · remove");
+        assert_eq!(target_label("Treasurer"), "Treasurer");
+        assert_eq!(target_label("transaction:3"), "Transaction #3");
+        assert_eq!(target_label("import_batch:3"), "Import batch #3");
+        assert_eq!(action_label("documentation_submitted"), "Submitted for review");
+        assert_eq!(target_label("item:1 location:1 delta:-2"), "Item 1 · Location 1 · change -2");
+        assert_eq!(target_label("membership:bob"), "Member @bob");
+        assert_eq!(outcome_label("attempt"), "Attempted");
+        assert_eq!(action_label("transaction.notifications_suppressed"), "Transaction notifications suppressed");
+        assert_eq!(action_label("member.removed"), "Member removed");
+        assert_eq!(action_label("custom.code"), "custom.code");
+    }
 
     #[test]
     fn observe_mutations_and_downloads_record_intent() {
