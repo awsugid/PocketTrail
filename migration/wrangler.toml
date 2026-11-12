@@ -1,0 +1,30 @@
+# SvelteKit migration slice: local validation only.
+#
+# Deliberately has no `account_id` and no `[[routes]]`, so an accidental
+# `wrangler deploy` cannot publish this worker over the live PocketTrail
+# service at pocket.awscommunity.id. The D1 id below is a placeholder, not the
+# production database, so `--remote` commands cannot reach real data either.
+name = "pockettrail-migration"
+main = ".svelte-kit/cloudflare/_worker.js"
+compatibility_date = "2025-09-01"
+# SvelteKit's server runtime imports a small amount of Node surface; the
+# adapter documentation requires this flag for that import graph.
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = ".svelte-kit/cloudflare"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "pockettrail_migration"
+database_id = "00000000-0000-4000-8000-000000000000"
+migrations_dir = "../migrations"
+
+[[r2_buckets]]
+binding = "DOCUMENTS"
+bucket_name = "pockettrail-migration-documents"
+
+# No LOCAL_DEV / SECRET_SESSION_KEY / GOOGLE_CLIENT_ID here on purpose: local
+# flags and secrets come from .dev.vars only, so they cannot leak into a
+# deployed var set.

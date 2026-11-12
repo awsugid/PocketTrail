@@ -1,0 +1,31 @@
+{
+  "name": "pockettrail-migration",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "npm run build && wrangler dev",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "test:unit": "vitest run",
+    "test:e2e": "node e2e/run.mjs",
+    "test:ui": "node e2e/ui.mjs",
+    "test": "npm run test:unit && npm run test:e2e",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:seed:local": "wrangler d1 execute DB --local --file ../tests/fixtures/seed.sql"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-cloudflare": "7.2.10",
+    "@sveltejs/kit": "2.70.4",
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "@types/node": "^22.20.5",
+    "playwright": "^1.61.1",
+    "svelte": "5.57.3",
+    "svelte-check": "4.7.8",
+    "typescript": "6.0.3",
+    "vite": "8.3.8",
+    "vitest": "5.1.0",
+    "wrangler": "4.160.1"
+  }
+}

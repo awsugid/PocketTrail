@@ -1,0 +1,545 @@
+/* PocketTrail migration slice: visual tokens from DESIGN.md, applied to the
+   wide-screen and 320px layouts the slice must survive. Two rules carry the
+   task hierarchy: prose and financial tables get width, and nothing is
+   wrapped in a border unless it is a real grouping. */
+
+:root {
+	--bg: #fafafa;
+	--surface: #fff;
+	--surface-2: #f4f4f5;
+	--text: #18181b;
+	--text-secondary: #62626b;
+	--border: #e4e4e7;
+	--border-strong: #a1a1aa;
+	--control-border: #d4d4d8;
+	--accent: #b45309;
+	--focus: #a15120;
+	--primary: #27272a;
+	--primary-hover: #3f3f46;
+	--danger: #b42318;
+	--danger-bg: #fff1f0;
+	--success: #176343;
+	--success-bg: #edf8f1;
+	--warning-text: #854d0e;
+	--warning-bg: #fff8e8;
+	--attention-text: #9a4614;
+	--attention-bg: #fff2e8;
+	--neutral-bg: #f0f0f2;
+	--radius-panel: 12px;
+	--radius-control: 6px;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	-webkit-text-size-adjust: 100%;
+}
+
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+	font-size: 14px;
+	line-height: 1.6;
+}
+
+a {
+	color: var(--text);
+	text-decoration-color: var(--border-strong);
+	text-underline-offset: 2px;
+}
+
+a:hover {
+	text-decoration-color: var(--accent);
+}
+
+:focus-visible {
+	outline: 2px solid var(--focus);
+	outline-offset: 2px;
+}
+
+.shell {
+	max-width: 1200px;
+	margin: 0 auto;
+	padding: 20px 20px 64px;
+}
+
+.masthead {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 16px;
+	align-items: baseline;
+	justify-content: space-between;
+	padding-bottom: 12px;
+	border-bottom: 1px solid var(--border);
+}
+
+.masthead__org {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 10px;
+	align-items: baseline;
+}
+
+.masthead__org-name {
+	font-weight: 650;
+	letter-spacing: -0.01em;
+}
+
+.masthead__nav {
+	display: flex;
+	gap: 14px;
+	align-items: baseline;
+}
+
+.masthead__nav a {
+	color: var(--text-secondary);
+	text-decoration: none;
+}
+
+.masthead__nav a[aria-current='page'] {
+	color: var(--text);
+	font-weight: 600;
+}
+
+.masthead__nav a:hover {
+	color: var(--text);
+}
+
+.page-head {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 20px;
+	align-items: flex-end;
+	justify-content: space-between;
+	margin: 28px 0 4px;
+}
+
+h1 {
+	margin: 0;
+	font-size: 28px;
+	font-weight: 650;
+	line-height: 1.25;
+	letter-spacing: -0.035em;
+}
+
+h2 {
+	margin: 0 0 8px;
+	font-size: 18px;
+	font-weight: 650;
+	line-height: 1.4;
+	letter-spacing: -0.02em;
+}
+
+.lede {
+	margin: 6px 0 0;
+	max-width: 70ch;
+	color: var(--text-secondary);
+}
+
+.meta-line {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 14px;
+	margin: 10px 0 0;
+	color: var(--text-secondary);
+	font-size: 13px;
+}
+
+/* Filters read as one compact row, not a panel of controls. */
+.toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px 16px;
+	align-items: flex-end;
+	margin: 20px 0 12px;
+}
+
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	font-size: 13px;
+	color: var(--text-secondary);
+}
+
+.select,
+.input {
+	font: inherit;
+	font-size: 14px;
+	color: var(--text);
+	background: var(--surface);
+	border: 1px solid var(--control-border);
+	border-radius: var(--radius-control);
+	padding: 7px 10px;
+	min-height: 36px;
+}
+
+.select:focus-visible,
+.input:focus-visible {
+	border-color: var(--focus);
+	outline-offset: 0;
+}
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font: inherit;
+	font-size: 14px;
+	font-weight: 550;
+	color: var(--text);
+	background: var(--surface);
+	border: 1px solid var(--control-border);
+	border-radius: var(--radius-control);
+	padding: 7px 12px;
+	min-height: 36px;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.btn:hover {
+	background: var(--surface-2);
+}
+
+.btn--primary {
+	color: #fafafa;
+	background: var(--primary);
+	border-color: var(--primary);
+}
+
+.btn--primary:hover {
+	background: var(--primary-hover);
+}
+
+.btn--quiet {
+	background: transparent;
+	border-color: transparent;
+	color: var(--text-secondary);
+}
+
+.btn--quiet:hover {
+	background: var(--surface-2);
+	color: var(--text);
+}
+
+.count {
+	margin: 0;
+	color: var(--text-secondary);
+	font-size: 13px;
+}
+
+/* Wide financial table: full width, no surrounding border box. */
+.table-scroll {
+	overflow-x: auto;
+	margin-top: 4px;
+}
+
+table.ledger {
+	width: 100%;
+	border-collapse: collapse;
+	font-variant-numeric: tabular-nums;
+}
+
+table.ledger caption {
+	text-align: left;
+	color: var(--text-secondary);
+	font-size: 13px;
+	padding-bottom: 8px;
+}
+
+table.ledger thead th {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	background: var(--bg);
+	text-align: left;
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+	color: var(--text-secondary);
+	padding: 8px 12px 8px 0;
+	border-bottom: 1px solid var(--border-strong);
+	white-space: nowrap;
+}
+
+table.ledger tbody td {
+	padding: 12px 12px 12px 0;
+	border-bottom: 1px solid var(--border);
+	vertical-align: top;
+}
+
+table.ledger tbody tr:hover td {
+	background: var(--surface);
+}
+
+.cell--num {
+	text-align: right;
+	padding-right: 0 !important;
+	white-space: nowrap;
+}
+
+.cell--nowrap {
+	white-space: nowrap;
+}
+
+.cell__sub {
+	display: block;
+	color: var(--text-secondary);
+	font-size: 12px;
+}
+
+.row-identity a {
+	font-weight: 550;
+	text-decoration: none;
+}
+
+.row-identity a:hover {
+	text-decoration: underline;
+}
+
+.amount--in {
+	color: var(--success);
+}
+
+.badge {
+	display: inline-block;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1.4;
+	padding: 2px 7px;
+	border-radius: 5px;
+	white-space: nowrap;
+}
+
+.badge--needs {
+	color: var(--attention-text);
+	background: var(--attention-bg);
+}
+
+.badge--review {
+	color: var(--warning-text);
+	background: var(--warning-bg);
+}
+
+.badge--approved {
+	color: var(--success);
+	background: var(--success-bg);
+}
+
+.badge--changes {
+	color: var(--danger);
+	background: var(--danger-bg);
+}
+
+.badge--muted {
+	color: var(--text-secondary);
+	background: var(--neutral-bg);
+}
+
+/* Detail: one dominant reading column plus a narrow reference rail. */
+.detail-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 32px;
+	margin-top: 24px;
+}
+
+@media (min-width: 960px) {
+	.detail-grid {
+		grid-template-columns: minmax(0, 1fr) 300px;
+		gap: 48px;
+	}
+}
+
+.detail-section + .detail-section {
+	margin-top: 28px;
+}
+
+.rail {
+	border-top: 1px solid var(--border);
+	padding-top: 16px;
+}
+
+@media (min-width: 960px) {
+	.rail {
+		border-top: 0;
+		border-left: 1px solid var(--border);
+		padding: 0 0 0 24px;
+	}
+}
+
+dl.facts {
+	margin: 0;
+	display: grid;
+	grid-template-columns: minmax(96px, auto) 1fr;
+	gap: 6px 16px;
+	font-size: 13px;
+}
+
+dl.facts dt {
+	color: var(--text-secondary);
+}
+
+dl.facts dd {
+	margin: 0;
+	overflow-wrap: anywhere;
+}
+
+.prose-block {
+	margin: 0;
+	max-width: 72ch;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.empty-state {
+	margin-top: 24px;
+	padding: 32px 0;
+	border-top: 1px solid var(--border);
+	border-bottom: 1px solid var(--border);
+	max-width: 60ch;
+}
+
+.empty-state p {
+	margin: 0 0 8px;
+	color: var(--text-secondary);
+}
+
+ol.plain-list,
+ul.plain-list {
+	margin: 0;
+	padding-left: 1.25em;
+}
+
+ul.plain-list li {
+	margin-bottom: 6px;
+}
+
+.choice-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin: 16px 0 0;
+	list-style: none;
+	padding: 0;
+	max-width: 460px;
+}
+
+.choice-list li form {
+	margin: 0;
+}
+
+.choice-list .btn {
+	width: 100%;
+	justify-content: flex-start;
+	gap: 10px;
+}
+
+.notice {
+	margin: 16px 0;
+	padding: 10px 12px;
+	background: var(--warning-bg);
+	border-radius: var(--radius-control);
+	color: var(--warning-text);
+	max-width: 60ch;
+}
+
+.notice--danger {
+	background: var(--danger-bg);
+	color: var(--danger);
+}
+
+.auth-column {
+	max-width: 420px;
+	margin: 56px auto 0;
+}
+
+.auth-column h1 {
+	font-size: 24px;
+}
+
+.pager {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	margin-top: 20px;
+}
+
+.muted {
+	color: var(--text-secondary);
+}
+
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	* {
+		transition: none !important;
+		animation: none !important;
+	}
+}
+
+@media (max-width: 640px) {
+	.shell {
+		padding: 12px 12px 48px;
+	}
+
+	h1 {
+		font-size: 22px;
+	}
+
+	/* The header row stays in the accessibility tree; it is only moved out of
+	   the visual flow, so each stacked cell keeps its column association. */
+	table.ledger thead {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+	}
+
+	table.ledger,
+	table.ledger tbody,
+	table.ledger tr,
+	table.ledger td {
+		display: block;
+	}
+
+	table.ledger tbody tr {
+		padding: 12px 0;
+		border-bottom: 1px solid var(--border);
+	}
+
+	table.ledger tbody td {
+		border: 0;
+		padding: 2px 0;
+	}
+
+	/* The header row is gone, so each money fact keeps its label inline. */
+	table.ledger tbody td[data-label]::before {
+		content: attr(data-label) ': ';
+		color: var(--text-secondary);
+	}
+
+	.cell--num {
+		text-align: left;
+	}
+}
