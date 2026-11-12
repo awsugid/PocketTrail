@@ -75,6 +75,17 @@ describe('workflow decisions', () => {
 		expect(submitTransaction(ACTIVE, expenseTxn(), 'carol')).toBeNull();
 		expect(submitTransaction(ACTIVE, expenseTxn({ documentation: { explanation: '', evidence: [], evidenceUnavailableReason: null } }), 'carol')).toMatchObject({ kind: 'IncompleteDocumentation' });
 		expect(submitTransaction(ACTIVE, expenseTxn({ status: 'submitted' }), 'carol')).toMatchObject({ kind: 'InvalidStatus' });
+		expect(submitTransaction(org(new Set(['ViewTransactions'])), expenseTxn(), 'carol')).toMatchObject({ kind: 'NotAuthorized', required: 'DocumentTransactions' });
+	});
+	it('income with notes needs no purposes, evidence, or approval', () => {
+		const income = expenseTxn({ direction: 'in', purposes: [], documentation: { explanation: 'Member income notes', evidence: [], evidenceUnavailableReason: null } });
+		expect(validateDocumentation(income)).toBeNull();
+		expect(income.documentation.evidence.push('attachment')).toBe(1);
+		expect(validateDocumentation({ ...income, documentation: { explanation: ' \n\t', evidence: ['attachment'], evidenceUnavailableReason: null } })).toMatchObject({ kind: 'IncompleteDocumentation', what: 'explanation' });
+	});
+	it('approval only from submitted, comments never revert it', () => {
+		const draft = expenseTxn();
+		expect(approveTransaction(ACTIVE, draft, 'carol')).toMatchObject({ kind: 'InvalidStatus', expected: 'submitted', actual: 'draft' });
 	});
 	it('approve requires submitted state and excludes any responsible member', () => {
 		const submitted = expenseTxn({ status: 'submitted' });
