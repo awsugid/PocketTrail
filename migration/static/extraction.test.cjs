@@ -1,9 +1,9 @@
 "use strict";
 /* Standalone test for the fixed-grid text reconstruction.
-   Run: node static/extraction.test.js
+   Run: node static/extraction.test.cjs
    All fixture content is synthetic; no real statement values appear here. */
 var assert = require("assert");
-var ex = require("./extraction.js");
+var ex = require("./extraction.cjs");
 
 function item(str, x, y, w) {
   var it = { str: str, transform: [1, 0, 0, 1, x, y] };
@@ -82,5 +82,5 @@ assert.strictEqual(italicRows.length, 2, "italic note shares transaction line");
 assert.ok(italicRows[0].includes("Event food") && italicRows[0].includes("01 Mar 2025"));
 assert.ok(italicRows[1].includes("ID# TEST-77"), "time/ID line stays separate");
 
-console.log("extraction.test.js: all assertions passed (fixed absolute-x grid)");
+console.log("extraction.test.cjs: all assertions passed (fixed absolute-x grid)");
 
