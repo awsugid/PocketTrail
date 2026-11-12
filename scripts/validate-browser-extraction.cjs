@@ -18,11 +18,11 @@ async function main() {
   const server = http.createServer(async (req, res) => {
     if (req.url === "/") {
       res.setHeader("Content-Type", "text/html");
-      res.end('<!doctype html><title>Local extraction test</title><script src="/extraction.js"></script>');
+      res.end('<!doctype html><title>Local extraction test</title><script src="/extraction.cjs"></script>');
       return;
     }
     const allowed = new Map([
-      ["/extraction.js", "extraction.js"],
+      ["/extraction.cjs", "extraction.cjs"],
       ["/vendor/pdf.min.mjs", "vendor/pdf.min.mjs"],
       ["/vendor/pdf.worker.min.mjs", "vendor/pdf.worker.min.mjs"],
     ]);
@@ -30,7 +30,7 @@ async function main() {
     if (!relative) { res.writeHead(404); res.end(); return; }
     try {
       res.setHeader("Content-Type", "text/javascript");
-      res.end(await fs.readFile(path.join(root, "static", relative)));
+      res.end(await fs.readFile(path.join(root, "migration", "static", relative)));
     } catch { res.writeHead(500); res.end(); }
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
