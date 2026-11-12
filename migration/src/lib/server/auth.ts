@@ -54,7 +54,10 @@ export interface OrgRow {
 	is_synthetic: number;
 	notifications_enabled: number;
 	notification_cutoff_date: string | null;
+	notification_revision: number;
 	created_at: number;
+	creator_membership_id: number | null;
+	income_explanation_role_id: number | null;
 }
 
 export interface MemberRow {
