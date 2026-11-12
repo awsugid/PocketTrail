@@ -3,10 +3,15 @@
 // calls, so a binding change shows up as a type error rather than as silent
 // `unknown` access. Runtime validation still happens in db.ts.
 
+export interface D1Meta {
+	changes?: number;
+	[key: string]: unknown;
+}
+
 export interface D1Result<T> {
 	results: T[];
 	success?: boolean;
-	meta?: unknown;
+	meta?: D1Meta;
 }
 
 export interface D1PreparedStatement {
@@ -18,23 +23,37 @@ export interface D1PreparedStatement {
 
 export interface D1Database {
 	prepare(query: string): D1PreparedStatement;
+	/** D1 batch: statements run sequentially in one implicit transaction; any
+	 * failure aborts the whole batch. */
+	batch<T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]>;
 }
 
-/** Only `get` is declared: this slice proves the binding is wired, and private
- * evidence retrieval is ported in a later slice. */
+export interface R2Body {
+	arrayBuffer(): Promise<ArrayBuffer>;
+}
+
+export interface R2Object {
+	body?: R2Body;
+	[key: string]: unknown;
+}
+
+/** Private-document bucket. Only put/get of whole small objects is used, so
+ * the type stays minimal; a binding change must surface as a type error. */
 export interface R2Bucket {
-	get(key: string): Promise<unknown>;
+	put(key: string, value: ArrayBuffer | Uint8Array | string): Promise<unknown>;
+	get(key: string): Promise<R2Object | null>;
 }
 
 export interface ExecutionContextLike {
 	waitUntil(promise: Promise<unknown>): void;
 }
 
-/** The `env` contract of migration/wrangler.toml plus .dev.vars. */
+/** The `env` contract of wrangler.toml plus .dev.vars. */
 export interface Bindings {
 	DB: D1Database;
 	DOCUMENTS: R2Bucket;
 	SECRET_SESSION_KEY?: string;
 	LOCAL_DEV?: string;
 	GOOGLE_CLIENT_ID?: string;
+	EMAIL_DELIVERY_ENABLED?: string;
 }

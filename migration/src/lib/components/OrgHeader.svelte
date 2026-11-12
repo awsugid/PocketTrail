@@ -22,7 +22,7 @@
 		{/if}
 	</div>
 	<nav class="masthead__nav" aria-label="Organization">
-		<a href="/org/{org.slug}/ledger" aria-current={active === 'ledger' ? 'page' : undefined}>Ledger</a>
+		<a href="/org/{org.slug}/transactions" aria-current={active === 'ledger' ? 'page' : undefined}>Ledger</a>
 		<form method="POST" action="/logout">
 			<input type="hidden" name="csrf_token" value={csrfToken} />
 			<button class="btn btn--quiet" type="submit">Sign out</button>

@@ -33,7 +33,7 @@
 	<ul class="plain-list" style="margin-top: 24px; max-width: 60ch">
 		{#each data.organizations as org (org.slug)}
 			<li>
-				<a href="/org/{org.slug}/ledger">{org.name}</a>
+				<a href="/org/{org.slug}/transactions">{org.name}</a>
 			</li>
 		{/each}
 	</ul>

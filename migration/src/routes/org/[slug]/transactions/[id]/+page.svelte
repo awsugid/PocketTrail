@@ -1,26 +1,15 @@
 <script lang="ts">
-	import OrgHeader from '$lib/components/OrgHeader.svelte';
+	import OrgShell from '$lib/components/OrgShell.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
 	const entry = $derived(data.entry);
-	const ledgerHref = $derived(`/org/${data.org.slug}/ledger`);
+	const ledgerHref = $derived(`/org/${data.shell.org.slug}/transactions`);
 </script>
 
-<svelte:head>
-	<title>{entry.counterparty.name} · {data.org.name}</title>
-</svelte:head>
-
-<OrgHeader
-	org={data.org}
-	organizations={data.organizations}
-	userName={data.user.name}
-	csrfToken={data.csrfToken}
-	active="ledger"
-/>
-
-<p style="margin: 20px 0 0"><a href={ledgerHref}>← Ledger</a></p>
+<OrgShell {...data.shell} active="transactions">
+	<p style="margin: 0 0 16px"><a href={ledgerHref}>← Ledger</a></p>
 
 <div class="page-head">
 	<div>
@@ -86,7 +75,7 @@
 			{/if}
 		</section>
 
-		<section class="detail-section">
+			<section class="detail-section">
 			<h2>Review</h2>
 			{#if entry.status === 'approved'}
 				<p>
@@ -96,7 +85,7 @@
 			{:else if entry.status === 'changes_requested'}
 				<p>Changes were requested; the responsible member must save details before review.</p>
 			{:else}
-				<p class="muted">Awaiting review. Approval is not available in this migration slice.</p>
+				<p class="muted">Awaiting review.</p>
 			{/if}
 		</section>
 	</div>
@@ -132,3 +121,5 @@
 		{/if}
 	</aside>
 </div>
+</OrgShell>
+

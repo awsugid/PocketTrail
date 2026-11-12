@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { orgsOfUser, requireMember } from '$lib/server/auth';
+import { requireMember, shellContext } from '$lib/server/auth';
 import { ledgerDetail } from '$lib/server/ledger';
 import type { PageServerLoad } from './$types';
 
@@ -13,10 +13,7 @@ export const load: PageServerLoad = async (event) => {
 	const entry = await ledgerDetail(ctx.db, ctx.org.id, id);
 	if (!entry) throw error(404, 'That transaction does not exist in this organization.');
 	return {
-		org: { slug: ctx.org.slug, name: ctx.org.name, isSynthetic: ctx.org.is_synthetic !== 0 },
-		user: { name: ctx.user.name },
-		organizations: await orgsOfUser(ctx.db, ctx.user.id),
-		csrfToken: ctx.session.csrf,
+		shell: await shellContext(ctx),
 		entry
 	};
 };

@@ -1,36 +1,25 @@
 <script lang="ts">
-	import OrgHeader from '$lib/components/OrgHeader.svelte';
+	import OrgShell from '$lib/components/OrgShell.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
-	const base = $derived(`/org/${data.org.slug}/ledger`);
+	const base = $derived(`/org/${data.shell.org.slug}/transactions`);
 	const countLabel = $derived(
 		`${data.entries.length}${data.hasNext ? '+' : ''} transaction${data.entries.length === 1 ? '' : 's'}`
 	);
 </script>
 
-<svelte:head>
-	<title>Ledger · {data.org.name}</title>
-</svelte:head>
-
-<OrgHeader
-	org={data.org}
-	organizations={data.organizations}
-	userName={data.user.name}
-	csrfToken={data.csrfToken}
-	active="ledger"
-/>
-
-<div class="page-head">
-	<div>
-		<h1>Ledger</h1>
-		<p class="lede">
-			Bank movements from this organization's pockets. Money facts come from statements; explanations,
-			evidence, and approval are added here.
-		</p>
+<OrgShell {...data.shell} active="transactions">
+	<div class="page-head">
+		<div>
+			<h1>Ledger</h1>
+			<p class="lede">
+				Bank movements from this organization's pockets. Money facts come from statements; explanations,
+				evidence, and approval are added here.
+			</p>
+		</div>
 	</div>
-</div>
 
 <form class="toolbar" method="GET" action={base}>
 	<div class="field">
@@ -124,8 +113,12 @@
 		{#if data.filter === 'all'}
 			<p>No bank movements have been recorded for this organization yet.</p>
 			<p class="muted">
-				Movements arrive by importing a bank statement. This slice does not include the import flow
-				yet, so an empty ledger here means no statement has been imported.
+				Movements arrive by importing a bank statement
+				{#if data.canImport}
+					— <a href="/org/{data.shell.org.slug}/imports">start an import</a>.
+				{:else}
+					; ask a member who can import statements.
+				{/if}
 			</p>
 		{:else}
 			<p>No transactions match this status filter.</p>
@@ -135,3 +128,5 @@
 		{/if}
 	</div>
 {/if}
+</OrgShell>
+

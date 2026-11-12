@@ -62,7 +62,7 @@ async function runChecks() {
 		`${noSession.status} ${noSession.headers.get('location')}`
 	);
 
-	const noSessionLedger = await anon.get('/org/demo-jakarta/ledger');
+	const noSessionLedger = await anon.get('/org/demo-jakarta/transactions');
 	check(
 		'unauthenticated ledger redirects to /login',
 		noSessionLedger.status === 303 &&
@@ -167,7 +167,7 @@ async function runChecks() {
 	);
 
 	// -------------------------------------------------------------- ledger read
-	const ledger = await alice.get('/org/demo-jakarta/ledger');
+	const ledger = await alice.get('/org/demo-jakarta/transactions');
 	const ledgerHtml = await ledger.text();
 	check('ledger renders for a member', ledger.status === 200, String(ledger.status));
 	check(
@@ -190,7 +190,7 @@ async function runChecks() {
 		`${ledger.headers.get('cache-control')} ${ledger.headers.get('x-frame-options')}`
 	);
 
-	const filtered = await alice.get('/org/demo-jakarta/ledger?status=needs_details');
+	const filtered = await alice.get('/org/demo-jakarta/transactions?status=needs_details');
 	const filteredHtml = await filtered.text();
 	check(
 		'needs-details filter keeps only documentation shortfalls',
@@ -201,34 +201,34 @@ async function runChecks() {
 	);
 
 	// ------------------------------------------------------------- cross-org reads
-	const foreignOrg = await alice.get('/org/demo-indonesia/ledger');
+	const foreignOrg = await alice.get('/org/demo-indonesia/transactions');
 	check(
 		'a non-member cannot read another organization\'s ledger',
 		foreignOrg.status === 403,
 		String(foreignOrg.status)
 	);
 
-	const ownEntry = await alice.get('/org/demo-jakarta/ledger/1');
+	const ownEntry = await alice.get('/org/demo-jakarta/transactions/1');
 	check('a member can open one of their organization\'s entries', ownEntry.status === 200, String(ownEntry.status));
 
-	const missingEntry = await alice.get('/org/demo-jakarta/ledger/999999');
+	const missingEntry = await alice.get('/org/demo-jakarta/transactions/999999');
 	check('a missing entry is not found', missingEntry.status === 404, String(missingEntry.status));
 
-	const crossOrgEntry = await alice.get('/org/demo-jakarta/ledger/900');
+	const crossOrgEntry = await alice.get('/org/demo-jakarta/transactions/900');
 	check(
 		'another organization\'s entry is indistinguishable from a missing one',
 		crossOrgEntry.status === 404,
 		String(crossOrgEntry.status)
 	);
 
-	const crossOrgPath = await alice.get('/org/demo-indonesia/ledger/900');
+	const crossOrgPath = await alice.get('/org/demo-indonesia/transactions/900');
 	check(
 		'another organization\'s path is forbidden before the entry is looked up',
 		crossOrgPath.status === 403,
 		String(crossOrgPath.status)
 	);
 
-	const bogusId = await alice.get('/org/demo-jakarta/ledger/not-a-number');
+	const bogusId = await alice.get('/org/demo-jakarta/transactions/not-a-number');
 	check('a non-numeric entry id is not found', bogusId.status === 404, String(bogusId.status));
 
 	// ------------------------------------------------------ cross-org data leakage
@@ -242,7 +242,7 @@ async function runChecks() {
 		bobOrgs.includes('Jakarta — synthetic demo') && bobOrgs.includes('Indonesia — synthetic demo'),
 		'org list is wrong for bob'
 	);
-	const bobForeign = await bob.get('/org/demo-jakarta/ledger/900');
+	const bobForeign = await bob.get('/org/demo-jakarta/transactions/900');
 	check(
 		'isolation follows the organization, not the user',
 		bobForeign.status === 404,
@@ -258,7 +258,7 @@ async function runChecks() {
 		user_id: 'dana'
 	});
 	check('a member without the ledger permission can sign in', danaSignedIn.status === 303);
-	const danaLedger = await dana.get('/org/demo-jakarta/ledger');
+	const danaLedger = await dana.get('/org/demo-jakarta/transactions');
 	const danaBody = await danaLedger.text();
 	check(
 		'an active member whose role lacks the permission is denied',

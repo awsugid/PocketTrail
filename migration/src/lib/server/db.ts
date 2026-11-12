@@ -22,6 +22,21 @@ export async function qOne<T>(
 	return (await statement.first<T>()) ?? null;
 }
 
+/** Execute a statement without reading results. */
+export async function exec(
+	db: D1Database,
+	sql: string,
+	params: readonly unknown[] = []
+): Promise<void> {
+	const statement = params.length ? db.prepare(sql).bind(...params) : db.prepare(sql);
+	await statement.run();
+}
+
+/** Epoch milliseconds, from the runtime clock. */
+export function nowMs(): number {
+	return Date.now();
+}
+
 /** Epoch seconds, from the runtime clock. */
 export function nowSecs(): number {
 	return Math.floor(Date.now() / 1000);

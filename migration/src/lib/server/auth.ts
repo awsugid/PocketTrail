@@ -25,6 +25,7 @@ import {
 	type CookieOptions,
 	type Session
 } from './session';
+import { googlePicture } from './profile';
 
 /** The parts of a request event the guards need. */
 export type CtxEvent = Pick<RequestEvent, 'cookies' | 'platform' | 'url'>;
@@ -186,6 +187,35 @@ export async function orgsOfUser(
 		 WHERE m.user_id = ?1 AND m.removed_at IS NULL ORDER BY o.name`,
 		[userId]
 	);
+}
+
+/** Common props every organization page passes to OrgShell: identity, active
+ * organization context, membership list, and the session-bound CSRF token. */
+export async function shellContext(ctx: TenantContext) {
+	const organizations = await orgsOfUser(ctx.db, ctx.user.id);
+	return {
+		user: {
+			name: ctx.user.name,
+			email: ctx.user.email,
+			picture: ctx.user.picture ? googlePicture(ctx.user.picture) : null,
+			isPlatformAdmin: ctx.user.is_platform_admin !== 0
+		},
+		org: {
+			slug: ctx.org.slug,
+			name: ctx.org.name,
+			notificationsEnabled: ctx.org.notifications_enabled !== 0
+		},
+		organizations,
+		members: ctx.memberRows.map((m) => ({
+			id: m.id,
+			name: m.name,
+			email: m.email,
+			handle: m.handle,
+			active: m.removed_at === null
+		})),
+		csrfToken: ctx.session.csrf,
+		localMode: ctx.config.localDev
+	};
 }
 
 /** Requires an active membership of `slug` that grants `permission`. The

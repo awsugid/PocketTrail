@@ -1,4 +1,4 @@
-import { orgsOfUser, requireMember } from '$lib/server/auth';
+import { requireMember, shellContext } from '$lib/server/auth';
 import { LEDGER_FILTERS, ledgerPage, parseFilter, parsePage } from '$lib/server/ledger';
 import type { PageServerLoad } from './$types';
 
@@ -10,10 +10,7 @@ export const load: PageServerLoad = async (event) => {
 	const page = parsePage(event.url.searchParams.get('page'));
 	const result = await ledgerPage(ctx.db, ctx.org.id, filter, page);
 	return {
-		org: { slug: ctx.org.slug, name: ctx.org.name, isSynthetic: ctx.org.is_synthetic !== 0 },
-		user: { name: ctx.user.name },
-		organizations: await orgsOfUser(ctx.db, ctx.user.id),
-		csrfToken: ctx.session.csrf,
+		shell: await shellContext(ctx),
 		filter: filter ?? 'all',
 		filters: LEDGER_FILTERS,
 		canImport: ctx.can('ImportStatements'),
