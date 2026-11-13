@@ -221,14 +221,20 @@ await withWorker(async () => {
 		// ------------------------------------------------------------- settings
 		await page.goto(`${ORIGIN}/org/demo-jakarta/settings`);
 		check(
-			'settings renders its focused sections',
+			'settings index links its focused sections',
 			(await page.locator('h1').count()) === 1 &&
-				(await page.getByRole('heading', { name: 'Pockets' }).count()) === 1 &&
-				(await page.getByRole('heading', { name: 'People' }).count()) === 1 &&
-				(await page.getByRole('heading', { name: 'Roles' }).count()) === 1 &&
-				(await page.getByRole('heading', { name: 'Notifications' }).count()) === 1,
-			'section headings missing'
+				(await page.locator('nav[aria-label="Settings sections"] a').count()) === 6,
+			String(await page.locator('nav[aria-label="Settings sections"] a').count())
 		);
+		for (const section of ['pockets', 'routing', 'people', 'roles', 'notifications']) {
+			await page.goto(`${ORIGIN}/org/demo-jakarta/settings/${section}`);
+			check(
+				`settings ${section} page renders one heading and no overflow`,
+				(await page.locator('h1').count()) === 1 &&
+					(await page.locator('h1').first().innerText()).toLowerCase() === section
+			);
+		}
+		await page.goto(`${ORIGIN}/org/demo-jakarta/settings`);
 		await page.screenshot({ path: `${ROOT}/.wrangler/ui/settings-1440.png`, fullPage: true });
 		shots.push('settings-1440.png');
 		await page.setViewportSize({ width: 320, height: 900 });

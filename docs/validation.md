@@ -17,9 +17,9 @@ Environment: Node 22.20.0, npm 10.9.3, Linux. Pinned versions: `svelte` 5.57.3,
 | `npm run test:unit` | **135 passed** across 14 files |
 | `npm run test:extraction` | all assertions passed (browser extraction helper) |
 | `npm run test:e2e` | **46 runtime checks passed** |
-| `npm run test:journeys` | **134 checks passed**, 0 failures |
-| `npm run test:ui` | **25 rendered-UI checks passed** |
-| `printf 'n\n' \| CI=1 npx wrangler deploy --dry-run --outdir /tmp/pt-dry` | succeeded; 788.35 KiB upload (171.34 KiB gzip); bindings resolved as `env.DB` (D1), `env.DOCUMENTS` (R2), `env.ASSETS` |
+| `npm run test:journeys` | **139 checks passed**, 0 failures |
+| `npm run test:ui` | **30 rendered-UI checks passed** |
+| `printf 'n\n' \| CI=1 npx wrangler deploy --dry-run --outdir /tmp/pt-dry` | succeeded; 814.70 KiB upload (174.27 KiB gzip); bindings resolved as `env.DB` (D1), `env.DOCUMENTS` (R2), `env.ASSETS` |
 
 The runtime suites are not mocks. They apply `migrations/*.sql` to a fresh local
 D1 database with `wrangler d1 migrations apply --local`, seed
@@ -61,7 +61,7 @@ key), CSRF/origin enforcement, organization isolation (foreign ids reported as
 missing, non-members denied), permission-named denials, exact money rendering,
 response hygiene (`private, no-store`, `nosniff`, `DENY`), and logout.
 
-## Journey checks (134) — `e2e/journeys/*.mjs`
+## Journey checks (139) — `e2e/journeys/*.mjs`
 
 - **transactions** — documentation save with revision CAS, stale-revision
   rejection leaving no trace, historical responsible member denied approval,
@@ -77,7 +77,9 @@ response hygiene (`private, no-store`, `nosniff`, `DENY`), and logout.
   changed bank fields retained rather than overwritten, missing-ID batches
   blocking confirmation with a 409, repeated bank IDs quarantined in one
   statement, and organization/permission scoping of the staging page.
-- **settings** — per-section permissions, role validation requiring
+- **settings** — one page per section (pockets, routing, people, roles,
+  notifications) plus an index that only links and shows the audit trail;
+  per-section permissions, role validation requiring
   `ViewTransactions`, duplicate role/pocket/mapping rejection, active-owner
   rules, member grant/revoke/restore with immediate access loss, self-removal
   refusal, invitation create/revoke, notification enable gated on a fresh
@@ -90,14 +92,14 @@ response hygiene (`private, no-store`, `nosniff`, `DENY`), and logout.
   surviving version, no duplicate child rows) and two concurrent import
   confirmations (one row inserted, one result set).
 
-## Rendered UI checks (25) — `e2e/ui.mjs`
+## Rendered UI checks (30) — `e2e/ui.mjs`
 
 JavaScript-disabled sign-in, ledger at 320/768/1440/1920px with exact money and
 no horizontal overflow, stacked mobile cells keeping labels and table roles,
 keyboard focus order with visible outlines, reduced-motion rendering, transaction
 detail (purposes, owed-documentation notice, labelled controls, single `h1`),
-foreign-organization denial page, settings sections at desktop and 320px, import
-staging form labels, platform administration sections, an accessible-name audit
+foreign-organization denial page, the settings index and each focused settings
+route (desktop and 320px), import staging form labels, platform administration sections, an accessible-name audit
 of every visible control, and the mobile navigation toggle. Screenshots are
 written to `.wrangler/ui/` (git-ignored).
 

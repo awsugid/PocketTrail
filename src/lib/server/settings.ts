@@ -42,6 +42,8 @@ export interface SettingsCtx {
 	/** Every membership row of the org, active or not (Rust `g.mems`). */
 	memberRows: MemRow[];
 	secret: string | null;
+	/** Settings sub-route to return to after a mutation ("pockets", "people",…). */
+	section?: string;
 }
 
 function str(form: FormData, name: string): string {
@@ -67,9 +69,10 @@ function intOr(form: FormData, name: string, fallback: number): number {
 }
 
 /** Redirect back to the settings page with a flash message. */
-export function backPath(slug: string, message = ''): string {
+export function backPath(slug: string, message = '', section = ''): string {
 	const query = message === '' ? '' : `?msg=${encodeURIComponent(message)}`;
-	return `/org/${slug}/settings${query}`;
+	const suffix = section === '' ? '' : `/${section}`;
+	return `/org/${slug}/settings${suffix}${query}`;
 }
 
 // ------------------------------------------------------------ page data
@@ -285,7 +288,7 @@ export async function saveRole(ctx: SettingsCtx, form: FormData, id: number | nu
 			committed(ctx.db, ctx.org.id, ctx.user.id, 'role.created', `role:${name}`)
 		]);
 	}
-	return redirect(303, backPath(ctx.org.slug, 'Role saved'));
+	return redirect(303, backPath(ctx.org.slug, 'Role saved', ctx.section));
 }
 
 // --------------------------------------------------------------- members
@@ -316,7 +319,7 @@ export async function addMember(ctx: SettingsCtx, form: FormData): Promise<never
 			.bind(ctx.org.id, user.id, roleId, handle, nowMs()),
 		committed(ctx.db, ctx.org.id, ctx.user.id, 'member.added', `membership:${handle}`)
 	]);
-	return redirect(303, backPath(ctx.org.slug, 'Membership granted'));
+	return redirect(303, backPath(ctx.org.slug, 'Membership granted', ctx.section));
 }
 
 export async function setRole(ctx: SettingsCtx, form: FormData, id: number): Promise<never> {
@@ -331,7 +334,7 @@ export async function setRole(ctx: SettingsCtx, form: FormData, id: number): Pro
 			.bind(roleId, id, ctx.org.id),
 		committedIfChanged(ctx.db, ctx.org.id, ctx.user.id, 'member.role_changed', `membership:${id}`)
 	]);
-	return redirect(303, backPath(ctx.org.slug, 'Member role changed'));
+	return redirect(303, backPath(ctx.org.slug, 'Member role changed', ctx.section));
 }
 
 async function setMembershipActive(ctx: SettingsCtx, id: number, active: boolean): Promise<never> {
@@ -367,7 +370,7 @@ async function setMembershipActive(ctx: SettingsCtx, id: number, active: boolean
 	}
 	return redirect(
 		303,
-		backPath(ctx.org.slug, active ? 'Membership restored' : 'Access revoked; historical attribution retained')
+		backPath(ctx.org.slug, active ? 'Membership restored' : 'Access revoked; historical attribution retained', ctx.section)
 	);
 }
 
@@ -414,7 +417,7 @@ export async function addMapping(ctx: SettingsCtx, form: FormData): Promise<neve
 		// mapped membership is the stable, non-sensitive identity.
 		committed(ctx.db, ctx.org.id, ctx.user.id, 'mapping.created', `mapping:member-${member.id}`)
 	]);
-	return redirect(303, backPath(ctx.org.slug, 'Mapping saved; existing transaction assignments were not changed'));
+	return redirect(303, backPath(ctx.org.slug, 'Mapping saved; existing transaction assignments were not changed', ctx.section));
 }
 
 export async function deleteMapping(ctx: SettingsCtx, id: number): Promise<never> {
@@ -422,7 +425,7 @@ export async function deleteMapping(ctx: SettingsCtx, id: number): Promise<never
 		ctx.db.prepare('DELETE FROM actor_mappings WHERE id=?1 AND org_id=?2').bind(id, ctx.org.id),
 		committedIfChanged(ctx.db, ctx.org.id, ctx.user.id, 'mapping.deleted', `mapping:${id}`)
 	]);
-	return redirect(303, backPath(ctx.org.slug, 'Mapping removed; historical assignments retained'));
+	return redirect(303, backPath(ctx.org.slug, 'Mapping removed; historical assignments retained', ctx.section));
 }
 
 // --------------------------------------------------------------- pockets
@@ -452,7 +455,7 @@ export async function addPocket(ctx: SettingsCtx, form: FormData): Promise<never
 			.bind(ctx.org.id, name, opening, ownerMem.id),
 		committed(ctx.db, ctx.org.id, ctx.user.id, 'pocket.created', `pocket:${name}`)
 	]);
-	return redirect(303, backPath(ctx.org.slug, 'Pocket created'));
+	return redirect(303, backPath(ctx.org.slug, 'Pocket created', ctx.section));
 }
 
 export async function setPocketOwner(ctx: SettingsCtx, form: FormData, id: number): Promise<never> {
@@ -470,7 +473,7 @@ export async function setPocketOwner(ctx: SettingsCtx, form: FormData, id: numbe
 		// actionLabel intentionally falls back to the raw action code here.
 		committedIfChanged(ctx.db, ctx.org.id, ctx.user.id, 'pocket.owner_changed', `pocket:${id}`)
 	]);
-	return redirect(303, backPath(ctx.org.slug, 'Pocket owner saved; historical assignments retained'));
+	return redirect(303, backPath(ctx.org.slug, 'Pocket owner saved; historical assignments retained', ctx.section));
 }
 
 // ---------------------------------------------------------- income routing
@@ -493,7 +496,7 @@ export async function saveIncomeRole(ctx: SettingsCtx, form: FormData): Promise<
 			`organization:${ctx.org.id}`
 		)
 	]);
-	return redirect(303, backPath(ctx.org.slug, 'Income explanation role saved'));
+	return redirect(303, backPath(ctx.org.slug, 'Income explanation role saved', ctx.section));
 }
 
 // ---------------------------------------------------------- notifications
@@ -537,7 +540,7 @@ export async function saveNotifications(ctx: SettingsCtx, form: FormData): Promi
 	}
 	return redirect(
 		303,
-		backPath(ctx.org.slug, 'Notification settings saved; delivery remains local-outbox only')
+		backPath(ctx.org.slug, 'Notification settings saved; delivery remains local-outbox only', ctx.section)
 	);
 }
 
@@ -571,7 +574,7 @@ export async function sendDigest(ctx: SettingsCtx): Promise<never> {
 	}
 	return redirect(
 		303,
-		backPath(ctx.org.slug, 'Eligible weekly digests captured locally; no email was sent')
+		backPath(ctx.org.slug, 'Eligible weekly digests captured locally; no email was sent', ctx.section)
 	);
 }
 
