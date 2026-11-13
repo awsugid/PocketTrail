@@ -1,6 +1,6 @@
 ---
 name: PocketTrail
-description: Shadcn-inspired organizer workspace, server-rendered with HTMX
+description: Shadcn-inspired organizer workspace, server-rendered with SvelteKit
 colors:
   bg: "#fafafa"
   surface: "#fff"
@@ -149,26 +149,22 @@ are small authored inline SVG with consistent stroke treatment, never emoji.
   zinc borders and warm focus outlines. Read-only/disabled fields use a muted
   surface; invalid fields use an error border. Preserve native validation,
   names, permissions, CSRF and submission semantics when enhancing controls.
-- **Custom controls:** progressive select/date enhancements live separately in
-  `static/components.css` and `static/components.js`; retain native controls as
-  the source of form values and a usable fallback. Triggers match field borders,
-  six-pixel corners and 40px desktop / 44px mobile height. Native top-layer
-  popovers use white surfaces, eight-pixel corners and their own floating shadow.
-  Selects provide keyboard navigation, typeahead, disabled options and visible
-  selection. Date controls provide a seven-column calendar, month/year fields,
-  typed ISO date input and constraint errors; selected days are charcoal, today
-  outlined. Forced-colors mode preserves selection outlines. Enhancement initializes
-  after HTMX swaps and observes added controls; labels, focus, required validation
-  and original submitted values remain connected to native fields.
+- **Controls:** native `select`, `date`, `time`, `file` and `textarea` elements
+  are the source of form values and the no-JavaScript fallback. Styling lives in
+  `src/app.css` (`.input`, `.select`, `.btn`); no custom control library is
+  vendored. Destructive confirmations use plain labelled buttons and, where a
+  consequence needs explaining, a sentence next to the control rather than a
+  script dialog. Every control keeps a `<label for>` association, so keyboard
+  focus, required validation and screen-reader names survive enhancement.
 - **Tables:** sentence-case muted headers, generous rows, subtle hover, aligned
   tabular amounts and secondary metadata within cells. Captions identify tables.
 - **Feedback:** status/alert regions, extraction and allocation live updates,
-  local/synthetic banners, explicit empty-state actions. HTMX request styling
-  identifies busy submissions; existing JavaScript owns lifecycle behavior.
-  Destructive forms (remove member, revoke invitation, delete mapping, suppress
-  notifications, platform access) carry `hx-confirm` naming the consequence.
-  Domain rejections and audit codes are translated to organizer wording on the
-  server (`domain_map::user_message`, `audit_rules::action_label`); internal
+  local/synthetic banners, explicit empty-state actions. Forms are ordinary POST
+  submissions that still work without JavaScript; SvelteKit's `use:enhance`
+  adds in-place submission. Destructive actions (remove member, revoke
+  invitation, delete mapping, suppress notifications, platform access) state the
+  consequence before the button. Domain rejections and audit codes are translated
+  to organizer wording on the server (`userMessage`, `actionLabel`); internal
   state names such as Draft/Submitted never render.
 - **Motion:** menus enter over 160ms with a short upward offset and slight scale;
   disclosure carets rotate, button states transition over 120ms, request feedback

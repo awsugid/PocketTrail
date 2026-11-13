@@ -30,7 +30,7 @@ async function main() {
     if (!relative) { res.writeHead(404); res.end(); return; }
     try {
       res.setHeader("Content-Type", "text/javascript");
-      res.end(await fs.readFile(path.join(root, "migration", "static", relative)));
+      res.end(await fs.readFile(path.join(root, "static", relative)));
     } catch { res.writeHead(500); res.end(); }
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));

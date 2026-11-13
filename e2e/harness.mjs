@@ -141,7 +141,7 @@ export function prepareWorker() {
 		'DB',
 		'--local',
 		'--file',
-		'../tests/fixtures/seed.sql'
+		'tests/fixtures/seed.sql'
 	]);
 	run('npx', ['wrangler', 'd1', 'execute', 'DB', '--local', '--file', 'e2e/fixtures/extra.sql']);
 	run('npm', ['run', 'build']);

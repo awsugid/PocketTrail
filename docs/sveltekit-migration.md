@@ -248,3 +248,39 @@ delivery is part of this plan. Existing local-validation release boundary holds.
   bootstrap policy, notification transport and unresolved import-correction rules.
 - If existing data cannot fit safe integer arithmetic, settle exact storage and
   serialization representation before financial-rule porting.
+
+## Final status (executed)
+
+Phases 0–5 of this plan are complete in this repository; this section is the
+record, and the plan text above is retained as the decision history.
+
+- **One app, no split.** The SvelteKit application is the root project. There is
+  no Rust source, `Cargo.toml`/`Cargo.lock`, `build.rs`, Wasm target,
+  `worker-build` step, HTMX runtime, Minijinja templates, or separate frontend
+  build. `npm ci && npm run build` builds the Worker.
+- **Schema untouched.** `migrations/0001…0010` and `tests/fixtures/seed.sql` are
+  the same files the previous implementation used; no framework-coupled database
+  redesign happened.
+- **Server-only authority.** `$lib/server/*` holds sessions, permission
+  evaluation, D1/R2 access, the parser, financial rules, audit and notification
+  eligibility. Every protected load, action and endpoint re-authorizes against
+  rows read for that request; no layout load acts as a gate.
+- **Journeys.** Authentication and organization context, per-pocket ledger and
+  filters, imports (stage → preview → confirm), expense/income detail, review,
+  discussion, evidence, inventory, settings (pockets, mappings, people, roles,
+  notifications, audit), platform administration, invitations, and the local
+  notification outbox are all present as SvelteKit routes.
+- **Parity mechanisms.** Revision CAS with token-gated audit rows, import
+  status-token CAS, append-only audit triggers, quarantine of repeated bank IDs,
+  `duplicate_unchanged`/`conflict` classification, historical responsible-member
+  approval denial, income-only routing, suppression cancelling outbox rows, and
+  exact integer money are all exercised by the suites in
+  [validation.md](validation.md).
+- **Verification replaced, not weakened.** Rust-source inspection tests became
+  SQL tests over the real migrations plus HTTP/browser journeys against a built
+  Worker; see validation.md for the exact counts and the remaining unverified
+  items (live Google sign-in, private-sample comparison, real email delivery,
+  production deployment).
+
+The Rust implementation remains available in Git history for rollback reference;
+it is not kept in the working tree.

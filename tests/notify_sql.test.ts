@@ -7,7 +7,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MIGRATIONS_DIR = join(ROOT, 'migrations');
 
 let db: InstanceType<typeof DatabaseSync>;

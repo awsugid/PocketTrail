@@ -8,9 +8,10 @@ web
 
 ## Stack
 
-Rust + HTMX on Cloudflare is the current proposed direction, not an irrevocable
-choice. The user permits a different stack if implementation constraints warrant
-it. Cloudflare Workers, D1, and R2 are proposed components, pending validation.
+SvelteKit (TypeScript) on Cloudflare Workers, with D1 for records and private R2
+for documents. One full-stack app: server rendering, server loads and form
+actions, server-only modules for sessions, permissions and financial rules.
+Cloudflare Workers, D1, and R2 are the deployed components; local validation only.
 
 ## Users
 
@@ -200,8 +201,8 @@ The project is named PocketTrail. Its website should match the AWS User Group
 style requested by the user. The existing Jakarta community website is an
 acceptable brand reference; the user also permits AWS design guidance.
 Cloudscape is an official, open-source design system built for and used by AWS.
-Its shipped component library is React-based; using its guidance with Rust +
-HTMX does not imply using those components or inheriting their accessibility
+Its shipped component library is React-based; using its guidance with Svelte
+does not imply using those components or inheriting their accessibility
 guarantees. The specific adaptation and brand assets have not yet been established.
 
 ## Evidence on Hand

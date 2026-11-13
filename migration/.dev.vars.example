@@ -1,9 +1,0 @@
-# Copy to .dev.vars (git-ignored). Local development only.
-LOCAL_DEV=true
-
-# HMAC key for session cookies: at least 32 characters.
-SECRET_SESSION_KEY=
-
-# Public Google OAuth client ID. Left empty until Google verification is
-# ported; the slice then reports Google sign-in as not configured.
-GOOGLE_CLIENT_ID=

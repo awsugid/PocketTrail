@@ -1,19 +1,33 @@
 {
-  "name": "pockettrail",
-  "private": true,
-  "scripts": {
-    "dev": "wrangler dev --ip 127.0.0.1 --infer-origin-from-routes=false",
-    "build": "wrangler deploy --dry-run",
-    "ci:build": "sh scripts/cloudflare-ci.sh build",
-    "ci:deploy": "sh scripts/cloudflare-ci.sh deploy",
-    "db:migrate:local": "wrangler d1 migrations apply DB --local",
-    "db:seed:local": "wrangler d1 execute DB --local --file tests/fixtures/seed.sql",
-    "test": "cargo test --workspace && node static/extraction.test.js && python3 scripts/admin-self-check.py && python3 scripts/local-smoke.test.py && python3 scripts/cloudflare-ci.test.py",
-    "check:wasm": "cargo check --target wasm32-unknown-unknown --lib",
-    "deploy": "wrangler d1 migrations apply DB --remote && wrangler deploy"
-  },
-  "devDependencies": {
-    "wrangler": "^4",
-    "playwright": "^1.61.1"
-  }
+	"name": "pockettrail",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "npm run build && wrangler dev",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"test:unit": "vitest run",
+		"test:e2e": "node e2e/run.mjs",
+		"test:ui": "node e2e/ui.mjs",
+		"test:journeys": "node e2e/journeys/runner.mjs inventory txns imports settings races",
+		"test": "npm run test:unit && npm run test:e2e && npm run test:journeys",
+		"db:migrate:local": "wrangler d1 migrations apply DB --local",
+		"db:seed:local": "wrangler d1 execute DB --local --file tests/fixtures/seed.sql",
+		"test:extraction": "node static/extraction.test.cjs"
+	},
+	"devDependencies": {
+		"@sveltejs/adapter-cloudflare": "7.2.10",
+		"@sveltejs/kit": "2.70.4",
+		"@sveltejs/vite-plugin-svelte": "7.3.1",
+		"@types/node": "^22.20.5",
+		"playwright": "^1.61.1",
+		"svelte": "5.57.3",
+		"svelte-check": "4.7.8",
+		"typescript": "6.0.3",
+		"vite": "8.3.8",
+		"vitest": "5.1.0",
+		"wrangler": "4.160.1"
+	}
 }

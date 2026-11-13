@@ -1,28 +1,30 @@
+# PocketTrail: one SvelteKit app on Cloudflare Workers.
+#
+# Deliberately has no `account_id` and no `[[routes]]`, so an accidental
+# `wrangler deploy` cannot publish this worker over the live PocketTrail
+# service at pocket.awscommunity.id. The D1 id below is a placeholder, not the
+# production database, so `--remote` commands cannot reach real data either.
 name = "pockettrail"
-account_id = "26422c9ad224a7618c8670b6c7037bf6"
-main = "build/worker/shim.mjs"
+main = ".svelte-kit/cloudflare/_worker.js"
 compatibility_date = "2025-09-01"
-
-[[routes]]
-pattern = "pocket.awscommunity.id"
-custom_domain = true
-
-[build]
-command = "worker-build --release"
+# SvelteKit's server runtime imports a small amount of Node surface; the
+# adapter documentation requires this flag for that import graph.
+compatibility_flags = ["nodejs_compat"]
 
 [assets]
-directory = "./static"
+directory = ".svelte-kit/cloudflare"
 binding = "ASSETS"
-run_worker_first = true
 
 [[d1_databases]]
 binding = "DB"
 database_name = "pockettrail"
-database_id = "c0192e27-2795-4f65-94f9-56166b239aa0"
+database_id = "00000000-0000-4000-8000-000000000000"
+migrations_dir = "migrations"
 
 [[r2_buckets]]
 binding = "DOCUMENTS"
 bucket_name = "pockettrail-documents"
 
-# No LOCAL_DEV, no GOOGLE_CLIENT_ID here on purpose: local flags/secrets come
-# from .dev.vars only, so they can never leak into deployed vars.
+# No LOCAL_DEV / SECRET_SESSION_KEY / GOOGLE_CLIENT_ID here on purpose: local
+# flags and secrets come from .dev.vars only, so they cannot leak into a
+# deployed var set.

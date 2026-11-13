@@ -1,5 +1,13 @@
 # UI density polish: rendered evidence
 
+> **Status:** historical evidence from the previous Rust/HTMX interface. The
+> screenshots and measurements describe that UI, which this rewrite replaced
+> (see [DESIGN.md](../DESIGN.md)). The same density rules are enforced by
+> `npm run test:ui`, which checks 320/768/1440/1920px layouts, stacked money
+> labels, focus visibility, and reduced motion against the current app; results
+> are in [validation.md](validation.md).
+
+
 This refinement preserves the shipped navy/orange, shadcn-inspired HTMX UI.
 It reduces spacing and repeated scaffolding, not text size, financial content,
 permission checks, safety explanations, or the visibility of editable sections.

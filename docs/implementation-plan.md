@@ -1,5 +1,11 @@
 # Local implementation plan
 
+> **Status:** superseded. This plan describes the first (Rust) implementation.
+> The running application is now the SvelteKit rewrite recorded in
+> [sveltekit-migration.md](sveltekit-migration.md); treat the Rust-specific
+> delivery items below as history.
+
+
 ## Scope and release boundary
 
 The first build is a local validation release, not an authorization to deploy,

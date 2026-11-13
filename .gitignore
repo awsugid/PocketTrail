@@ -19,3 +19,6 @@ test-results/
 playwright-report/
 local-data/
 __pycache__/
+
+# SvelteKit build state and generated types.
+.svelte-kit/

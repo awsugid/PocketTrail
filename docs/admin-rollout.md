@@ -1,5 +1,14 @@
 # Administration rollout — migrations applied, CI/CD rollout pending
 
+> **Status:** historical record of the platform-administration rollout performed
+> against the previous Rust Worker. The commands and smoke scripts it cites
+> (`cargo test`, `scripts/*.py`, `scripts/*.cjs`) belonged to that implementation
+> and were removed with it. The equivalent behavior is now covered by
+> `npm run test:journeys` (settings/platform) and `npm run test:ui`; see
+> [validation.md](validation.md). The production migration history it records
+> still applies — schema and `migrations/` did not change in the rewrite.
+
+
 Implementation integrated and locally validated. With explicit operator approval,
 production migrations `0006`–`0009` applied successfully; remote migration listing
 reports none pending. Worker rollout and real SMTP/Google acceptance remain
