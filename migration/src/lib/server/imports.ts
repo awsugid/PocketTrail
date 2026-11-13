@@ -5,7 +5,7 @@
 // reviewable import items only.
 
 import { error, redirect } from '@sveltejs/kit';
-import type { D1PreparedStatement, R2Bucket } from '$lib/d1';
+import { r2Bytes, type D1PreparedStatement, type R2Bucket } from '$lib/d1';
 import { counterpartyDisplay, parseStatement, toPayloadJson, type StatementRowPayload } from './parser';
 import { fmtMoney, fmtTs, validDate, validTime, MAX_SAFE_MINOR } from '$lib/fmt';
 import { activeMem, mapCounterparty, mappingsOf, pocketsOf, type MappingRow, type MemRow, type TxnRow } from './rows';
@@ -105,9 +105,9 @@ async function loadPayload(ctx: TxnCtx, batch: BatchRow): Promise<ImportPayload>
 	const bucket: R2Bucket | null = ctx.env.DOCUMENTS ?? null;
 	if (!bucket) throw error(503, 'Private import storage is not configured.');
 	const object = await bucket.get(key);
-	if (!object || !object.body) throw error(404, 'The staged statement is no longer available.');
+	if (!object) throw error(404, 'The staged statement is no longer available.');
 	try {
-		return JSON.parse(new TextDecoder().decode(await object.body.arrayBuffer())) as ImportPayload;
+		return JSON.parse(new TextDecoder().decode(await r2Bytes(object))) as ImportPayload;
 	} catch {
 		throw error(500, 'The staged statement could not be read. Start a new import.');
 	}

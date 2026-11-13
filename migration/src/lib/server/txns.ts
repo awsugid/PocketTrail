@@ -61,7 +61,7 @@ import {
 	type DomainError
 } from '$lib/domain';
 import { fmtMoney, fmtSize, fmtTs, parseRupiah, rupiahInput, validDate, validTime } from '$lib/fmt';
-import type { D1PreparedStatement, R2Bucket } from '$lib/d1';
+import { r2Bytes, type D1PreparedStatement, type R2Bucket } from '$lib/d1';
 
 // --------------------------------------------------------------- request ctx
 
@@ -1088,8 +1088,8 @@ export async function downloadDocument(ctx: TxnCtx, documentId: number): Promise
 	const bucket: R2Bucket | null = ctx.env.DOCUMENTS ?? null;
 	if (!bucket) throw error(503, 'Private document storage unavailable.');
 	const object = await bucket.get(document.r2_key);
-	if (!object || !object.body) throw error(404, 'Document content is unavailable; its historical record is retained.');
-	const bytes = await object.body.arrayBuffer();
+	if (!object) throw error(404, 'Document content is unavailable; its historical record is retained.');
+	const bytes = await r2Bytes(object);
 	const filename = [...document.filename]
 		.filter((c) => /[A-Za-z0-9._\- ]/.test(c))
 		.slice(0, 160)

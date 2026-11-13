@@ -1,6 +1,6 @@
 import type { Actions, PageServerLoad, RequestEvent } from './$types';
 
-import { requireMember, shellContext } from '$lib/server/auth';
+import { requireMember, shellContext, verifiedForm } from '$lib/server/auth';
 import {
 	addMapping,
 	addMember,
@@ -31,15 +31,23 @@ export const load: PageServerLoad = async (event) => {
 	};
 };
 
-/** Settings mutations share one permission-checked context per action. */
-async function ctxFor(event: RequestEvent, permission: Parameters<typeof requireMember>[2]): Promise<SettingsCtx> {
-	const ctx = await requireMember(event, event.params.slug, permission);
+/** Settings mutations share one permission-checked context per action, and the
+ * form is only read after the origin and session-CSRF gates pass. */
+async function formFor(
+	event: RequestEvent,
+	permission: Parameters<typeof requireMember>[2]
+): Promise<{ ctx: SettingsCtx; form: FormData }> {
+	const member = await requireMember(event, event.params.slug, permission);
+	const form = await verifiedForm(event, member.session);
 	return {
-		db: ctx.db,
-		user: ctx.user,
-		org: ctx.org,
-		memberRows: ctx.memberRows,
-		secret: ctx.config.secret
+		ctx: {
+			db: member.db,
+			user: member.user,
+			org: member.org,
+			memberRows: member.memberRows,
+			secret: member.config.secret
+		},
+		form
 	};
 }
 
@@ -52,61 +60,56 @@ function intField(form: FormData, name: string): number {
 
 export const actions: Actions = {
 	createRole: async (event) => {
-		const ctx = await ctxFor(event, 'ManageRoles');
-		return saveRole(ctx, await event.request.formData(), null);
+		const { ctx, form } = await formFor(event, 'ManageRoles');
+		return saveRole(ctx, form, null);
 	},
 	updateRole: async (event) => {
-		const ctx = await ctxFor(event, 'ManageRoles');
-		const form = await event.request.formData();
+		const { ctx, form } = await formFor(event, 'ManageRoles');
 		return saveRole(ctx, form, intField(form, 'id'));
 	},
 	applyTemplate: async (event) => {
-		const ctx = await requireMember(event, event.params.slug, 'ManageRoles');
-		return applyTemplate(ctx, await event.request.formData());
+		const member = await requireMember(event, event.params.slug, 'ManageRoles');
+		const form = await verifiedForm(event, member.session);
+		return applyTemplate(member, form);
 	},
 	addMember: async (event) => {
-		const ctx = await ctxFor(event, 'ManageMembers');
-		return addMember(ctx, await event.request.formData());
+		const { ctx, form } = await formFor(event, 'ManageMembers');
+		return addMember(ctx, form);
 	},
 	setRole: async (event) => {
-		const ctx = await ctxFor(event, 'ManageMembers');
-		const form = await event.request.formData();
+		const { ctx, form } = await formFor(event, 'ManageMembers');
 		return setRole(ctx, form, intField(form, 'id'));
 	},
 	removeMember: async (event) => {
-		const ctx = await ctxFor(event, 'ManageMembers');
-		const form = await event.request.formData();
+		const { ctx, form } = await formFor(event, 'ManageMembers');
 		return removeMember(ctx, intField(form, 'id'));
 	},
 	restoreMember: async (event) => {
-		const ctx = await ctxFor(event, 'ManageMembers');
-		const form = await event.request.formData();
+		const { ctx, form } = await formFor(event, 'ManageMembers');
 		return restoreMember(ctx, intField(form, 'id'));
 	},
 	addMapping: async (event) => {
-		const ctx = await ctxFor(event, 'ImportStatements');
-		return addMapping(ctx, await event.request.formData());
+		const { ctx, form } = await formFor(event, 'ImportStatements');
+		return addMapping(ctx, form);
 	},
 	deleteMapping: async (event) => {
-		const ctx = await ctxFor(event, 'ImportStatements');
-		const form = await event.request.formData();
+		const { ctx, form } = await formFor(event, 'ImportStatements');
 		return deleteMapping(ctx, intField(form, 'id'));
 	},
 	addPocket: async (event) => {
-		const ctx = await ctxFor(event, 'ImportStatements');
-		return addPocket(ctx, await event.request.formData());
+		const { ctx, form } = await formFor(event, 'ImportStatements');
+		return addPocket(ctx, form);
 	},
 	setPocketOwner: async (event) => {
-		const ctx = await ctxFor(event, 'ImportStatements');
-		const form = await event.request.formData();
+		const { ctx, form } = await formFor(event, 'ImportStatements');
 		return setPocketOwner(ctx, form, intField(form, 'id'));
 	},
 	saveIncomeRole: async (event) => {
-		const ctx = await ctxFor(event, 'ManageRoles');
-		return saveIncomeRole(ctx, await event.request.formData());
+		const { ctx, form } = await formFor(event, 'ManageRoles');
+		return saveIncomeRole(ctx, form);
 	},
 	saveNotifications: async (event) => {
-		const ctx = await ctxFor(event, 'ManageNotifications');
-		return saveNotifications(ctx, await event.request.formData());
+		const { ctx, form } = await formFor(event, 'ManageNotifications');
+		return saveNotifications(ctx, form);
 	}
 };

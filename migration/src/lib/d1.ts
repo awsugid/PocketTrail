@@ -33,8 +33,20 @@ export interface R2Body {
 }
 
 export interface R2Object {
+	/** Workers' R2ObjectBody exposes arrayBuffer()/text()/json() on the object
+	 * itself; `.body` is a stream. */
+	arrayBuffer?(): Promise<ArrayBuffer>;
+	text?(): Promise<string>;
 	body?: R2Body;
 	[key: string]: unknown;
+}
+
+/** Reads a stored object as bytes, whichever of the two shapes the runtime
+ * provides (Workers' R2ObjectBody, or a stubbed `body` stream). */
+export async function r2Bytes(object: R2Object): Promise<ArrayBuffer> {
+	if (typeof object.arrayBuffer === 'function') return object.arrayBuffer();
+	if (object.body) return object.body.arrayBuffer();
+	throw new Error('R2 object body is unavailable');
 }
 
 /** Private-document bucket. Only put/get of whole small objects is used, so

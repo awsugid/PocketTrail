@@ -278,3 +278,12 @@ export function assertFormCsrf(value: FormDataEntryValue | null, session: Sessio
 		throw error(403, 'CSRF token missing or invalid.');
 	}
 }
+
+/** Origin + session-CSRF gate for a form POST, applied before any mutation.
+ * Ports the `form_post` preamble from src/web/mod.rs. */
+export async function verifiedForm(event: CtxEvent, session: Session): Promise<FormData> {
+	assertSameOrigin(event.request, event.url);
+	const form = await event.request.formData();
+	assertFormCsrf(form.get('csrf_token'), session);
+	return form;
+}
