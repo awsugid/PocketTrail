@@ -65,12 +65,18 @@ interface GoogleIdentity {
 		let cancelled = false;
 		void ensureGis().then((google) => {
 			if (cancelled || !google) return;
+			// Use GIS's default popup mode so the credential comes back through the
+			// callback and is posted by this page: `ux_mode: 'redirect'` hands the
+			// credential to the page as a form POST issued from accounts.google.com,
+			// which the framework's cross-site form guard rejects before any action
+			// runs. `nonce` binds the returned ID token to this session's challenge
+			// token, which the `google` action verifies.
 			google.accounts.id.initialize({
 				client_id: data.googleClientId,
 				callback: (response: { credential?: string }) => {
 					if (typeof response.credential === 'string') submitCredential(response.credential);
 				},
-				ux_mode: 'redirect'
+				nonce: data.csrfToken
 			});
 			google.accounts.id.renderButton(host, { theme: 'outline', size: 'large', width: 320 });
 		});
