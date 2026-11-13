@@ -28,7 +28,7 @@ import {
 import { googlePicture } from './profile';
 
 /** The parts of a request event the guards need. */
-export type CtxEvent = Pick<RequestEvent, 'cookies' | 'platform' | 'url'>;
+export type CtxEvent = Pick<RequestEvent, 'cookies' | 'platform' | 'request' | 'url'>;
 
 export interface AppConfig {
 	/** Non-null only when SECRET_SESSION_KEY has at least 32 characters. */
