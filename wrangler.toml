@@ -1,9 +1,7 @@
 # PocketTrail: one SvelteKit app on Cloudflare Workers.
 #
-# Deliberately has no `account_id` and no `[[routes]]`, so an accidental
-# `wrangler deploy` cannot publish this worker over the live PocketTrail
-# service at pocket.awscommunity.id. The D1 id below is a placeholder, not the
-# production database, so `--remote` commands cannot reach real data either.
+# Existing deployment bindings are preserved. Local development uses Wrangler's
+# local D1/R2 emulation; deployment and remote migrations require authorization.
 name = "pockettrail"
 main = ".svelte-kit/cloudflare/_worker.js"
 compatibility_date = "2025-09-01"
@@ -18,7 +16,7 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "pockettrail"
-database_id = "00000000-0000-4000-8000-000000000000"
+database_id = "c0192e27-2795-4f65-94f9-56166b239aa0"
 migrations_dir = "migrations"
 
 [[r2_buckets]]
