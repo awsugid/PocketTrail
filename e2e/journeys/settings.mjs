@@ -189,7 +189,7 @@ export async function checks(ctx) {
 	check('notifications can be enabled with a previewed cutoff', enabled.status === 303, String(enabled.status));
 	const digest = await alice.postForm('/org/demo-jakarta/notifications/digest', { csrf_token: csrf });
 	check('a digest capture is accepted', digest.status === 303, String(digest.status));
-	const afterDigest = await (await alice.get('/org/demo-jakarta/settings')).text();
+	const afterDigest = await (await alice.get('/org/demo-jakarta/settings/notifications')).text();
 	check('the local outbox is shown', /Local outbox/.test(afterDigest));
 	check('no delivery transport is claimed', /no email|Delivery stays/i.test(afterDigest));
 	const bobNotify = await bob.postForm('/org/demo-jakarta/settings/notifications?/saveNotifications', {
@@ -205,7 +205,10 @@ export async function checks(ctx) {
 	check('a platform administrator sees the platform page', platform.status === 200, String(platform.status));
 	const platformHtml = await platform.text();
 	const adminCsrf = csrfFrom(platformHtml) ?? '';
-	check('platform administration grants no organization finances', /grants no access|not.*financial/i.test(platformHtml));
+	check(
+		'platform administration shows no organization finances',
+		!/Demo Cloud Provider|Demo Venue|Rp\s?\d/.test(platformHtml)
+	);
 	check('a non-administrator is denied the platform page', (await bob.get('/platform')).status === 403);
 	const selfAdmin = await admin.postForm('/platform/users/admin', {
 		csrf_token: adminCsrf,

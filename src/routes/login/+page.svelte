@@ -1,4 +1,7 @@
 <script lang="ts">
+	import AuthFrame from '$lib/components/AuthFrame.svelte';
+	import Icon from '$lib/components/Icon.svelte';
+	import { guard } from '$lib/forms';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -90,41 +93,39 @@ interface GoogleIdentity {
 	<title>Sign in · PocketTrail</title>
 </svelte:head>
 
-<main class="auth-column">
+<AuthFrame>
 	<h1>Sign in</h1>
-	<p class="lede">PocketTrail records community finances for AWS User Group organizers.</p>
 
 	{#if data.devLoginEnabled}
-		<p class="notice">
-			Local fixture sign-in. These synthetic identities only work on this machine's loopback address, and
-			this form is never served by a deployed PocketTrail instance.
-		</p>
-		<ul class="choice-list">
-			{#each data.users as user (user.id)}
-				<li>
-					<form method="POST" action="?/dev">
-						<input type="hidden" name="csrf_token" value={data.csrfToken} />
-						<input type="hidden" name="user_id" value={user.id} />
-						<button class="btn" type="submit">
-							{user.name}
-							<span class="muted">{user.email}</span>
-						</button>
-					</form>
-				</li>
-			{/each}
-		</ul>
+		<div class="panel">
+			<div class="panel__head"><Icon name="user" size={16} /><h2>Local fixtures</h2></div>
+			<ul class="rows">
+				{#each data.users as user (user.id)}
+					<li>
+						<form method="POST" action="?/dev" use:guard>
+							<input type="hidden" name="csrf_token" value={data.csrfToken} />
+							<input type="hidden" name="user_id" value={user.id} />
+							<button class="row-button" type="submit">
+								<span class="rows__main"><strong>{user.name}</strong><span class="cell__sub">{user.email}</span></span>
+								<Icon name="next" size={16} />
+							</button>
+						</form>
+					</li>
+				{/each}
+			</ul>
+		</div>
+		<p class="hint gap-top">Synthetic identities, loopback only.</p>
 	{:else}
 		<p class="muted">No local fixture identities are available on this host.</p>
 	{/if}
 
 	{#if data.googleConfigured}
-		<div class="notice">
-			<p style="margin-top: 0">Use your Google account to continue.</p>
-			<div bind:this={googleHost} class="google-host"></div>
+		<div class="panel gap-top">
+			<div class="panel__body">
+				<div bind:this={googleHost} class="google-host"></div>
+			</div>
 		</div>
 	{:else}
-		<p class="muted" style="margin-top: 16px">
-			Google sign-in is not configured. Set <code>GOOGLE_CLIENT_ID</code> in <code>.dev.vars</code> to enable it.
-		</p>
+		<p class="hint gap-top">Google sign-in is not configured.</p>
 	{/if}
-</main>
+</AuthFrame>

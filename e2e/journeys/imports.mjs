@@ -70,7 +70,7 @@ export async function checks(ctx) {
 		const preview = await alice.get(batchPath);
 		const previewHtml = await preview.text();
 		check('the batch preview renders', preview.status === 200, String(preview.status));
-		check('the preview says nothing is recorded yet', /Nothing is recorded yet/.test(previewHtml));
+		check('the batch is shown as a preview, not a result', /<title>Import preview/.test(previewHtml) && /Will import/.test(previewHtml));
 		check('new rows are planned for import', (previewHtml.split('Will import').length - 1) === 2, 'plan badges');
 		check('the confirm control is offered', /Confirm import/.test(previewHtml));
 
@@ -166,7 +166,7 @@ export async function checks(ctx) {
 	check('a missing bank ID is flagged for review', missingHtml.includes('Needs review'));
 	check(
 		'the missing ID blocks confirmation',
-		/resolve these before confirming/i.test(missingHtml) && !/Confirm import/.test(missingHtml),
+		/Resolve before confirming/.test(missingHtml) && !/Confirm import/.test(missingHtml),
 		'confirm still offered'
 	);
 	const blocked = await alice.postForm(`${missingPath}?/confirm`, { csrf_token: csrf });

@@ -1,122 +1,93 @@
 <script lang="ts">
+	import Empty from '$lib/components/Empty.svelte';
+	import Icon, { type IconName } from '$lib/components/Icon.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
+	import PageHead from '$lib/components/PageHead.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 	const slug = $derived(data.shell.org.slug);
 	const empty = $derived(data.explain.length === 0 && data.review.length === 0 && data.imports.length === 0);
+
+	const groups = $derived<
+		Array<{ key: string; title: string; icon: IconName; rows: Array<{ href: string; title: string; sub: string; badge: string; tone: string }> }>
+	>([
+		{
+			key: 'explain',
+			title: 'To explain',
+			icon: 'comment',
+			rows: data.explain.map((task) => ({
+				href: `/org/${slug}/transactions/${task.id}`,
+				title: task.counterparty,
+				sub: `${task.date} · ${task.pocketName}`,
+				badge: task.income ? 'Income notes' : 'Explanation',
+				tone: 'needs'
+			}))
+		},
+		{
+			key: 'review',
+			title: 'To review',
+			icon: 'check',
+			rows: data.review.map((task) => ({
+				href: `/org/${slug}/transactions/${task.id}`,
+				title: task.counterparty,
+				sub: `${task.date} · ${task.pocketName}`,
+				badge: 'Awaiting review',
+				tone: 'review'
+			}))
+		},
+		{
+			key: 'imports',
+			title: 'Imports',
+			icon: 'imports',
+			rows: data.imports.map((batch) => ({
+				href: `/org/${slug}/imports/${batch.id}`,
+				title: batch.filename || 'Statement import',
+				sub: `Batch #${batch.id}`,
+				badge: batch.status === 'ready' ? 'Ready to confirm' : batch.status,
+				tone: 'info'
+			}))
+		}
+	]);
 </script>
 
+<svelte:head>
+	<title>Actions · {data.shell.org.name}</title>
+</svelte:head>
+
 <OrgShell {...data.shell} active="actions">
-	<div class="page-head">
-		<div>
-			<h1>Actions</h1>
-			<p class="lede">Your documentation tasks, reviews waiting on you, and imports in progress. The ledger keeps every record regardless.</p>
-		</div>
-	</div>
+	<PageHead title="Actions" icon="actions" />
 
 	{#if empty}
-		<div class="empty-state">
-			<p>Nothing is waiting on you right now.</p>
-			<p class="muted">
-				This does not mean the ledger is empty — <a href="/org/{slug}/transactions">browse all transactions</a> to see everything.
-				{#if !data.canImport}
-					Importing statements is done by members with import permission.
-				{/if}
-			</p>
+		<div class="panel">
+			<Empty icon="check" title="All clear">
+				<a class="btn" href="/org/{slug}/transactions"><Icon name="ledger" size={16} />Open ledger</a>
+			</Empty>
 		</div>
 	{:else}
-		{#if data.explain.length > 0}
-			<section class="task-group">
-				<h2>Explanations you owe <span class="count-badge">{data.explain.length}</span></h2>
-				<ul class="task-list">
-					{#each data.explain as task (task.id)}
-						<li>
-							<a href="/org/{slug}/transactions/{task.id}">
-								<span class="task-title">{task.counterparty}</span>
-								<span class="cell__sub">{task.date} · {task.pocketName} · {task.income ? 'income notes needed' : 'explanation needed'}</span>
-							</a>
-						</li>
-					{/each}
-				</ul>
-			</section>
-		{/if}
-
-		{#if data.review.length > 0}
-			<section class="task-group">
-				<h2>Ready for your review <span class="count-badge">{data.review.length}</span></h2>
-				<ul class="task-list">
-					{#each data.review as task (task.id)}
-						<li>
-							<a href="/org/{slug}/transactions/{task.id}">
-								<span class="task-title">{task.counterparty}</span>
-								<span class="cell__sub">{task.date} · {task.pocketName} · awaiting review</span>
-							</a>
-						</li>
-					{/each}
-				</ul>
-			</section>
-		{/if}
-
-		{#if data.imports.length > 0}
-			<section class="task-group">
-				<h2>Imports in progress <span class="count-badge">{data.imports.length}</span></h2>
-				<ul class="task-list">
-					{#each data.imports as batch (batch.id)}
-						<li>
-							<a href="/org/{slug}/imports/{batch.id}">
-								<span class="task-title">{batch.filename || 'Statement import'}</span>
-								<span class="cell__sub">{batch.status === 'ready' ? 'ready to confirm' : batch.status}</span>
-							</a>
-						</li>
-					{/each}
-				</ul>
-			</section>
-		{/if}
+		<div class="stack">
+			{#each groups.filter((group) => group.rows.length > 0) as group (group.key)}
+				<section class="panel" aria-labelledby="{group.key}-heading">
+					<div class="panel__head">
+						<Icon name={group.icon} size={16} /><h2 id="{group.key}-heading">{group.title}</h2>
+						<span class="count">{group.rows.length}</span>
+					</div>
+					<ul class="rows rows--link">
+						{#each group.rows as row (row.href)}
+							<li>
+								<a href={row.href}>
+									<span class="rows__main">
+										<strong>{row.title}</strong>
+										<span class="rows__sub">{row.sub}</span>
+									</span>
+									<span class="badge badge--{row.tone}">{row.badge}</span>
+									<Icon name="chevron" size={16} class="tail" />
+								</a>
+							</li>
+						{/each}
+					</ul>
+				</section>
+			{/each}
+		</div>
 	{/if}
 </OrgShell>
-
-<style>
-	.task-group {
-		margin: 0 0 24px;
-	}
-	.task-group h2 {
-		font-size: 18px;
-		margin: 0 0 10px;
-	}
-	.count-badge {
-		display: inline-block;
-		min-width: 22px;
-		padding: 1px 7px;
-		margin-left: 6px;
-		border-radius: 10px;
-		background: var(--neutral-bg);
-		color: var(--text-secondary);
-		font-size: 12px;
-		font-variant-numeric: tabular-nums;
-	}
-	.task-list {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		max-width: 760px;
-	}
-	.task-list li {
-		border-bottom: 1px solid var(--border);
-	}
-	.task-list a {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-		padding: 12px 8px;
-		text-decoration: none;
-		color: var(--text);
-		border-radius: var(--radius-control);
-	}
-	.task-list a:hover {
-		background: var(--surface-2);
-	}
-	.task-title {
-		font-weight: 600;
-	}
-</style>

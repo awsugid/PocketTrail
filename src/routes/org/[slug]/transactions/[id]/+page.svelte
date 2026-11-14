@@ -1,6 +1,9 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
+	import Icon from '$lib/components/Icon.svelte';
+	import Notice from '$lib/components/Notice.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
+	import PageHead from '$lib/components/PageHead.svelte';
+	import { submit } from '$lib/forms';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -22,21 +25,31 @@
 		member: string;
 	}
 
-	let splits = $state<SplitDraft[]>([]);
-	let responsible = $state('');
-	let seededRevision = -1;
-
-	// Re-seed the editable draft whenever the server hands back a new revision
-	// (an action reload), never on unrelated reactive reads.
-	$effect(() => {
-		if (seededRevision === txn.revision) return;
-		seededRevision = txn.revision;
-		splits = txn.splits.map((split) => ({
+	const draftOf = () => ({
+		splits: txn.splits.map((split) => ({
 			label: split.label,
 			amount: split.rupiah,
 			member: split.responsibleMemberId === null ? '' : String(split.responsibleMemberId)
-		}));
-		responsible = txn.responsibleMemberId === null ? '' : String(txn.responsibleMemberId);
+		})),
+		responsible: txn.responsibleMemberId === null ? '' : String(txn.responsibleMemberId)
+	});
+
+	// Seeded at initialisation so the server-rendered form (and a no-JavaScript
+	// submit) already carries the saved purposes.
+	const initial = draftOf();
+	let splits = $state<SplitDraft[]>(initial.splits);
+	let responsible = $state(initial.responsible);
+	let seededRevision: number | null = null;
+
+	// Re-seed when the server hands back a new revision (an action reload).
+	$effect(() => {
+		const first = seededRevision === null;
+		const changed = seededRevision !== txn.revision;
+		seededRevision = txn.revision;
+		if (first || !changed) return;
+		const next = draftOf();
+		splits = next.splits;
+		responsible = next.responsible;
 	});
 
 	function addSplit() {
@@ -46,6 +59,20 @@
 		if (splits.length <= 1) return;
 		splits = splits.filter((_, i) => i !== index);
 	}
+
+	const statusLabel = $derived(
+		txn.isIncome
+			? txn.incomeComplete
+				? 'Income noted'
+				: 'Income notes needed'
+			: txn.status === 'approved'
+				? 'Approved'
+				: txn.status === 'changes_requested'
+					? 'Changes requested'
+					: txn.needsDetails
+						? 'Needs details'
+						: 'Pending review'
+	);
 </script>
 
 <svelte:head>
@@ -53,485 +80,356 @@
 </svelte:head>
 
 <OrgShell {...data.shell} active="transactions">
-	<p class="back">
-		<a href="/org/{data.shell.org.slug}/transactions">← Ledger</a>
-	</p>
+	<PageHead title={txn.counterpartyDisplay.name} back={{ href: `/org/${data.shell.org.slug}/transactions`, label: 'Ledger' }}>
+		{#snippet actions()}
+			<p class="amount-total" class:amount--in={txn.amountMinor > 0}>{txn.amount}</p>
+		{/snippet}
+		{#snippet meta()}
+			<span class="badge badge--{tone}">{statusLabel}</span>
+			{#if txn.suppressed}<span class="badge badge--muted"><Icon name="bell" size={12} />Suppressed</span>{/if}
+			<span>{txn.date}{txn.time ? ` ${txn.time}` : ''}</span>
+			<span>{txn.transactionType || 'Movement'}</span>
+			<span>{txn.pocketName}</span>
+		{/snippet}
+	</PageHead>
 
-	{#if data.msg}
-		<p class="notice" role="status">{data.msg}</p>
-	{/if}
-
-	<div class="page-head">
-		<div>
-			<h1>{txn.counterpartyDisplay.name}</h1>
-			<p class="meta-line">
-				<span>{txn.date}{txn.time ? ` ${txn.time}` : ''}</span>
-				<span>{txn.transactionType || 'Movement'}</span>
-				<span>{txn.pocketName}</span>
-				<span class="badge badge--{tone}">
-					{txn.isIncome
-						? txn.incomeComplete
-							? 'Income noted'
-							: 'Income notes needed'
-						: txn.status === 'approved'
-							? 'Approved'
-							: txn.status === 'changes_requested'
-								? 'Changes requested'
-								: txn.needsDetails
-									? 'Needs details'
-									: 'Pending review'}
-				</span>
-				{#if txn.suppressed}<span class="badge badge--muted">Notifications suppressed</span>{/if}
-			</p>
-		</div>
-		<p class="amount-total" class:amount--in={txn.amountMinor > 0}>{txn.amount}</p>
-	</div>
+	{#if data.msg}<Notice tone="success">{data.msg}</Notice>{/if}
 
 	{#if txn.missing.length > 0 && !txn.isIncome}
-		<div class="notice" role="status">
-			<p style="margin: 0 0 4px"><strong>Still needed before review:</strong></p>
-			<ul style="margin: 0; padding-left: 1.2em">
-				{#each txn.missing as item (item)}
-					<li>{item}</li>
-				{/each}
+		<Notice tone="warning">
+			<strong>Needed before review</strong>
+			<ul>
+				{#each txn.missing as item (item)}<li>{item}</li>{/each}
 			</ul>
-		</div>
+		</Notice>
 	{/if}
 
 	<div class="detail-grid">
-		<div>
-			<!-- Explanation / income notes: the primary task of this page. -->
-			<section class="detail-section" aria-labelledby="explain-heading">
-				<h2 id="explain-heading">{txn.isIncome ? 'Income notes' : 'Explanation'}</h2>
-				{#if !txn.can.edit && !txn.can.incomeNotes}
-					{#if txn.explanation.trim() !== ''}
-						<p class="prose-block">{txn.explanation}</p>
-					{:else}
-						<p class="muted">No explanation has been recorded yet.</p>
-					{/if}
-				{:else}
-					<form method="POST" action="?/details" use:enhance class="stack-form">
-						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
-						<input type="hidden" name="revision" value={txn.revision} />
-						<div class="field">
-							<label for="explanation">{txn.isIncome ? 'Notes' : 'Explanation'}
-								{#if txn.isIncome}<span class="muted">(required, written by you)</span>{/if}
-							</label>
-							<textarea class="input textarea" id="explanation" name="explanation" required
-								>{txn.explanation}</textarea>
-							<p class="hint">
-								{txn.isIncome
-									? 'Income needs member-authored notes. No approval is involved.'
-									: 'What was this money for? Substantive edits reopen review.'}
-							</p>
-						</div>
-
-						{#if !txn.isIncome && txn.can.edit}
-							<div class="field">
-								<label for="responsible">Responsible member</label>
-								<select class="select" id="responsible" name="responsible_member_id" required bind:value={responsible}>
-									<option value="">Choose a member</option>
-									{#each txn.members as member (member.id)}
-										<option value={String(member.id)}>{member.name}</option>
-									{/each}
-								</select>
-							</div>
-
-							<fieldset class="purposes">
-								<legend>Purposes</legend>
-								<p class="hint">
-									Positive IDR amounts that add up to {txn.amountMagnitudeMinor === 0
-										? 'the bank amount'
-										: txn.totals?.amountMinor !== undefined
-											? txn.totals.amountMinor / 100
-											: ''}. Each purpose may name its own responsible member.
-								</p>
-								{#each splits as row, index (index)}
-									<div class="split-row">
-										<div class="field">
-											<label for="split-label-{index}">Purpose {index + 1}</label>
-											<input class="input" id="split-label-{index}" name="split_label[]" bind:value={row.label} required />
-										</div>
-										<div class="field">
-											<label for="split-amount-{index}">Amount (IDR)</label>
-											<input class="input" id="split-amount-{index}" name="split_amount[]" inputmode="decimal"
-												bind:value={row.amount} required />
-										</div>
-										<div class="field">
-											<label for="split-member-{index}">Responsible</label>
-											<select class="select" id="split-member-{index}" name="split_member[]" bind:value={row.member} required>
-												<option value="">Choose a member</option>
-												{#each txn.members as member (member.id)}
-													<option value={String(member.id)}>{member.name}</option>
-												{/each}
-											</select>
-										</div>
-										<button class="btn btn--quiet split-remove" type="button" onclick={() => removeSplit(index)}
-											disabled={splits.length <= 1}>Remove</button
-										>
-									</div>
-								{/each}
-								<button class="btn" type="button" onclick={addSplit}>Add a purpose</button>
-								{#if txn.totals}
-									<p class="hint" role="status">
-										Saved purposes total {txn.totals.splitTotalMinor === txn.totals.amountMinor
-											? 'the bank amount'
-											: 'a different amount than the bank record'}.
-									</p>
-								{/if}
-							</fieldset>
-
-							<div class="field">
-								<label for="reason">Document-unavailable reason <span class="muted">(optional)</span></label>
-								<input class="input" id="reason" name="evidence_unavailable_reason"
-									value={txn.evidenceUnavailableReason} />
-								<p class="hint">Record this instead of attaching a document when none exists.</p>
-							</div>
+		<div class="stack">
+			<section class="panel" aria-labelledby="explain-heading">
+				<div class="panel__head">
+					<Icon name="comment" size={16} /><h2 id="explain-heading">{txn.isIncome ? 'Income notes' : 'Explanation'}</h2>
+				</div>
+				<div class="panel__body">
+					{#if !txn.can.edit && !txn.can.incomeNotes}
+						{#if txn.explanation.trim() !== ''}
+							<p class="prose-block">{txn.explanation}</p>
+						{:else}
+							<p class="muted">Nothing recorded.</p>
 						{/if}
+					{:else}
+						<form method="POST" action="?/details" class="form" use:submit>
+							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
+							<input type="hidden" name="revision" value={txn.revision} />
+							<div class="field">
+								<label for="explanation">{txn.isIncome ? 'Notes' : 'Explanation'} <span class="req" aria-hidden="true">*</span></label>
+								<textarea class="input textarea" id="explanation" name="explanation" required>{txn.explanation}</textarea>
+							</div>
 
-						<button class="btn btn--primary" type="submit">
-							{txn.isIncome ? 'Save notes' : 'Save details'}
-						</button>
-					</form>
-				{/if}
+							{#if !txn.isIncome && txn.can.edit}
+								<div class="field">
+									<label for="responsible">Responsible member <span class="req" aria-hidden="true">*</span></label>
+									<select class="select" id="responsible" name="responsible_member_id" required bind:value={responsible}>
+										<option value="">Choose a member</option>
+										{#each txn.members as member (member.id)}
+											<option value={String(member.id)}>{member.name}</option>
+										{/each}
+									</select>
+								</div>
+
+								<fieldset class="form">
+									<legend>
+										Purposes <span class="muted count">of {txn.amount}</span>
+									</legend>
+									{#each splits as row, index (index)}
+										<div class="split-row">
+											<div class="field">
+												<label for="split-label-{index}">Purpose {index + 1}</label>
+												<input class="input" id="split-label-{index}" name="split_label[]" bind:value={row.label} required />
+											</div>
+											<div class="field">
+												<label for="split-amount-{index}">Amount (IDR)</label>
+												<input class="input" id="split-amount-{index}" name="split_amount[]" inputmode="decimal" bind:value={row.amount} required />
+											</div>
+											<div class="field">
+												<label for="split-member-{index}">Responsible</label>
+												<select class="select" id="split-member-{index}" name="split_member[]" bind:value={row.member} required>
+													<option value="">Choose a member</option>
+													{#each txn.members as member (member.id)}
+														<option value={String(member.id)}>{member.name}</option>
+													{/each}
+												</select>
+											</div>
+											<button
+												class="btn btn--quiet btn--icon"
+												type="button"
+												aria-label="Remove purpose {index + 1}"
+												onclick={() => removeSplit(index)}
+												disabled={splits.length <= 1}
+											>
+												<Icon name="trash" size={16} />
+											</button>
+										</div>
+									{/each}
+									<div class="form-actions">
+										<button class="btn btn--sm" type="button" onclick={addSplit}><Icon name="plus" size={14} />Purpose</button>
+									</div>
+									{#if txn.totals}
+										<p class="hint" role="status">
+											{txn.totals.splitTotalMinor === txn.totals.amountMinor ? 'Saved purposes match the bank amount.' : 'Saved purposes differ from the bank amount.'}
+										</p>
+									{/if}
+								</fieldset>
+
+								<div class="field">
+									<label for="reason">No document available — why?</label>
+									<input class="input" id="reason" name="evidence_unavailable_reason" value={txn.evidenceUnavailableReason} />
+								</div>
+							{/if}
+
+							<div class="form-actions">
+								<button class="btn btn--primary" type="submit"><Icon name="check" size={16} />Save</button>
+							</div>
+						</form>
+					{/if}
+				</div>
 			</section>
 
-			{#if !txn.isIncome}
-				<section class="detail-section" aria-labelledby="purposes-heading">
-					<h2 id="purposes-heading">Purposes</h2>
-					{#if txn.splits.length > 0}
-						<ul class="plain-list">
-							{#each txn.splits as split (split.label + split.amountMinor)}
-								<li>
-									{split.label} — {split.amount}
-									{#if split.responsibleName}
-										<span class="cell__sub">Responsible: {split.responsibleName}</span>
-									{/if}
-								</li>
-							{/each}
-						</ul>
-						{#if txn.totals}
-							<p class="hint">
-								Bank amount {txn.amount} · purposes total
-								{txn.totals.splitTotalMinor === txn.totals.amountMinor ? 'match' : 'do not match'}.
-							</p>
-						{/if}
-					{:else}
-						<p class="muted">This movement is recorded as a single purpose.</p>
-					{/if}
-				</section>
-			{/if}
-
-			<section class="detail-section" aria-labelledby="evidence-heading">
-				<h2 id="evidence-heading">Evidence</h2>
-				{#if txn.evidence.length > 0}
-					<ul class="evidence-list">
-						{#each txn.evidence as document (document.id)}
+			{#if !txn.isIncome && txn.splits.length > 0}
+				<section class="panel" aria-labelledby="purposes-heading">
+					<div class="panel__head">
+						<Icon name="ledger" size={16} /><h2 id="purposes-heading">Purposes</h2>
+						<span class="count">{txn.splits.length}</span>
+					</div>
+					<ul class="rows">
+						{#each txn.splits as split (split.label + split.amountMinor)}
 							<li>
-								<a href={document.url}>{document.filename}</a>
-								<span class="cell__sub">{document.sizeDisplay}{document.note ? ` · ${document.note}` : ''}</span>
+								<div class="rows__main">
+									<strong>{split.label}</strong>
+									{#if split.responsibleName}<span class="rows__sub">{split.responsibleName}</span>{/if}
+								</div>
+								<span class="cell--nowrap">{split.amount}</span>
 							</li>
 						{/each}
 					</ul>
-				{:else if txn.evidenceUnavailableReason.trim() !== ''}
-					<p>
-						No document attached. Reason recorded:
-						<span class="prose-block">{txn.evidenceUnavailableReason}</span>
-					</p>
-				{:else}
-					<p class="muted">No supporting document and no stated reason yet.</p>
-				{/if}
+				</section>
+			{/if}
 
+			<section class="panel" aria-labelledby="evidence-heading">
+				<div class="panel__head">
+					<Icon name="file" size={16} /><h2 id="evidence-heading">Evidence</h2>
+					<span class="count">{txn.evidence.length}</span>
+				</div>
+				{#if txn.evidence.length > 0}
+					<ul class="rows">
+						{#each txn.evidence as document (document.id)}
+							<li>
+								<div class="rows__main">
+									<a href={document.url}>{document.filename}</a>
+									<span class="rows__sub">{document.sizeDisplay}{document.note ? ` · ${document.note}` : ''}</span>
+								</div>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+				{#if txn.evidence.length === 0 && txn.evidenceUnavailableReason.trim() !== ''}
+					<div class="panel__body">
+						<p class="prose-block"><span class="muted">No document:</span> {txn.evidenceUnavailableReason}</p>
+					</div>
+				{/if}
 				{#if txn.can.upload}
-					<form method="POST" action="?/document" enctype="multipart/form-data" use:enhance class="stack-form compact">
-						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
-						<input type="hidden" name="revision" value={txn.revision} />
-						<div class="field">
-							<label for="evidence-file">Attach evidence <span class="muted">(PDF, PNG, or JPEG up to 10 MB)</span></label>
-							<input class="input" id="evidence-file" name="file" type="file" accept="application/pdf,image/png,image/jpeg" required />
-						</div>
-						<div class="field">
-							<label for="evidence-note">Document note <span class="muted">(optional)</span></label>
-							<input class="input" id="evidence-note" name="note" />
-						</div>
-						<button class="btn" type="submit">Attach document</button>
-					</form>
+					<div class="panel__body {txn.evidence.length > 0 ? 'panel__body--ruled' : ''}">
+						<form method="POST" action="?/document" enctype="multipart/form-data" class="form form--inline" use:submit={{ reset: true }}>
+							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
+							<input type="hidden" name="revision" value={txn.revision} />
+							<div class="field">
+								<label for="evidence-file">File <span class="muted">PDF, PNG, JPEG · 10 MB</span></label>
+								<input class="input" id="evidence-file" name="file" type="file" accept="application/pdf,image/png,image/jpeg" required />
+							</div>
+							<div class="field">
+								<label for="evidence-note">Note</label>
+								<input class="input" id="evidence-note" name="note" />
+							</div>
+							<button class="btn" type="submit"><Icon name="upload" size={16} />Attach</button>
+						</form>
+					</div>
 				{/if}
 			</section>
 
 			{#if !txn.isIncome}
-				<section class="detail-section" aria-labelledby="review-heading">
-					<h2 id="review-heading">Review</h2>
-					{#if txn.reviewDecision}
-						<p>
-							<strong>{txn.reviewDecision.statusLabel}</strong>
-							by {txn.reviewDecision.authorName} · {txn.reviewDecision.createdAt}
-							{#if txn.reviewDecision.note.trim() !== ''}
-								<span class="prose-block">{txn.reviewDecision.note}</span>
-							{/if}
-						</p>
-					{:else if txn.status === 'approved'}
-						<p>Approved.</p>
-					{:else}
-						<p class="muted">Awaiting review.</p>
-					{/if}
+				<section class="panel" aria-labelledby="review-heading">
+					<div class="panel__head"><Icon name="check" size={16} /><h2 id="review-heading">Review</h2></div>
+					<div class="panel__body stack">
+						{#if txn.reviewDecision}
+							<p>
+								<strong>{txn.reviewDecision.statusLabel}</strong>
+								<span class="muted">{txn.reviewDecision.authorName} · {txn.reviewDecision.createdAt}</span>
+								{#if txn.reviewDecision.note.trim() !== ''}
+									<span class="prose-block">{txn.reviewDecision.note}</span>
+								{/if}
+							</p>
+						{:else if txn.status === 'approved'}
+							<p><strong>Approved</strong></p>
+						{:else}
+							<p class="muted">Awaiting review.</p>
+						{/if}
 
-					{#if txn.can.approve}
-						{#if txn.approval.eligible}
-							<div class="review-forms">
-								<form method="POST" action="?/approve" use:enhance class="stack-form compact">
+						{#if txn.can.approve}
+							{#if txn.approval.eligible}
+								<form method="POST" action="?/approve" class="form form--inline" use:submit>
 									<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 									<input type="hidden" name="revision" value={txn.revision} />
 									<div class="field">
-										<label for="approve-note">Approval note <span class="muted">(optional)</span></label>
+										<label for="approve-note">Approval note</label>
 										<input class="input" id="approve-note" name="note" />
 									</div>
-									<button class="btn btn--primary" type="submit">Approve</button>
+									<button class="btn btn--primary" type="submit"><Icon name="check" size={16} />Approve</button>
 								</form>
-								<form method="POST" action="?/requestChanges" use:enhance class="stack-form compact">
+								<form method="POST" action="?/requestChanges" class="form form--inline" use:submit>
 									<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 									<input type="hidden" name="revision" value={txn.revision} />
 									<div class="field">
-										<label for="changes-note">What needs changing? <span class="muted">(required)</span></label>
+										<label for="changes-note">What needs changing? <span class="req" aria-hidden="true">*</span></label>
 										<input class="input" id="changes-note" name="note" required />
 									</div>
-									<button class="btn" type="submit">Request changes</button>
+									<button class="btn" type="submit"><Icon name="alert" size={16} />Request changes</button>
 								</form>
-							</div>
-						{:else}
-							<p class="muted">{txn.approval.ineligibleReason ?? 'You cannot decide this transaction.'}</p>
+							{:else}
+								<p class="muted">{(txn.approval.ineligibleReason ?? 'You cannot decide this transaction.').replace(/^./, (c) => c.toUpperCase())}</p>
+							{/if}
 						{/if}
-					{/if}
 
-					{#if txn.can.submit}
-						<form method="POST" action="?/submit" use:enhance class="stack-form compact">
-							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
-							<input type="hidden" name="revision" value={txn.revision} />
-							<button class="btn" type="submit">Resubmit for review</button>
-						</form>
-					{/if}
+						{#if txn.can.submit}
+							<form method="POST" action="?/submit" use:submit>
+								<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
+								<input type="hidden" name="revision" value={txn.revision} />
+								<button class="btn" type="submit"><Icon name="next" size={16} />Resubmit for review</button>
+							</form>
+						{/if}
+					</div>
 				</section>
 			{/if}
 
-			<section class="detail-section" aria-labelledby="discussion-heading">
-				<h2 id="discussion-heading">Discussion</h2>
-				{#if txn.comments.length === 0}
-					<p class="muted">No comments yet.</p>
-				{:else}
-					<ol class="comment-list">
-						{#each txn.comments as comment, index (index)}
-							<li>
-								<p class="comment-meta">{comment.authorName} · {comment.createdAt}</p>
-								<p class="prose-block">{comment.body}</p>
-							</li>
-						{/each}
-					</ol>
+			<section class="panel" aria-labelledby="discussion-heading">
+				<div class="panel__head">
+					<Icon name="comment" size={16} /><h2 id="discussion-heading">Discussion</h2>
+					<span class="count">{txn.comments.length}</span>
+				</div>
+				{#if txn.comments.length > 0}
+					<div class="panel__body">
+						<ol class="timeline">
+							{#each txn.comments as comment, index (index)}
+								<li>
+									<p class="muted"><strong>{comment.authorName}</strong> · {comment.createdAt}</p>
+									<p class="prose-block">{comment.body}</p>
+								</li>
+							{/each}
+						</ol>
+					</div>
 				{/if}
-
 				{#if txn.can.comment}
-					<form method="POST" action="?/comment" use:enhance class="stack-form compact">
-						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
-						<div class="field">
-							<label for="comment-body">Add a comment</label>
-							<textarea class="input textarea" id="comment-body" name="body" rows="3" required></textarea>
-							<p class="hint">Mention a member with @handle. Comments never change the approval.</p>
-						</div>
-						<button class="btn" type="submit">Post comment</button>
-					</form>
+					<div class="panel__body {txn.comments.length > 0 ? 'panel__body--ruled' : ''}">
+						<form method="POST" action="?/comment" class="form" use:submit={{ reset: true }}>
+							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
+							<div class="field">
+								<label for="comment-body">Comment</label>
+								<textarea class="input textarea" id="comment-body" name="body" rows="3" required placeholder="Mention a member with @handle"></textarea>
+							</div>
+							<div class="form-actions">
+								<button class="btn" type="submit"><Icon name="comment" size={16} />Post</button>
+							</div>
+						</form>
+					</div>
 				{/if}
 			</section>
 
-			<section class="detail-section" aria-labelledby="history-heading">
-				<h2 id="history-heading">History</h2>
-				{#if txn.audit.length === 0}
-					<p class="muted">No recorded changes yet.</p>
-				{:else}
-					<ol class="audit-list">
-						{#each txn.audit as entry, index (index)}
-							<li>
-								<p class="audit-meta">
-									<strong>{entry.authorName}</strong> · {entry.createdAt} · {entry.actionLabel}
-								</p>
-								{#if entry.previousLabel !== entry.newLabel}
-									<p class="audit-facts">{entry.previousLabel} → {entry.newLabel}</p>
-								{/if}
-								{#if entry.facts.length > 0}
-									<ul class="audit-facts">
-										{#each entry.facts as fact, index (index)}
-											<li><span class="muted">{fact[0]}:</span> {fact[1]}</li>
-										{/each}
-									</ul>
-								{/if}
-							</li>
-						{/each}
-					</ol>
+			<section class="panel" aria-labelledby="history-heading">
+				<div class="panel__head">
+					<Icon name="history" size={16} /><h2 id="history-heading">History</h2>
+					<span class="count">{txn.audit.length}</span>
+				</div>
+				{#if txn.audit.length > 0}
+					<div class="panel__body">
+						<ol class="timeline">
+							{#each txn.audit as entry, index (index)}
+								<li>
+									<p><strong>{entry.actionLabel}</strong> <span class="muted">{entry.authorName} · {entry.createdAt}</span></p>
+									{#if entry.previousLabel !== entry.newLabel}
+										<p class="rows__sub">{entry.previousLabel} → {entry.newLabel}</p>
+									{/if}
+									{#each entry.facts as fact, index (index)}
+										<p class="rows__sub">{fact[0]}: {fact[1]}</p>
+									{/each}
+								</li>
+							{/each}
+						</ol>
+					</div>
 				{/if}
 			</section>
 		</div>
 
-		<aside class="rail" aria-labelledby="facts-heading">
-			<h2 id="facts-heading">Bank facts</h2>
-			<dl class="facts">
-				<dt>Date</dt>
-				<dd>{txn.date}{txn.time ? ` ${txn.time}` : ''}</dd>
-				<dt>Amount</dt>
-				<dd>{txn.amount}</dd>
-				<dt>Balance after</dt>
-				<dd>{txn.balance}</dd>
-				<dt>Type</dt>
-				<dd>{txn.transactionType || '—'}</dd>
-				<dt>Pocket</dt>
-				<dd>{txn.pocketName}</dd>
-				<dt>Counterparty</dt>
-				<dd>
-					{txn.counterpartyDisplay.name}
-					{#if txn.counterpartyDisplay.bankAccount}
-						<span class="cell__sub">{txn.counterpartyDisplay.bankAccount}</span>
-					{/if}
-				</dd>
-				<dt>Jago ID</dt>
-				<dd class="mono">{txn.bankId || '—'}</dd>
-				<dt>Responsible</dt>
-				<dd>
-					{txn.responsibleName ?? 'Unassigned'}
-					{#if txn.responsibleInactive}<span class="cell__sub">No longer an active member</span>{/if}
-				</dd>
-			</dl>
-
-			{#if txn.bankNotes.trim() !== ''}
-				<h2 class="rail-heading">Bank notes</h2>
-				<p class="prose-block">{txn.bankNotes}</p>
-			{/if}
+		<aside class="stack" aria-labelledby="facts-heading">
+			<section class="panel">
+				<div class="panel__head"><Icon name="info" size={16} /><h2 id="facts-heading">Bank facts</h2></div>
+				<dl class="panel__body facts">
+					<dt>Date</dt>
+					<dd>{txn.date}{txn.time ? ` ${txn.time}` : ''}</dd>
+					<dt>Amount</dt>
+					<dd>{txn.amount}</dd>
+					<dt>Balance</dt>
+					<dd>{txn.balance}</dd>
+					<dt>Type</dt>
+					<dd>{txn.transactionType || '—'}</dd>
+					<dt>Pocket</dt>
+					<dd>{txn.pocketName}</dd>
+					<dt>Counterparty</dt>
+					<dd>
+						{txn.counterpartyDisplay.name}
+						{#if txn.counterpartyDisplay.bankAccount}<span class="cell__sub">{txn.counterpartyDisplay.bankAccount}</span>{/if}
+					</dd>
+					<dt>Jago ID</dt>
+					<dd class="mono">{txn.bankId || '—'}</dd>
+					<dt>Responsible</dt>
+					<dd>
+						{txn.responsibleName ?? 'Unassigned'}
+						{#if txn.responsibleInactive}<span class="cell__sub">No longer active</span>{/if}
+					</dd>
+				</dl>
+				{#if txn.bankNotes.trim() !== ''}
+					<div class="panel__body panel__body--ruled">
+						<h3>Bank notes</h3>
+						<p class="prose-block">{txn.bankNotes}</p>
+					</div>
+				{/if}
+			</section>
 
 			{#if txn.can.suppress}
-				<h2 class="rail-heading">Notifications</h2>
-				{#if txn.suppressed}
-					<p>
-						Suppressed: <span class="prose-block">{txn.suppressedReason}</span>
-					</p>
-					<form method="POST" action="?/unsuppress" use:enhance>
-						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
-						<input type="hidden" name="revision" value={txn.revision} />
-						<button class="btn" type="submit">Resume notifications</button>
-					</form>
-				{:else}
-					<form method="POST" action="?/suppress" use:enhance class="stack-form compact">
-						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
-						<input type="hidden" name="revision" value={txn.revision} />
-						<div class="field">
-							<label for="suppress-reason">Suppression reason <span class="muted">(required)</span></label>
-							<input class="input" id="suppress-reason" name="reason" required />
-							<p class="hint">Cancels queued mentions and digests about this movement. It never changes approval.</p>
-						</div>
-						<button class="btn" type="submit">Suppress notifications</button>
-					</form>
-				{/if}
+				<section class="panel" aria-labelledby="suppress-heading">
+					<div class="panel__head"><Icon name="bell" size={16} /><h2 id="suppress-heading">Notifications</h2></div>
+					<div class="panel__body">
+						{#if txn.suppressed}
+							<p class="prose-block"><span class="muted">Suppressed:</span> {txn.suppressedReason}</p>
+							<form method="POST" action="?/unsuppress" class="gap-top" use:submit>
+								<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
+								<input type="hidden" name="revision" value={txn.revision} />
+								<button class="btn" type="submit">Resume</button>
+							</form>
+						{:else}
+							<form method="POST" action="?/suppress" class="form" use:submit>
+								<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
+								<input type="hidden" name="revision" value={txn.revision} />
+								<div class="field">
+									<label for="suppress-reason">Reason <span class="req" aria-hidden="true">*</span></label>
+									<input class="input" id="suppress-reason" name="reason" required />
+								</div>
+								<div class="form-actions">
+									<button class="btn" type="submit">Suppress</button>
+								</div>
+							</form>
+						{/if}
+					</div>
+				</section>
 			{/if}
 		</aside>
 	</div>
 </OrgShell>
-
-<style>
-	.back {
-		margin: 0 0 8px;
-	}
-	.amount-total {
-		margin: 0;
-		font-size: 22px;
-		font-weight: 650;
-		letter-spacing: -0.02em;
-		font-variant-numeric: tabular-nums;
-	}
-	.stack-form {
-		display: flex;
-		flex-direction: column;
-		gap: 14px;
-		max-width: 560px;
-		margin-top: 12px;
-	}
-	.stack-form.compact {
-		gap: 10px;
-		margin-top: 10px;
-	}
-	.textarea {
-		width: 100%;
-		min-height: 96px;
-		resize: vertical;
-	}
-	.hint {
-		margin: 4px 0 0;
-		font-size: 12px;
-		color: var(--text-secondary);
-	}
-	.mono {
-		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-		font-size: 12px;
-	}
-	.purposes {
-		border: 0;
-		padding: 0;
-		margin: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 10px;
-	}
-	.purposes legend {
-		padding: 0;
-		font-weight: 600;
-		font-size: 13px;
-	}
-	.split-row {
-		display: grid;
-		gap: 8px;
-		align-items: end;
-		padding-bottom: 10px;
-		border-bottom: 1px solid var(--border);
-	}
-	@media (min-width: 720px) {
-		.split-row {
-			grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.4fr) auto;
-		}
-	}
-	.split-remove {
-		align-self: end;
-	}
-	.review-forms {
-		display: grid;
-		gap: 18px;
-		margin-top: 12px;
-	}
-	@media (min-width: 960px) {
-		.review-forms {
-			grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-		}
-	}
-	.evidence-list,
-	.comment-list,
-	.audit-list {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 12px;
-	}
-	.comment-list li,
-	.audit-list li {
-		border-left: 2px solid var(--border);
-		padding-left: 12px;
-	}
-	.comment-meta,
-	.audit-meta {
-		margin: 0 0 2px;
-		font-size: 12px;
-		color: var(--text-secondary);
-	}
-	.audit-facts {
-		margin: 2px 0 0;
-		padding-left: 1.1em;
-		font-size: 13px;
-	}
-	.rail-heading {
-		margin-top: 20px;
-	}
-</style>

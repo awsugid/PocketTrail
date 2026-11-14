@@ -28,7 +28,7 @@ export async function checks(ctx) {
 	const openHtml = await open.text();
 	check('a member can open a transaction detail', open.status === 200, String(open.status));
 	check('detail carries the session CSRF token', csrfFrom(openHtml) !== null);
-	check('detail renders the owed-documentation notice', /Still needed before review/.test(openHtml));
+	check('detail renders the owed-documentation notice', /Needed before review/.test(openHtml));
 	const csrf = csrfFrom(openHtml) ?? '';
 
 	// ------------------------------------------------------- documentation save
@@ -201,7 +201,7 @@ export async function checks(ctx) {
 	const income = await alice.get('/org/demo-jakarta/transactions/2');
 	const incomeHtml = await income.text();
 	check('an income movement opens for its recipient', income.status === 200, String(income.status));
-	check('income explains that no approval is involved', /no approval is involved/i.test(incomeHtml));
+	check('income offers notes but no approval step', /Income notes/.test(incomeHtml) && !/id="review-heading"/.test(incomeHtml));
 	const incomeCsrf = csrfFrom(incomeHtml) ?? csrf;
 	const incomeSave = await alice.postForm('/org/demo-jakarta/transactions/2?/details', {
 		csrf_token: incomeCsrf,

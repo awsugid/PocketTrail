@@ -33,18 +33,27 @@ colors:
   navy-700: "#45454c"
   navy-text: "#fafafa"
   navy-muted: "#bdbdc5"
+  selection: "#f3d9bf"
+  nav-accent: "#f0b36b"
+  placeholder: "#71717a"
 typography:
   headline:
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-    fontSize: "28px"
+    fontSize: "24px"
     fontWeight: 650
     lineHeight: 1.25
-    letterSpacing: "-0.035em"
+    letterSpacing: "-0.03em"
   title:
-    fontSize: "18px"
+    fontSize: "16px"
     fontWeight: 650
     lineHeight: 1.4
-    letterSpacing: "-0.02em"
+    letterSpacing: "-0.015em"
+  small:
+    fontSize: "13px"
+    lineHeight: 1.5
+  caption:
+    fontSize: "12px"
+    lineHeight: 1.5
   body:
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "14px"
@@ -53,6 +62,7 @@ rounded:
   panel: "12px"
   control: "6px"
   badge: "5px"
+  chip: "16px"
 spacing:
   field-gap: "14px"
   panel: "20px"
@@ -105,23 +115,28 @@ suppressed/neutral. Suppression never visually implies approval.
 
 System fonts only; no external font requests or licensed Amazon Ember assets.
 Monospace is reserved for opaque bank references and history detail, not branding.
-Body text uses the frontmatter scale; page headings reduce to 25px on narrow
-phones. Labels and table text are compact, with supporting metadata smaller and
+Body text uses the frontmatter scale; page headings reduce to 22px on narrow
+phones (the only off-ramp step). Labels and table text are compact, with supporting metadata smaller and
 muted. Amounts and fact values use tabular numerals. Explanatory text is bounded
 at roughly 76ch; financial tables may use the full work area.
 
 ## Layout
 
-Desktop shell uses a white sticky 64px topbar and charcoal 224px sidebar. Main
-work area has 24px vertical / 32px horizontal inset and a 1440px maximum width.
-At 1100px the sidebar contracts and section intro/body columns become linear.
-At 800px the sidebar becomes a native disclosure menu; organization selection
-moves to its own visible full-width header row. At 480px the main inset reduces,
-forms stay linear and split-purpose rows stack. Target minimum viewport: 320px.
+The shell is full-bleed: a white sticky 56px topbar spans the viewport and a
+charcoal 208px sidebar sits under it, with no outer gutter or max-width wrapper.
+Only the work area is bounded (1360px, 24px vertical / 32px horizontal inset),
+so financial tables still use the width. Account pages (organizations, platform)
+use the same topbar without a sidebar. At 1100px the sidebar contracts to a 64px
+icon rail (labels stay in the accessibility tree and as tooltips). At 800px it
+becomes a drawer opened by the topbar Menu button; the organization switcher
+stays visible in the topbar. At 480px the main inset reduces, forms stay linear
+and split-purpose rows stack. Target minimum viewport: 320px.
 
 Forms and field groups are bounded at 640px. Toolbars may align compact filters
-horizontally, wrapping when needed. Settings use anchor navigation, section
-introductions and bounded bodies. Tables scroll within their own wrapper; do not
+horizontally, wrapping when needed. Settings open on a status list (one linked
+row per section, with live counts and flags) and each section is its own page
+with an icon tab row; the overview has no tab row because its rows are the
+navigation. Tables scroll within their own wrapper; do not
 hide financial facts to fit a phone. Avoid page-level horizontal scrolling.
 
 ## Elevation & Depth
@@ -138,10 +153,15 @@ are small authored inline SVG with consistent stroke treatment, never emoji.
 
 ## Components
 
-- **Navigation:** labeled sidebar links, SVG icons, visible current state and
-  `aria-current`. Organization/account and mobile menus use native disclosures.
-  Current organization remains visible on phones. Notification disablement is
-  separate from transaction status.
+- **Navigation:** sidebar links pair an SVG icon with a label and mark the
+  current page with `aria-current="page"` (filled row plus warm icon). Organization
+  switching and the account menu live in the topbar as native `<details>`
+  disclosures that close on Escape (focus returns to the trigger), on an outside
+  press and after a choice. The current organization is always visible, also on
+  phones. A skip link precedes the topbar and every page has one `<main id="main">`.
+  Notification disablement is separate from transaction status.
+- **Chips:** a filter that changes the list is a row of links (`.chip`), one
+  per value, with `aria-current="true"` on the active one. No select plus Apply.
 - **Buttons:** charcoal primary, white bordered secondary, red-text destructive.
   Hover, active, disabled and visible focus states are defined. Small row actions
   expand to touch-sized controls on narrow phones.
@@ -152,18 +172,21 @@ are small authored inline SVG with consistent stroke treatment, never emoji.
 - **Controls:** native `select`, `date`, `time`, `file` and `textarea` elements
   are the source of form values and the no-JavaScript fallback. Styling lives in
   `src/app.css` (`.input`, `.select`, `.btn`); no custom control library is
-  vendored. Destructive confirmations use plain labelled buttons and, where a
-  consequence needs explaining, a sentence next to the control rather than a
-  script dialog. Every control keeps a `<label for>` association, so keyboard
+  vendored. Destructive actions (revoke access, revoke invitation, delete mapping,
+  revoke platform admin) confirm in one native `<dialog>` (`confirmDialog` in
+  `src/lib/forms.ts`) whose sentence states the consequence; Escape, Cancel and a
+  backdrop press all cancel. Without JavaScript the form posts directly, as the
+  server remains the authority. Every control keeps a `<label for>` association, so keyboard
   focus, required validation and screen-reader names survive enhancement.
 - **Tables:** sentence-case muted headers, generous rows, subtle hover, aligned
   tabular amounts and secondary metadata within cells. Captions identify tables.
-- **Feedback:** status/alert regions, extraction and allocation live updates,
-  local/synthetic banners, explicit empty-state actions. Forms are ordinary POST
-  submissions that still work without JavaScript; SvelteKit's `use:enhance`
-  adds in-place submission. Destructive actions (remove member, revoke
-  invitation, delete mapping, suppress notifications, platform access) state the
-  consequence before the button. Domain rejections and audit codes are translated
+- **Feedback:** status/alert regions (`Notice`), extraction and allocation live
+  updates, explicit empty-state actions. Forms are ordinary POST submissions that
+  still work without JavaScript. Every form carries `use:submit` (form actions) or
+  `use:guard` (plain endpoints) from `src/lib/forms.ts`: the form is `aria-busy`
+  and its submitter pulses while pending, a second submit is ignored, a rejection
+  renders inline in an alert and keeps what was typed, and a redirect is followed
+  in place. Domain rejections and audit codes are translated
   to organizer wording on the server (`userMessage`, `actionLabel`); internal
   state names such as Draft/Submitted never render.
 - **Motion:** menus enter over 160ms with a short upward offset and slight scale;
@@ -175,6 +198,21 @@ Accessibility features are implementation choices, not a claim of certification.
 Verify keyboard navigation, custom widget semantics, contrast and local overflow
 against rendered pages after changes.
 
+## Copy and icons
+
+Operate pages communicate through icons, buttons and real data, not prose. A page
+is an icon plus its name; there is no subtitle under a heading that restates what
+the heading says, and no paragraph describing what a form does. Text stays only
+where it prevents a mistake (a consequence sentence in a confirmation, a format
+for an opaque field, a blocked-state reason) or names a status. Controls that
+carry only an icon keep an accessible name through `aria-label` or visually
+hidden text; icon-only is used for repeated row actions, never for the primary
+action. Empty states are one icon, one short title and, when there is a next step,
+one button. Counts and flags replace descriptions: "2 mappings", "1 without owner".
+
+Icons are the authored set in `Icon.svelte` (24px grid, 1.6 stroke, round caps),
+drawn at 14, 16 or 18px beside text and 22px beside a page title.
+
 ## Do's and Don'ts
 
 ### Do:
@@ -182,9 +220,11 @@ against rendered pages after changes.
 - Do keep organization context visible and forms bounded on phones.
 - Do use visible labels, focus indicators and text alongside status colors.
 - Do preserve meaningful loading feedback with reduced motion enabled.
+- Do let an icon, a count or a badge say what a paragraph would.
 
 ### Don't:
 - Don't restore Cloudscape styling or require React for this visual language.
 - Don't add external paid services, fonts, fabricated records or metrics.
 - Don't nest cards or stretch ordinary forms across the workspace.
 - Don't confuse notification suppression with completed evidence or approval.
+- Don't add a subtitle, lede or hint that only restates a heading or a label.

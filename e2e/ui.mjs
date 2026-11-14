@@ -129,32 +129,53 @@ await withWorker(async () => {
 		await page.setViewportSize({ width: 1440, height: 900 });
 		await page.goto(`${ORIGIN}/org/demo-jakarta/transactions`);
 		const focusOrder = [];
-		for (let i = 0; i < 12; i += 1) {
+		for (let i = 0; i < 16; i += 1) {
 			await page.keyboard.press('Tab');
 			focusOrder.push(
 				await page.evaluate(() => {
 					const element = document.activeElement;
 					if (!element || element === document.body) return 'body';
 					const style = getComputedStyle(element);
-					return `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}[${(element.textContent ?? '').trim().slice(0, 24)}] outline=${style.outlineStyle}`;
+					const nav = element.closest('nav')?.getAttribute('aria-label') ?? '';
+					return `${element.tagName.toLowerCase()}[${(element.textContent ?? '').trim().slice(0, 24)}] nav=${nav} outline=${style.outlineStyle}`;
 				})
 			);
 		}
+		check('the skip link is the first tab stop', focusOrder[0].includes('Skip to content'), focusOrder[0]);
 		check(
-			'keyboard reaches the status filter control',
-			focusOrder.some((entry) => entry.startsWith('select#filter-status')),
-			focusOrder.join(' | ')
-		);
-		check(
-			'keyboard reaches the filter submit button',
-			focusOrder.some((entry) => entry.includes('[Apply]')),
+			'keyboard reaches the status filter links',
+			focusOrder.some((entry) => entry.includes('nav=Status filter')),
 			focusOrder.join(' | ')
 		);
 		check(
 			'focused controls show a visible outline',
-			focusOrder.filter((entry) => entry.startsWith('select') || entry.includes('Apply')).every((entry) => entry.includes('outline=solid')),
+			focusOrder.filter((entry) => entry.includes('nav=Status filter') || entry.startsWith('a[Skip')).every((entry) => entry.includes('outline=solid')),
 			focusOrder.join(' | ')
 		);
+		check(
+			'the current ledger filter is marked, not only coloured',
+			(await page.locator('nav[aria-label="Status filter"] a[aria-current="true"]').count()) === 1
+		);
+
+		// ------------------------------------------------------- menus + avatar
+		const accountMenu = page.locator('details.menu', { has: page.locator('summary[aria-label^="Account"]') });
+		await accountMenu.locator('summary').click();
+		check('the account menu opens', await accountMenu.evaluate((node) => node.open));
+		await page.keyboard.press('Escape');
+		check('Escape closes the account menu', !(await accountMenu.evaluate((node) => node.open)));
+		await accountMenu.locator('summary').click();
+		await page.mouse.click(700, 500);
+		check('a press outside closes the account menu', !(await accountMenu.evaluate((node) => node.open)));
+		const avatar = await page.evaluate(() => ({
+			text: document.querySelector('.avatar')?.textContent?.trim(),
+			broken: [...document.querySelectorAll('.avatar img')].some((img) => img.complete && img.naturalWidth === 0 && img.hasAttribute('data-loaded'))
+		}));
+		check('the avatar shows initials without a broken image', avatar.text === 'AF' && !avatar.broken, JSON.stringify(avatar));
+		const fullBleed = await page.evaluate(() => {
+			const bar = document.querySelector('.topbar')?.getBoundingClientRect();
+			return bar ? { left: bar.left, width: bar.width, viewport: document.documentElement.clientWidth } : null;
+		});
+		check('the topbar spans the full viewport width', fullBleed !== null && fullBleed.left === 0 && fullBleed.width === fullBleed.viewport, JSON.stringify(fullBleed));
 
 		// ---------------------------------------------------------- reduced motion
 		const reduced = await browser.newContext({
@@ -176,7 +197,7 @@ await withWorker(async () => {
 		check(
 			'detail page shows purposes and the owed-documentation notice',
 			(await page.getByText('DEMO: workshop supplies').count()) === 1 &&
-				(await page.getByText(/Still needed before review/).count()) === 1,
+				(await page.getByText(/Needed before review/).count()) === 1,
 			'detail content missing'
 		);
 		const labelAudit = await page.evaluate(() =>
@@ -221,9 +242,9 @@ await withWorker(async () => {
 		// ------------------------------------------------------------- settings
 		await page.goto(`${ORIGIN}/org/demo-jakarta/settings`);
 		check(
-			'settings index links its focused sections',
+			'settings overview links each section once, with status',
 			(await page.locator('h1').count()) === 1 &&
-				(await page.locator('nav[aria-label="Settings sections"] a').count()) === 6,
+				(await page.locator('nav[aria-label="Settings sections"] a[href*="/settings/"]').count()) === 5,
 			String(await page.locator('nav[aria-label="Settings sections"] a').count())
 		);
 		for (const section of ['pockets', 'routing', 'people', 'roles', 'notifications']) {
@@ -252,7 +273,7 @@ await withWorker(async () => {
 		await page.goto(`${ORIGIN}/org/demo-jakarta/imports`);
 		check(
 			'import staging page renders its labelled form',
-			(await page.getByLabel('Pocket').count()) === 1 &&
+			(await page.getByLabel('Pocket', { exact: true }).count()) === 1 &&
 				(await page.getByLabel('Original statement PDF').count()) === 1 &&
 				(await page.getByRole('button', { name: 'Stage statement' }).count()) === 1,
 			'staging form controls missing'
@@ -265,7 +286,7 @@ await withWorker(async () => {
 		check(
 			'platform administration renders accounts and the audit trail',
 			(await page.getByRole('heading', { name: 'Accounts' }).count()) === 1 &&
-				(await page.getByRole('heading', { name: 'Global audit trail' }).count()) === 1 &&
+				(await page.getByRole('heading', { name: 'Audit trail' }).count()) === 1 &&
 				(await page.getByText('Administrator').count()) >= 1,
 			'platform sections missing'
 		);

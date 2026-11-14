@@ -3,6 +3,5 @@
 	let { children } = $props();
 </script>
 
-<div class="shell">
-	{@render children()}
-</div>
+<a class="skip-link" href="#main">Skip to content</a>
+{@render children()}

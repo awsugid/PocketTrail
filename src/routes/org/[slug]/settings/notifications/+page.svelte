@@ -1,7 +1,11 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
+	import Empty from '$lib/components/Empty.svelte';
+	import Icon from '$lib/components/Icon.svelte';
+	import Notice from '$lib/components/Notice.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
+	import PageHead from '$lib/components/PageHead.svelte';
 	import SettingsNav from '$lib/components/SettingsNav.svelte';
+	import { guard, submit } from '$lib/forms';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -9,7 +13,6 @@
 	const s = $derived(data.settings);
 	const slug = $derived(data.shell.org.slug);
 	const base = $derived(`/org/${slug}/settings/notifications`);
-	const canManage = $derived(s.can.notifications);
 	const preview = $derived(s.notificationPreview);
 </script>
 
@@ -18,127 +21,116 @@
 </svelte:head>
 
 <OrgShell {...data.shell} active="settings">
-	<div class="page-head">
-		<div>
-			<h1>Notifications</h1>
-			<p class="lede">
-				Off by default. When on, messages are captured in a local outbox only — this build sends no email and
-				runs no scheduler. Enabling never releases messages queued while disabled.
-			</p>
-		</div>
-	</div>
-
+	<PageHead title="Notifications" icon="bell">
+		{#snippet meta()}
+			<span class="badge badge--{s.notifications.enabled ? 'approved' : 'muted'}">{s.notifications.enabled ? 'On' : 'Off'}</span>
+			<span>Local outbox only · no email is sent</span>
+		{/snippet}
+	</PageHead>
 	<SettingsNav current="notifications" can={s.can} slug={slug} />
 
-	{#if s.msg}<p class="notice" role="status">{s.msg}</p>{/if}
+	{#if s.msg}<Notice tone="success">{s.msg}</Notice>{/if}
 
-	{#if canManage}
-		<section class="detail-section" aria-labelledby="preview-heading">
-			<h2 id="preview-heading">Preview recipients</h2>
-			<p class="section-lede">
-				Choose the transaction-date cutoff and preview who would be asked for documentation. Enabling requires
-				previewing the same cutoff first.
-			</p>
-			<form method="GET" action={base} class="inline-form">
-				<label for="cutoff">Transaction-date cutoff</label>
-				<input class="input" id="cutoff" name="cutoff_date" type="date" value={s.notificationPreviewCutoff} required />
-				<button class="btn" type="submit">Preview recipients</button>
-			</form>
+	{#if !s.can.notifications}
+		<Notice tone="warning">Notification settings need the manage-notifications permission.</Notice>
+	{:else}
+		<div class="stack">
+			<section class="panel" aria-labelledby="preview-heading">
+				<div class="panel__head"><Icon name="people" size={16} /><h2 id="preview-heading">Preview recipients</h2></div>
+				<div class="panel__body stack">
+					<form method="GET" action={base} class="form form--inline">
+						<div class="field">
+							<label for="cutoff">Transaction-date cutoff</label>
+							<input class="input" id="cutoff" name="cutoff_date" type="date" value={s.notificationPreviewCutoff} required />
+						</div>
+						<button class="btn" type="submit"><Icon name="filter" size={16} />Preview</button>
+					</form>
 
-			{#if preview}
-				<div class="preview" role="status">
-					<p>
-						{preview.recipients.length} recipient{preview.recipients.length === 1 ? '' : 's'} at cutoff
-						<strong>{s.notificationPreviewCutoff}</strong>: {preview.totalItems} documentation
-						item{preview.totalItems === 1 ? '' : 's'} pending.
-						{#if preview.limited}<span class="muted">Scan limited to the most recent 500 movements.</span>{/if}
-					</p>
-					{#if preview.recipients.length > 0}
-						<ul class="plain-list">
-							{#each preview.recipients as recipient (recipient.name)}
-								<li>{recipient.name}: {recipient.pending} pending</li>
-							{/each}
-						</ul>
-					{:else}
-						<p class="muted">Nobody has documentation pending at this cutoff.</p>
+					{#if preview}
+						<div role="status">
+							<p>
+								<strong>{preview.totalItems}</strong> item{preview.totalItems === 1 ? '' : 's'} pending for
+								<strong>{preview.recipients.length}</strong> recipient{preview.recipients.length === 1 ? '' : 's'} since
+								{s.notificationPreviewCutoff}.
+								{#if preview.limited}<span class="muted">Latest 500 movements only.</span>{/if}
+							</p>
+							{#if preview.recipients.length > 0}
+								<ul class="rows">
+									{#each preview.recipients as recipient (recipient.name)}
+										<li>
+											<div class="rows__main"><strong>{recipient.name}</strong></div>
+											<span class="badge badge--needs">{recipient.pending} pending</span>
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
 					{/if}
 				</div>
-			{/if}
-		</section>
+			</section>
 
-		<section class="detail-section" aria-labelledby="settings-heading">
-			<h2 id="settings-heading">Delivery settings</h2>
-			<form method="POST" action="?/saveNotifications" use:enhance class="stack-form">
-				<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
-				<input type="hidden" name="preview_token" value={s.previewToken} />
-				<label class="check">
-					<input type="checkbox" name="enabled" checked={s.notifications.enabled} /> Enable organization
-					notifications
-				</label>
-				<div class="field">
-					<label for="cutoff-save">Transaction-date cutoff</label>
-					<input class="input" id="cutoff-save" name="cutoff_date" type="date" value={s.notifications.cutoffDate ?? ''} />
-					<p class="hint">A preview for a different cutoff is rejected. Mentions are not limited by this cutoff.</p>
+			<section class="panel" aria-labelledby="settings-heading">
+				<div class="panel__head"><Icon name="settings" size={16} /><h2 id="settings-heading">Delivery</h2></div>
+				<div class="panel__body stack">
+					<form method="POST" action="?/saveNotifications" class="form" use:submit>
+						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
+						<input type="hidden" name="preview_token" value={s.previewToken} />
+						<label class="check">
+							<input type="checkbox" name="enabled" checked={s.notifications.enabled} />Enable notifications for this organization
+						</label>
+						<div class="field">
+							<label for="cutoff-save">Transaction-date cutoff</label>
+							<input class="input" id="cutoff-save" name="cutoff_date" type="date" value={s.notifications.cutoffDate ?? ''} />
+							<p class="hint">Preview this cutoff first. Mentions ignore the cutoff.</p>
+						</div>
+						<div class="form-actions">
+							<button class="btn btn--primary" type="submit"><Icon name="check" size={16} />Save</button>
+						</div>
+					</form>
+					<form method="POST" action="/org/{slug}/notifications/digest" use:guard>
+						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
+						<button class="btn" type="submit" disabled={!s.notifications.enabled}>
+							<Icon name="mail" size={16} />Capture weekly digests
+						</button>
+					</form>
 				</div>
-				<button class="btn btn--primary" type="submit">Save notification settings</button>
-			</form>
+			</section>
 
-			<form method="POST" action="/org/{slug}/notifications/digest" class="stack-form compact">
-				<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
-				<button class="btn" type="submit" disabled={!s.notifications.enabled}>Capture weekly digests now</button>
-				<p class="hint">Captures one digest per eligible recipient whose cadence allows it. No email is sent.</p>
-			</form>
-		</section>
-
-		<section class="detail-section" aria-labelledby="outbox-heading">
-			<h2 id="outbox-heading">Local outbox</h2>
-			{#if !s.notifications.enabled}
-				<p class="muted">Notifications are disabled; nothing is deliverable.</p>
-			{:else if s.outbox.length === 0}
-				<p class="muted">No deliverable messages are queued.</p>
-			{:else}
-				<div class="table-scroll">
-					<table class="ledger">
-						<caption class="visually-hidden">Queued notifications, newest first</caption>
-						<thead>
-							<tr>
-								<th scope="col">Kind</th>
-								<th scope="col">To</th>
-								<th scope="col">Subject</th>
-								<th scope="col">Queued</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each s.outbox as row, index (index)}
+			<section class="panel" aria-labelledby="outbox-heading">
+				<div class="panel__head">
+					<Icon name="inbox" size={16} /><h2 id="outbox-heading">Outbox</h2>
+					<span class="count">{s.outbox.length}</span>
+				</div>
+				{#if !s.notifications.enabled}
+					<Empty icon="bell" title="Notifications are off" inline />
+				{:else if s.outbox.length === 0}
+					<Empty icon="inbox" title="Nothing queued" inline />
+				{:else}
+					<div class="table-scroll">
+						<table class="ledger">
+							<caption class="visually-hidden">Queued notifications, newest first</caption>
+							<thead>
 								<tr>
-									<td data-label="Kind">{row.kind}</td>
-									<td data-label="To">{row.toName}</td>
-									<td data-label="Subject">{row.subject}</td>
-									<td class="cell--nowrap" data-label="Queued">{row.createdAtLabel}</td>
+									<th scope="col">Kind</th>
+									<th scope="col">To</th>
+									<th scope="col">Subject</th>
+									<th scope="col">Queued</th>
 								</tr>
-							{/each}
-						</tbody>
-					</table>
-				</div>
-			{/if}
-			<p class="hint">
-				Reading the outbox re-checks eligibility now: removed members, disabled organizations, suppressed
-				transactions and completed income are filtered out of this list.
-			</p>
-		</section>
-	{:else}
-		<p class="muted">Notification settings require the manage-notifications permission.</p>
+							</thead>
+							<tbody>
+								{#each s.outbox as row, index (index)}
+									<tr>
+										<td>{row.kind}</td>
+										<td>{row.toName}</td>
+										<td>{row.subject}</td>
+										<td class="cell--nowrap">{row.createdAtLabel}</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
+			</section>
+		</div>
 	{/if}
 </OrgShell>
-
-<style>
-	.section-lede { margin: 0 0 12px; max-width: 70ch; color: var(--text-secondary); }
-	.inline-form { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 13px; color: var(--text-secondary); }
-	.stack-form { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; max-width: 560px; }
-	.stack-form.compact { gap: 6px; }
-	.check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
-	.field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-secondary); }
-	.hint { margin: 0; font-size: 12px; color: var(--text-secondary); }
-	.preview { margin: 12px 0; padding: 10px 12px; background: var(--surface-2); border-radius: var(--radius-control); max-width: 640px; }
-	.preview p { margin: 0 0 6px; }
-</style>
