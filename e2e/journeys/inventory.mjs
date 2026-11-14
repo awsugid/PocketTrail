@@ -47,7 +47,29 @@ export async function checks(ctx) {
 	});
 	check('overdraw rejected', reject.status === 400, String(reject.status));
 
-	const add = await alice.postForm('/org/demo-jakarta/inventory?/updateStock', {
+	        // CSRF: every inventory action rejects a wrong token and writes nothing.
+	        const rowCount = async () =>
+	                (await (await alice.get('/org/demo-jakarta/inventory')).text()).match(/<tr>/g)?.length ?? 0;
+	        const rowsBefore = await rowCount();
+	        const bad = { csrf_token: 'f'.repeat(32) };
+	        const forged = [
+	                ['addItem', { ...bad, name: 'FORGED item' }],
+	                ['addLocation', { ...bad, name: 'FORGED place' }],
+	                ['updateStock', { ...bad, item_id: '1', location_id: '1', direction: 'add', quantity: '7', reason: 'forged' }]
+	        ];
+	        for (const [action, fields] of forged) {
+	                const response = await alice.postForm(`/org/demo-jakarta/inventory?/${action}`, fields);
+	                check(`${action} rejects an invalid CSRF token`, response.status === 403, String(response.status));
+	        }
+	        check(
+	                'rejected CSRF posts wrote no rows',
+	                (await rowCount()) === rowsBefore &&
+	                        !(await (await alice.get('/org/demo-jakarta/inventory')).text()).includes('FORGED') &&
+	                        !(await (await alice.get('/org/demo-jakarta/inventory/1')).text()).includes('forged'),
+	                'a forged post changed data'
+	        );
+
+	        const add = await alice.postForm('/org/demo-jakarta/inventory?/updateStock', {
 		csrf_token: csrfToken,
 		item_id: String(item),
 		location_id: String(location),

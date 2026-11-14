@@ -1,7 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-import { requireMember, shellContext, type TenantContext } from '$lib/server/auth';
+import { requireMember, shellContext, verifiedForm, type TenantContext } from '$lib/server/auth';
 import { qOne } from '$lib/server/db';
 import {
 	addItemStatements,
@@ -60,7 +60,7 @@ export const actions: Actions = {
 		const ctx = await requireMember(event, event.params.slug, 'UpdateStock');
 		const own = ownMembershipId(ctx);
 		if (own === null) return fail(403, { message: 'Active membership required.' });
-		const form = await event.request.formData();
+		const form = await verifiedForm(event, ctx.session);
 		const name = String(form.get('name') ?? '').trim();
 		if (name === '') return fail(400, { message: 'Item name is required.' });
 		const variant = String(form.get('variant') ?? '').trim();
@@ -70,7 +70,7 @@ export const actions: Actions = {
 
 	addLocation: async (event) => {
 		const ctx = await requireMember(event, event.params.slug, 'UpdateStock');
-		const form = await event.request.formData();
+		const form = await verifiedForm(event, ctx.session);
 		const name = String(form.get('name') ?? '').trim();
 		if (name === '') return fail(400, { message: 'Location name is required.' });
 		await ctx.db.batch(addLocationStatements(ctx.db, ctx.org.id, ctx.user.id, name));
@@ -81,7 +81,7 @@ export const actions: Actions = {
 		const ctx = await requireMember(event, event.params.slug, 'UpdateStock');
 		const own = ownMembershipId(ctx);
 		if (own === null) return fail(403, { message: 'Active membership required.' });
-		const form = await event.request.formData();
+		const form = await verifiedForm(event, ctx.session);
 		const itemId = Number(String(form.get('item_id') ?? '').trim()) || 0;
 		const locationId = Number(String(form.get('location_id') ?? '').trim()) || 0;
 		// The form posts direction + positive quantity; `delta` is the signed
