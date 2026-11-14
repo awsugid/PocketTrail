@@ -70,7 +70,7 @@
 			status = `Extracted ${file.name} (${result.pages} page${result.pages === 1 ? '' : 's'}) with preserved rows.`;
 		} catch (cause) {
 			extractionFailed = true;
-			status = `Could not read the file${cause instanceof Error && cause.message ? `: ${cause.message}` : ''}. Paste the statement text manually instead.`;
+			status = `Could not read the file${cause instanceof Error && cause.message ? `: ${cause.message.replace(/[.\s]+$/, '')}` : ''}. Paste the statement text manually instead.`;
 		} finally {
 			busy = false;
 		}
@@ -113,6 +113,7 @@
 									name="file"
 									type="file"
 									accept="application/pdf,.pdf"
+									required
 									bind:this={fileInput}
 									onchange={extract}
 									aria-describedby="import-status"
@@ -125,7 +126,7 @@
 							<textarea class="input textarea mono-area" name="statement_text" rows="8" aria-label="Extracted statement text" bind:value={statementText}></textarea>
 						</details>
 						<div class="form-actions">
-							<button class="btn btn--primary" type="submit" disabled={busy || extractionFailed}>
+							<button class="btn btn--primary" type="submit" disabled={busy || (extractionFailed && statementText.trim() === '')}>
 								<Icon name="upload" size={16} />Stage statement
 							</button>
 						</div>

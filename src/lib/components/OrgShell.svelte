@@ -28,10 +28,6 @@
 	];
 </script>
 
-<svelte:head>
-	<title>{org.name} · PocketTrail</title>
-</svelte:head>
-
 <svelte:window onkeydown={(event) => event.key === 'Escape' && (navOpen = false)} />
 
 <div class="frame">
