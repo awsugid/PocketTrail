@@ -92,9 +92,9 @@
 					<li>
 						<a href={row.href}>
 							<Icon name={row.icon} class="lead" />
-							<span class="rows__main"><strong>{row.title}</strong></span>
+							<span class="rows__main"><strong>{row.title}</strong>{#if row.status && row.status.length > 12}<span class="rows__sub">{row.status}</span>{/if}</span>
 							{#if row.flag}<span class="badge badge--{row.flag.tone}">{row.flag.text}</span>{/if}
-							{#if row.status}<span class="count">{row.status}</span>{/if}
+							{#if row.status && row.status.length <= 12}<span class="count">{row.status}</span>{/if}
 							<Icon name="chevron" size={16} class="tail" />
 						</a>
 					</li>

@@ -9,7 +9,7 @@ colors:
   text-secondary: "#62626b"
   border: "#e4e4e7"
   border-strong: "#a1a1aa"
-  control-border: "#d4d4d8"
+  control-edge: "#8f8f94"
   link: "#27272a"
   link-hover: "#9a4614"
   accent: "#b45309"
@@ -17,6 +17,7 @@ colors:
   primary: "#27272a"
   primary-hover: "#3f3f46"
   primary-active: "#18181b"
+  row-hover: "#fcfcfc"
   danger: "#b42318"
   danger-bg: "#fff1f0"
   success: "#176343"
@@ -28,11 +29,11 @@ colors:
   info-text: "#315c78"
   info-bg: "#eff6fa"
   neutral-bg: "#f0f0f2"
-  navy-900: "#202023"
-  navy-800: "#303034"
-  navy-700: "#45454c"
-  navy-text: "#fafafa"
-  navy-muted: "#bdbdc5"
+  nav-bg: "#27272a"
+  nav-hover: "#333338"
+  nav-line: "#45454c"
+  nav-text: "#e9e9ec"
+  nav-muted: "#bdbdc5"
   selection: "#f3d9bf"
   nav-accent: "#f0b36b"
   placeholder: "#71717a"
@@ -58,6 +59,10 @@ typography:
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "14px"
     lineHeight: 1.6
+elevation:
+  shadow-menu: "0 8px 24px -6px rgb(24 24 27 / 0.22), 0 2px 6px rgb(24 24 27 / 0.08)"
+layout:
+  topbar-h: "56px"
 rounded:
   panel: "12px"
   control: "6px"
@@ -104,8 +109,15 @@ Frontmatter records shipped CSS token values. Primary charcoal carries actions;
 warm accent carries focus, selection and small navigation details. Links remain
 charcoal, with warm hover emphasis. Zinc hairlines separate white work surfaces.
 
-Legacy `navy-*` token names now describe charcoal shell colors, not blue.
-`--muted` aliases secondary text. Status pairs remain semantic: green approved,
+Shell colors are the `nav-*` tokens (charcoal); `--topbar-h` and `--shadow-menu`
+are the shared layout and elevation tokens. `--muted` aliases secondary text.
+
+Two zinc tones, two jobs. `border` and `border-strong` are separators and
+decoration. `control-edge` (`#8f8f94`, 3.2:1 on `surface`, 3.1:1 on `bg`) is the
+boundary of every input, select trigger, date trigger, chip, button and
+checkbox, so a control is visible without relying on hue. Focus on the dark
+sidebar uses `nav-accent` (`#f0b36b`, 8:1) because the default focus color is
+too dim there. Status pairs remain semantic: green approved,
 amber pending, warm orange needs details, red error, blue informational, zinc
 suppressed/neutral. Suppression never visually implies approval.
 
@@ -118,7 +130,7 @@ Monospace is reserved for opaque bank references and history detail, not brandin
 Body text uses the frontmatter scale; page headings reduce to 22px on narrow
 phones (the only off-ramp step). Labels and table text are compact, with supporting metadata smaller and
 muted. Amounts and fact values use tabular numerals. Explanatory text is bounded
-at roughly 76ch; financial tables may use the full work area.
+at 76ch (`.prose-block`, hints); financial tables may use the full work area.
 
 ## Layout
 
@@ -128,16 +140,28 @@ Only the work area is bounded (1360px, 24px vertical / 32px horizontal inset),
 so financial tables still use the width. Account pages (organizations, platform)
 use the same topbar without a sidebar. At 1100px the sidebar contracts to a 64px
 icon rail (labels stay in the accessibility tree and as tooltips). At 800px it
-becomes a drawer opened by the topbar Menu button; the organization switcher
-stays visible in the topbar. At 480px the main inset reduces, forms stay linear
-and split-purpose rows stack. Target minimum viewport: 320px.
+becomes an overlay drawer over a scrim, opened by the topbar Menu button: focus
+moves to its first link, Escape, the scrim and any link close it, and focus
+returns to the button. The organization switcher stays visible in the topbar.
+At 480px the main inset reduces, forms stay linear and split-purpose rows stack.
+Target minimum viewport: 320px.
 
-Forms and field groups are bounded at 640px. Toolbars may align compact filters
-horizontally, wrapping when needed. Settings open on a status list (one linked
-row per section, with live counts and flags) and each section is its own page
-with an icon tab row; the overview has no tab row because its rows are the
-navigation. Tables scroll within their own wrapper; do not
-hide financial facts to fit a phone. Avoid page-level horizontal scrolling.
+Every form, inline ones included, is bounded at 640px, and a panel that holds
+only a form is as wide as that form. Fields sit in at most two columns, grouped
+on purpose (one column at 480px and below); a field that needs the width takes
+`field--wide`. Toolbars may align compact filters horizontally, wrapping when
+needed. Settings open on a status list (one linked row per section, with live
+counts and flags) and each section is its own page with an icon tab row that
+includes Overview as its first tab. The row scrolls on narrow screens, fades its
+clipped edges, and keeps the current tab revealed after a resize. Tables use
+`table.ledger`; at 640px every table is `stack`ed into labelled rows
+(`data-label`, with explicit `role` restored by the `stack` action) so no
+column or action hides behind a silent scroll. Avoid page-level horizontal
+scrolling.
+
+A synthetic demo organization shows one compact "Synthetic data" chip in the
+topbar (icon only on phones); PRODUCT.md requires fixtures to stay distinguishable
+from real records.
 
 ## Elevation & Depth
 
@@ -157,7 +181,7 @@ are small authored inline SVG with consistent stroke treatment, never emoji.
   current page with `aria-current="page"` (filled row plus warm icon). Organization
   switching and the account menu live in the topbar as native `<details>`
   disclosures that close on Escape (focus returns to the trigger), on an outside
-  press and after a choice. The current organization is always visible, also on
+  press, when focus leaves, and after a choice. The current organization is always visible, also on
   phones. A skip link precedes the topbar and every page has one `<main id="main">`.
   Notification disablement is separate from transaction status.
 - **Chips:** a filter that changes the list is a row of links (`.chip`), one
@@ -169,24 +193,42 @@ are small authored inline SVG with consistent stroke treatment, never emoji.
   zinc borders and warm focus outlines. Read-only/disabled fields use a muted
   surface; invalid fields use an error border. Preserve native validation,
   names, permissions, CSRF and submission semantics when enhancing controls.
-- **Controls:** native `select`, `date`, `time`, `file` and `textarea` elements
-  are the source of form values and the no-JavaScript fallback. Styling lives in
-  `src/app.css` (`.input`, `.select`, `.btn`); no custom control library is
-  vendored. Destructive actions (revoke access, revoke invitation, delete mapping,
-  revoke platform admin) confirm in one native `<dialog>` (`confirmDialog` in
-  `src/lib/forms.ts`) whose sentence states the consequence; Escape, Cancel and a
-  backdrop press all cancel. Without JavaScript the form posts directly, as the
-  server remains the authority. Every control keeps a `<label for>` association, so keyboard
-  focus, required validation and screen-reader names survive enhancement.
+- **Controls:** `Select`, `Combobox`, `DatePicker` and `Checkbox` live in
+  `src/lib/components/ui/` and wrap the headless `bits-ui` primitives (keyboard,
+  ARIA, focus and typeahead come from there); styling is ours, from the tokens in
+  `src/app.css` (`.ui-*`, `.input`, `.btn`). No Tailwind, no shadcn CLI. Triggers
+  look like inputs (`control-edge` border, chevron or calendar icon); popovers use
+  `shadow-menu`, mark the selected item with a check, and stay inside the
+  viewport at 375px. Each renders a hidden input under the same `name`, so forms
+  post exactly what they did natively, and CSRF and server validation are
+  unchanged. `Combobox` is a text input with suggestions: a picked option or a
+  typed new value is submitted as typed (the routing label picker offers the
+  pocket's imported, still-unmapped labels, and is a plain input when there are
+  none). `DatePicker` shows one human format ("1 Jan 2025", `fmtDate`) and submits
+  ISO `YYYY-MM-DD`. Every control keeps a `<label for>` on its trigger or input.
+  Native `<input type=file|time|number>` and `<textarea>` stay native.
+  Destructive actions (revoke access, revoke invitation, delete mapping, revoke
+  platform admin) confirm inline, not in a dialog: see Feedback.
 - **Tables:** sentence-case muted headers, generous rows, subtle hover, aligned
   tabular amounts and secondary metadata within cells. Captions identify tables.
 - **Feedback:** status/alert regions (`Notice`), extraction and allocation live
   updates, explicit empty-state actions. Forms are ordinary POST submissions that
   still work without JavaScript. Every form carries `use:submit` (form actions) or
   `use:guard` (plain endpoints) from `src/lib/forms.ts`: the form is `aria-busy`
-  and its submitter pulses while pending, a second submit is ignored, a rejection
-  renders inline in an alert and keeps what was typed, and a redirect is followed
-  in place. Domain rejections and audit codes are translated
+  and its submitter pulses while pending, a second submit is ignored, and a
+  redirect is followed in place. One rule covers both: a rejection (including a
+  `guard` fetch that returns non-2xx) renders in a focused, scrolled-into-view
+  alert placed above the actions, marks the named field `aria-invalid` and keeps
+  what was typed; the error screen is only for 5xx. Every form, the sign-out and
+  sign-in forms included, carries one of the two.
+  **Inline confirm.** A destructive button turns, in place, into a short
+  consequence sentence ("Revoke Bob? Access and notifications end now.") with
+  Revoke and Cancel. Focus moves to the confirming button; Escape or Cancel
+  restores the original button and its focus; a prompt left alone reverts after
+  about five seconds, but never while focus is inside it. No modal, no dialog.
+  Without JavaScript the form posts directly, as the server stays the authority.
+  A form with typed-in values can warn before the page is left (`unsavedGuard`,
+  memory only; financial drafts are never stored). Domain rejections and audit codes are translated
   to organizer wording on the server (`userMessage`, `actionLabel`); internal
   state names such as Draft/Submitted never render.
 - **Motion:** menus enter over 160ms with a short upward offset and slight scale;

@@ -197,6 +197,11 @@ code,
 	flex: none;
 }
 
+.menu__trigger--bordered {
+	min-width: 0;
+	width: 100%;
+}
+
 @media (max-width: 480px) {
 	.topbar__chip span {
 		position: absolute;
@@ -214,6 +219,7 @@ code,
 .menu {
 	position: relative;
 	min-width: 0;
+	max-width: 100%;
 }
 
 .menu > summary {
@@ -230,7 +236,7 @@ code,
 	align-items: center;
 	gap: 8px;
 	min-height: 36px;
-	max-width: min(260px, 100%);
+	max-width: 260px;
 	padding: 4px 8px;
 	border: 1px solid transparent;
 	border-radius: var(--radius-control);
@@ -248,6 +254,7 @@ code,
 }
 
 .menu__label {
+	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -890,6 +897,10 @@ code,
 
 .rows--link > li > a:hover {
 	background: var(--surface-2);
+}
+
+.rows--link .rows__main {
+	flex: 1 1 auto;
 }
 
 .rows--link .lead {

@@ -81,7 +81,7 @@
 	<span class="topbar__spacer"></span>
 
 	{#if org?.synthetic}
-		<span class="badge badge--info topbar__chip" title="Synthetic demo data, not real records"><Icon name="info" size={12} /><span>Synthetic data</span></span>
+		<span class="badge badge--info topbar__chip" role="status" title="Synthetic demo data, not real records"><Icon name="info" size={12} /><span>Synthetic data</span></span>
 	{/if}
 
 	<details class="menu" use:menu>
