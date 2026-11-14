@@ -5,6 +5,7 @@
 	import OrgShell from '$lib/components/OrgShell.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
 	import { submit } from '$lib/forms';
+	import { stack } from '$lib/table';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -74,7 +75,7 @@
 			<Empty icon="imports" title="No importable rows" inline />
 		{:else}
 			<div class="table-scroll">
-				<table class="ledger">
+				<table class="ledger stack" use:stack>
 					<caption class="visually-hidden">Statement entries and how each is handled</caption>
 					<thead>
 						<tr>
@@ -98,12 +99,12 @@
 									<span class="cell__sub mono">{item.bankId || '—'}</span>
 								</td>
 								{#if data.preview}
-									<td class="cell--nowrap">{item.date}{item.time ? ` ${item.time}` : ''}</td>
+									<td class="cell--nowrap" data-label="Date">{item.date}{item.time ? ` ${item.time}` : ''}</td>
 								{/if}
-								<td class="cell--num">{item.amount}</td>
-								<td>{item.responsibleName ?? 'Unassigned'}</td>
-								<td class="cell--nowrap"><span class="badge badge--{badgeTone(item.status)}">{badgeLabel(item.status)}</span></td>
-								<td>{item.message || '—'}</td>
+								<td class="cell--num" data-label="Amount">{item.amount}</td>
+								<td data-label="Responsible">{item.responsibleName ?? 'Unassigned'}</td>
+								<td class="cell--nowrap" data-label="Result"><span class="badge badge--{badgeTone(item.status)}">{badgeLabel(item.status)}</span></td>
+								<td data-label="Message">{item.message || '—'}</td>
 								<td class="cell--nowrap">
 									{#if item.transactionId}
 										<a href="/org/{data.shell.org.slug}/transactions/{item.transactionId}">Open<span class="visually-hidden"> transaction</span></a>

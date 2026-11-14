@@ -6,6 +6,7 @@
 	import PageHead from '$lib/components/PageHead.svelte';
 	import SettingsNav from '$lib/components/SettingsNav.svelte';
 	import { guard, submit } from '$lib/forms';
+	import { stack } from '$lib/table';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -107,7 +108,7 @@
 					<Empty icon="inbox" title="Nothing queued" inline />
 				{:else}
 					<div class="table-scroll">
-						<table class="ledger">
+						<table class="ledger stack" use:stack>
 							<caption class="visually-hidden">Queued notifications, newest first</caption>
 							<thead>
 								<tr>
@@ -120,10 +121,10 @@
 							<tbody>
 								{#each s.outbox as row, index (index)}
 									<tr>
-										<td>{row.kind}</td>
-										<td>{row.toName}</td>
-										<td>{row.subject}</td>
-										<td class="cell--nowrap">{row.createdAtLabel}</td>
+										<td data-label="Kind">{row.kind}</td>
+										<td data-label="To">{row.toName}</td>
+										<td data-label="Subject">{row.subject}</td>
+										<td class="cell--nowrap" data-label="Queued">{row.createdAtLabel}</td>
 									</tr>
 								{/each}
 							</tbody>

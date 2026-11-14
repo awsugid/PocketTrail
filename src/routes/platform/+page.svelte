@@ -3,8 +3,9 @@
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
-	import { fmtTs } from '$lib/fmt';
+	import { fmtTsOrDash as fmtTs } from '$lib/fmt';
 	import { guard } from '$lib/forms';
+	import { stack } from '$lib/table';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -39,7 +40,7 @@
 				<span class="count">{p.usersFrom}–{p.usersTo} of {p.usersTotal}</span>
 			</div>
 			<div class="table-scroll">
-				<table class="ledger">
+				<table class="ledger stack" use:stack>
 					<caption class="visually-hidden">Accounts and platform administration state</caption>
 					<thead>
 						<tr>
@@ -53,15 +54,15 @@
 						{#each p.users as account (account.id)}
 							<tr>
 								<td class="row-identity">{account.name}</td>
-								<td>{account.email}</td>
-								<td>
+								<td data-label="Email">{account.email}</td>
+								<td data-label="Access">
 									<span class="badge badge--{account.admin ? 'approved' : 'muted'}">
 										{account.admin ? 'Administrator' : 'Member'}
 									</span>
 								</td>
 								<td class="cell--num">
 									{#if account.isSelf}
-										<span class="muted">You</span>
+										<span class="badge badge--muted">You</span>
 									{:else}
 										<form
 											method="POST"
@@ -162,7 +163,7 @@
 				<Empty icon="history" title="No events yet" inline />
 			{:else}
 				<div class="table-scroll">
-					<table class="ledger">
+					<table class="ledger stack" use:stack>
 						<caption class="visually-hidden">Platform events, newest first</caption>
 						<thead>
 							<tr>
@@ -176,11 +177,11 @@
 						<tbody>
 							{#each p.events as event (event.id)}
 								<tr>
-									<td>{event.actorName ?? '—'}</td>
-									<td>{event.actionLabel}</td>
-									<td>{event.targetLabel}</td>
-									<td>{event.outcomeLabel}</td>
-									<td class="cell--nowrap">{fmtTs(event.createdAt)}</td>
+									<td data-label="Actor">{event.actorName ?? '—'}</td>
+									<td data-label="Action">{event.actionLabel}</td>
+									<td data-label="Target">{event.targetLabel}</td>
+									<td data-label="Outcome">{event.outcomeLabel}</td>
+									<td class="cell--nowrap" data-label="When">{fmtTs(event.createdAt)}</td>
 								</tr>
 							{/each}
 						</tbody>

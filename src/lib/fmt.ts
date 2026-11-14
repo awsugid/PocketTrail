@@ -34,6 +34,11 @@ export function fmtTs(ms: number): string {
 	return `${pad(y, 4)}-${pad(m)}-${pad(d)} ${pad(Math.floor(rem / 3600))}:${pad(Math.floor((rem % 3600) / 60))}`;
 }
 
+/** Like `fmtTs`, but an unset (epoch or earlier) time is "—", never 1970. */
+export function fmtTsOrDash(ms: number): string {
+	return ms > 0 ? fmtTs(ms) : '—';
+}
+
 /** Days since 1970-01-01 -> [year, month, day]. Howard Hinnant's algorithm. */
 function civilFromDays(zRaw: number): [number, number, number] {
 	const z = zRaw + 719_468;

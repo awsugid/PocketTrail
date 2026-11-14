@@ -5,6 +5,7 @@
 	import OrgShell from '$lib/components/OrgShell.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
 	import { submit } from '$lib/forms';
+	import { stack } from '$lib/table';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -30,7 +31,7 @@
 				<Empty icon="inventory" title="No items yet" inline />
 			{:else}
 				<div class="table-scroll">
-					<table class="ledger">
+					<table class="ledger stack" use:stack>
 						<caption class="visually-hidden">Items with quantities per location</caption>
 						<thead>
 							<tr>
@@ -46,7 +47,7 @@
 										<a href="/org/{slug}/inventory/{item.id}">{item.name}</a>
 										{#if item.variant}<span class="cell__sub">{item.variant}</span>{/if}
 									</td>
-									<td>
+									<td data-label="Holdings">
 										{#if item.levels.length === 0}
 											<span class="muted">—</span>
 										{:else}
@@ -57,7 +58,7 @@
 											</ul>
 										{/if}
 									</td>
-									<td class="cell--num"><strong>{item.totalQty}</strong></td>
+									<td class="cell--num" data-label="Total"><strong>{item.totalQty}</strong></td>
 								</tr>
 							{/each}
 						</tbody>

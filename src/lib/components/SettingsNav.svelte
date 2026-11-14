@@ -9,10 +9,28 @@
 
 	let { slug, current, can }: Props = $props();
 
-	// On narrow screens the tab row scrolls; keep the current tab visible.
-	function reveal(nav: HTMLElement) {
-		const tab = nav.querySelector<HTMLElement>('[aria-current="page"]');
-		if (tab) nav.scrollLeft = tab.offsetLeft - nav.clientWidth / 2 + tab.offsetWidth / 2;
+	// On narrow screens the tab row scrolls: keep the current tab visible
+	// (also after a resize) and flag hidden overflow so CSS can fade the edges.
+	function tabs(nav: HTMLElement, _current?: string) {
+		const sync = () => {
+			nav.toggleAttribute('data-fade-start', nav.scrollLeft > 1);
+			nav.toggleAttribute('data-fade-end', nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 1);
+		};
+		const reveal = () => {
+			const tab = nav.querySelector<HTMLElement>('[aria-current="page"]');
+			if (tab) nav.scrollLeft = tab.offsetLeft - nav.clientWidth / 2 + tab.offsetWidth / 2;
+			sync();
+		};
+		const observer = new ResizeObserver(reveal);
+		observer.observe(nav);
+		nav.addEventListener('scroll', sync, { passive: true });
+		return {
+			update: reveal,
+			destroy() {
+				observer.disconnect();
+				nav.removeEventListener('scroll', sync);
+			}
+		};
 	}
 
 	const items = $derived(
@@ -29,7 +47,7 @@
 	);
 </script>
 
-<nav class="tabs" aria-label="Settings sections" use:reveal>
+<nav class="tabs" aria-label="Settings sections" use:tabs={current}>
 	{#each items as item (item.key)}
 		<a href={item.href} aria-current={current === item.key ? 'page' : undefined}>
 			<Icon name={item.icon} size={16} />{item.label}

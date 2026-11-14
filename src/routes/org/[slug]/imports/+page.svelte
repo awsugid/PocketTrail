@@ -5,6 +5,7 @@
 	import OrgShell from '$lib/components/OrgShell.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
 	import { submit } from '$lib/forms';
+	import { stack } from '$lib/table';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -144,7 +145,7 @@
 				<Empty icon="imports" title="No imports yet" inline />
 			{:else}
 				<div class="table-scroll">
-					<table class="ledger">
+					<table class="ledger stack" use:stack>
 						<caption class="visually-hidden">Statement imports, newest first</caption>
 						<thead>
 							<tr>
@@ -161,13 +162,13 @@
 										<a href="{base}/{batch.id}">{batch.filename}</a>
 										<span class="cell__sub">#{batch.id} · {batch.byName}</span>
 									</td>
-									<td class="cell--nowrap">{batch.createdAt}</td>
-									<td>
+									<td class="cell--nowrap" data-label="Staged">{batch.createdAt}</td>
+									<td data-label="Status">
 										<span class="badge badge--{batch.status === 'committed' ? 'approved' : 'review'}">
 											{batch.status === 'committed' ? 'Committed' : 'Awaiting confirmation'}
 										</span>
 									</td>
-									<td>
+									<td data-label="Result">
 										{#if Object.keys(batch.counts).length > 0}
 											<span class="count">
 												{batch.counts.imported ?? 0} new · {batch.counts.duplicate_unchanged ?? 0} unchanged ·

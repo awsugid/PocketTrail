@@ -3,6 +3,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
+	import { stack } from '$lib/table';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -47,10 +48,7 @@
 	{#if data.entries.length > 0}
 		<div class="panel">
 			<div class="table-scroll">
-				<!-- Explicit roles: below 640px the stacking rule sets `display: block`, which
-				     drops implicit table semantics in some assistive technology. -->
-				<!-- svelte-ignore a11y_no_redundant_roles -->
-				<table class="ledger stack" role="table">
+				<table class="ledger stack" use:stack>
 					<caption class="visually-hidden">Bank movements with amounts, balances, status, and responsible member</caption>
 					<thead>
 						<tr>
@@ -64,9 +62,8 @@
 					</thead>
 					<tbody>
 						{#each data.entries as entry (entry.id)}
-							<!-- svelte-ignore a11y_no_redundant_roles -->
-							<tr role="row">
-								<td class="row-identity" role="cell">
+							<tr>
+								<td class="row-identity">
 									<a href="{base}/{entry.id}">{entry.counterparty.name}</a>
 									{#if entry.counterparty.bankAccount}
 										<span class="cell__sub">{entry.counterparty.bankAccount}</span>
@@ -75,21 +72,21 @@
 										{entry.transactionType}{entry.transactionType && entry.pocketName ? ' · ' : ''}{entry.pocketName}
 									</span>
 								</td>
-								<td class="cell--nowrap" role="cell" data-label="Date">
+								<td class="cell--nowrap" data-label="Date">
 									{entry.date}
 									{#if entry.time}<span class="cell__sub">{entry.time}</span>{/if}
 								</td>
-								<td class="cell--num {entry.amountMinor > 0 ? 'amount--in' : ''}" role="cell" data-label="Amount">
+								<td class="cell--num {entry.amountMinor > 0 ? 'amount--in' : ''}" data-label="Amount">
 									{entry.amount}
 								</td>
-								<td class="cell--num" role="cell" data-label="Balance after">{entry.balance}</td>
-								<td role="cell" data-label="Status">
+								<td class="cell--num" data-label="Balance after">{entry.balance}</td>
+								<td data-label="Status">
 									<span class="badge badge--{entry.statusTone}">{entry.statusLabel}</span>
 									{#if entry.suppressed}
 										<span class="cell__sub">Notifications suppressed</span>
 									{/if}
 								</td>
-								<td role="cell" data-label="Responsible">{entry.responsibleName ?? '—'}</td>
+								<td data-label="Responsible">{entry.responsibleName ?? '—'}</td>
 							</tr>
 						{/each}
 					</tbody>

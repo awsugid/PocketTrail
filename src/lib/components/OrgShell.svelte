@@ -6,18 +6,31 @@
 
 	interface Props {
 		user: { name: string; email: string; picture: string | null; isPlatformAdmin: boolean };
-		org: { slug: string; name: string; notificationsEnabled: boolean };
+		org: { slug: string; name: string; notificationsEnabled: boolean; synthetic: boolean };
 		organizations: Array<{ slug: string; name: string }>;
 		csrfToken: string;
 		active: string;
-		localMode?: boolean;
 		children: Snippet;
 	}
 
-	let { user, org, organizations, csrfToken, active, localMode = false, children }: Props = $props();
+	let { user, org, organizations, csrfToken, active, children }: Props = $props();
 
 	let navOpen = $state(false);
 	afterNavigate(() => (navOpen = false));
+
+	// Phone drawer: focus the first link on open; closing (Escape, scrim, link)
+	// returns focus to the menu button unless navigation already moved on.
+	let wasOpen = false;
+	$effect(() => {
+		if (navOpen) document.querySelector<HTMLElement>('#org-nav a')?.focus();
+		else if (wasOpen && document.activeElement?.closest('#org-nav')) document.getElementById('menu-button')?.focus();
+		wasOpen = navOpen;
+	});
+	function onKey(event: KeyboardEvent) {
+		if (event.key !== 'Escape' || !navOpen) return;
+		navOpen = false;
+		document.getElementById('menu-button')?.focus();
+	}
 
 	const nav: Array<{ key: string; label: string; path: string; icon: IconName }> = [
 		{ key: 'actions', label: 'Actions', path: 'actions', icon: 'actions' },
@@ -28,7 +41,7 @@
 	];
 </script>
 
-<svelte:window onkeydown={(event) => event.key === 'Escape' && (navOpen = false)} />
+<svelte:window onkeydown={onKey} />
 
 <div class="frame">
 	<Topbar {user} {csrfToken} {org} {organizations} bind:navOpen />
@@ -43,10 +56,8 @@
 					<Icon name={item.icon} /><span class="sidebar__label">{item.label}</span>
 				</a>
 			{/each}
-			{#if localMode}
-				<div class="sidebar__foot"><span class="sidebar__chip">Local data</span></div>
-			{/if}
 		</nav>
+		{#if navOpen}<button class="scrim" type="button" tabindex="-1" aria-label="Close menu" onclick={() => { navOpen = false; document.getElementById('menu-button')?.focus(); }}></button>{/if}
 		<main class="main" id="main" tabindex="-1">
 			<div class="main__inner">
 				{@render children()}

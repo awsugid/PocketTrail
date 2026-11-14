@@ -2,6 +2,7 @@
 	import Empty from '$lib/components/Empty.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
+	import { stack } from '$lib/table';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -23,7 +24,7 @@
 			<Empty icon="history" title="No stock changes yet" inline />
 		{:else}
 			<div class="table-scroll">
-				<table class="ledger">
+				<table class="ledger stack" use:stack>
 					<caption class="visually-hidden">Stock movement history with who, what, when, and why</caption>
 					<thead>
 						<tr>
@@ -38,12 +39,12 @@
 					<tbody>
 						{#each data.movements as movement (movement.at + movement.locationName)}
 							<tr>
-								<td class="cell--nowrap">{movement.at}</td>
-								<td>{movement.memberName}</td>
-								<td>{movement.locationName}</td>
-								<td class="cell--num" class:amount--in={movement.delta > 0}>{movement.delta > 0 ? `+${movement.delta}` : movement.delta}</td>
-								<td class="cell--num">{movement.resultQty}</td>
-								<td>{movement.reason}</td>
+								<td class="cell--nowrap" data-label="When">{movement.at}</td>
+								<td data-label="Who">{movement.memberName}</td>
+								<td data-label="Location">{movement.locationName}</td>
+								<td class="cell--num" data-label="Change" class:amount--in={movement.delta > 0}>{movement.delta > 0 ? `+${movement.delta}` : movement.delta}</td>
+								<td class="cell--num" data-label="Result">{movement.resultQty}</td>
+								<td data-label="Reason">{movement.reason}</td>
 							</tr>
 						{/each}
 					</tbody>

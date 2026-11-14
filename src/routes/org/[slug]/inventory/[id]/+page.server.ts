@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { requireMember, shellContext } from '$lib/server/auth';
-import { fmtTs } from '$lib/fmt';
+import { fmtTsOrDash } from '$lib/fmt';
 import { inventoryItems, itemMovements } from '$lib/server/inventory';
 import type { PageServerLoad } from './$types';
 
@@ -16,7 +16,7 @@ export const load: PageServerLoad = async (event) => {
 		shell: await shellContext(ctx),
 		item: { id: item.id, name: item.name, variant: item.variant },
 		movements: movements.map((movement) => ({
-			at: fmtTs(movement.created_at),
+			at: fmtTsOrDash(movement.created_at),
 			memberName: movement.member_name,
 			locationName: movement.location_name,
 			delta: movement.delta,

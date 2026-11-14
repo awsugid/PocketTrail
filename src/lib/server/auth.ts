@@ -206,7 +206,8 @@ export async function shellContext(ctx: TenantContext) {
 		org: {
 			slug: ctx.org.slug,
 			name: ctx.org.name,
-			notificationsEnabled: ctx.org.notifications_enabled !== 0
+			notificationsEnabled: ctx.org.notifications_enabled !== 0,
+			synthetic: ctx.org.is_synthetic !== 0
 		},
 		organizations,
 		members: ctx.memberRows.map((m) => ({
@@ -216,8 +217,7 @@ export async function shellContext(ctx: TenantContext) {
 			handle: m.handle,
 			active: m.removed_at === null
 		})),
-		csrfToken: ctx.session.csrf,
-		localMode: ctx.config.localDev
+		csrfToken: ctx.session.csrf
 	};
 }
 

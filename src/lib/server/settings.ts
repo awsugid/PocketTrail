@@ -7,7 +7,7 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { D1Database } from '$lib/d1';
 import { ALL_PERMISSIONS, documentationOwed, incomeComplete, incomeRecipients } from '$lib/domain';
-import { parseRupiah, validDate, fmtTs } from '$lib/fmt';
+import { parseRupiah, validDate, fmtTsOrDash as fmtTs } from '$lib/fmt';
 import { digestBody, digestDue } from '$lib/notify_rules';
 import { committed, committedIfChanged, listOrg } from './audit';
 import {

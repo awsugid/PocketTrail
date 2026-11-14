@@ -5,7 +5,7 @@
 	interface Props {
 		user: { name: string; email?: string; picture?: string | null; isPlatformAdmin: boolean };
 		csrfToken: string;
-		org?: { slug: string; name: string };
+		org?: { slug: string; name: string; synthetic?: boolean };
 		organizations?: Array<{ slug: string; name: string }>;
 		/** Bound by OrgShell so the phone menu button can open the sidebar. */
 		navOpen?: boolean;
@@ -37,6 +37,7 @@
 <header class="topbar">
 	{#if org}
 		<button
+			id="menu-button"
 			class="btn btn--quiet btn--icon menu-button"
 			type="button"
 			aria-expanded={navOpen}
@@ -77,6 +78,10 @@
 	{/if}
 
 	<span class="topbar__spacer"></span>
+
+	{#if org?.synthetic}
+		<span class="badge badge--info topbar__chip" title="Synthetic demo data, not real records"><Icon name="info" size={12} /><span>Synthetic data</span></span>
+	{/if}
 
 	<details class="menu" use:menu>
 		<summary class="menu__trigger" aria-label="Account: {user.name}">
