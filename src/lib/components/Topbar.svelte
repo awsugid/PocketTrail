@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { guard } from '$lib/forms';
 	import { menu } from '$lib/menu';
 	import Icon from './Icon.svelte';
 
@@ -100,7 +101,7 @@
 			{#if user.isPlatformAdmin}
 				<a class="menu__item" href="/platform"><Icon name="platform" size={16} />Platform admin</a>
 			{/if}
-			<form method="POST" action="/logout">
+			<form method="POST" action="/logout" use:guard>
 				<input type="hidden" name="csrf_token" value={csrfToken} />
 				<button class="menu__item" type="submit"><Icon name="logout" size={16} />Sign out</button>
 			</form>

@@ -49,8 +49,8 @@
 									method="POST"
 									action="?/deleteMapping"
 									use:submit={{
-										confirm: `Future imports will no longer assign “${mapping.pattern}” to ${mapping.memberName}. Existing assignments stay.`,
-										confirmLabel: 'Delete mapping'
+										confirm: `Delete “${mapping.pattern}”? Existing assignments stay.`,
+										confirmLabel: 'Delete'
 									}}
 								>
 									<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />

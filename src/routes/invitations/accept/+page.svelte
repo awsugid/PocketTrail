@@ -3,7 +3,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
 	import { fmtTs } from '$lib/fmt';
-	import { guard } from '$lib/forms';
+	import { guard, submit } from '$lib/forms';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -47,7 +47,7 @@
 				<button class="btn" type="submit"><Icon name="logout" size={16} />Sign out</button>
 			</form>
 		{:else}
-			<form method="POST" action="?/accept" use:guard>
+			<form method="POST" action="?/accept" use:submit>
 				<input type="hidden" name="csrf_token" value={data.viewer.csrf} />
 				<input type="hidden" name="token" value={data.token} />
 				<button class="btn btn--primary" type="submit"><Icon name="check" size={16} />Join {inv.orgName}</button>

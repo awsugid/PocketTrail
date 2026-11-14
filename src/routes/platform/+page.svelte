@@ -69,8 +69,8 @@
 											action="/platform/users/admin"
 											use:guard={account.admin
 												? {
-														confirm: `${account.name} will lose platform administration. Organization access is unchanged.`,
-														confirmLabel: 'Revoke administrator'
+														confirm: `Revoke ${account.name}? Organization access stays.`,
+														confirmLabel: 'Revoke'
 													}
 												: {}}
 										>

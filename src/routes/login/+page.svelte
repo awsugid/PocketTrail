@@ -1,7 +1,7 @@
 <script lang="ts">
 	import AuthFrame from '$lib/components/AuthFrame.svelte';
 	import Icon from '$lib/components/Icon.svelte';
-	import { guard } from '$lib/forms';
+	import { submit } from '$lib/forms';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -102,7 +102,7 @@ interface GoogleIdentity {
 			<ul class="rows">
 				{#each data.users as user (user.id)}
 					<li>
-						<form method="POST" action="?/dev" use:guard>
+						<form method="POST" action="?/dev" use:submit>
 							<input type="hidden" name="csrf_token" value={data.csrfToken} />
 							<input type="hidden" name="user_id" value={user.id} />
 							<button class="row-button" type="submit">

@@ -58,8 +58,8 @@
 										method="POST"
 										action="?/removeMember"
 										use:submit={{
-											confirm: `${member.name} loses access to ${data.shell.org.name} immediately and stops receiving notifications. Past records keep their name.`,
-											confirmLabel: 'Revoke access'
+											confirm: `Revoke ${member.name}? Access and notifications end now.`,
+											confirmLabel: 'Revoke'
 										}}
 									>
 										<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
@@ -135,8 +135,8 @@
 										method="POST"
 										action="/org/{slug}/settings/invitations/{invitation.id}/revoke"
 										use:guard={{
-											confirm: `The invitation link for ${invitation.email} stops working.`,
-											confirmLabel: 'Revoke invitation'
+											confirm: `Revoke invite? The link stops working.`,
+											confirmLabel: 'Revoke'
 										}}
 									>
 										<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
