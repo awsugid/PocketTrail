@@ -105,6 +105,8 @@ await withWorker(async () => {
 		// ----------------------------------------------------- mobile money labels
 		await page.setViewportSize({ width: 320, height: 900 });
 		await page.goto(`${ORIGIN}/org/demo-jakarta/transactions`);
+		// The `stack` action adds the roles on hydration.
+		await page.waitForFunction(() => document.querySelector('table.ledger tbody tr')?.getAttribute('role') === 'row');
 		const mobileLabels = await page.evaluate(() => {
 			const cell = document.querySelector('table.ledger td[data-label="Amount"]');
 			const table = document.querySelector('table.ledger');

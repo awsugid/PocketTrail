@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Select from '$lib/components/ui/Select.svelte';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
@@ -76,27 +77,16 @@
 							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 							<div class="field">
 								<label for="stock-item">Item</label>
-								<select class="select" id="stock-item" name="item_id" required>
-									{#each data.items as item (item.id)}
-										<option value={item.id}>{item.name}{item.variant ? ` — ${item.variant}` : ''}</option>
-									{/each}
-								</select>
+								<Select id="stock-item" name="item_id" items={data.items.map((item) => ({ value: String(item.id), label: item.name + (item.variant ? ` — ${item.variant}` : '') }))} required />
 							</div>
 							<div class="field">
 								<label for="stock-location">Location</label>
-								<select class="select" id="stock-location" name="location_id" required>
-									{#each data.locations as location (location.id)}
-										<option value={location.id}>{location.name}</option>
-									{/each}
-								</select>
+								<Select id="stock-location" name="location_id" items={data.locations.map((location) => ({ value: String(location.id), label: location.name }))} required />
 							</div>
 							<div class="form-grid">
 								<div class="field">
 									<label for="stock-direction">Direction</label>
-									<select class="select" id="stock-direction" name="direction">
-										<option value="add">Add</option>
-										<option value="remove">Remove</option>
-									</select>
+									<Select id="stock-direction" name="direction" items={[{ value: 'add', label: 'Add' }, { value: 'remove', label: 'Remove' }]} />
 								</div>
 								<div class="field">
 									<label for="stock-quantity">Quantity</label>

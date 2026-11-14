@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Select from '$lib/components/ui/Select.svelte';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
@@ -46,11 +47,7 @@
 									<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 									<input type="hidden" name="id" value={member.id} />
 									<label class="visually-hidden" for="role-of-{member.id}">Role for {member.name}</label>
-									<select class="select" id="role-of-{member.id}" name="role_id" required style="width: auto">
-										{#each s.roles as role (role.id)}
-											<option value={role.id} selected={role.id === member.roleId}>{role.name}</option>
-										{/each}
-									</select>
+									<Select id="role-of-{member.id}" name="role_id" items={s.roles.map((role) => ({ value: String(role.id), label: role.name }))} value={String(member.roleId)} required auto />
 									<button class="btn btn--sm" type="submit"><Icon name="check" size={14} />Save</button>
 								</form>
 								{#if member.active}
@@ -91,11 +88,7 @@
 							</div>
 							<div class="field">
 								<label for="member-role">Role</label>
-								<select class="select" id="member-role" name="role_id" required>
-									{#each s.roles as role (role.id)}
-										<option value={role.id}>{role.name}</option>
-									{/each}
-								</select>
+								<Select id="member-role" name="role_id" items={s.roles.map((role) => ({ value: String(role.id), label: role.name }))} required />
 							</div>
 						</div>
 						<div class="form-actions">
@@ -159,11 +152,7 @@
 							</div>
 							<div class="field">
 								<label for="invite-role">Role</label>
-								<select class="select" id="invite-role" name="role_id" required>
-									{#each s.roles as role (role.id)}
-										<option value={role.id}>{role.name}</option>
-									{/each}
-								</select>
+								<Select id="invite-role" name="role_id" items={s.roles.map((role) => ({ value: String(role.id), label: role.name }))} required />
 							</div>
 						</div>
 						<div class="form-actions">

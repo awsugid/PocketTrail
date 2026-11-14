@@ -213,6 +213,7 @@ code,
 
 .menu {
 	position: relative;
+	min-width: 0;
 }
 
 .menu > summary {
@@ -229,7 +230,7 @@ code,
 	align-items: center;
 	gap: 8px;
 	min-height: 36px;
-	max-width: 260px;
+	max-width: min(260px, 100%);
 	padding: 4px 8px;
 	border: 1px solid transparent;
 	border-radius: var(--radius-control);
@@ -1560,5 +1561,242 @@ dl.facts dd {
 	*::after {
 		transition: none !important;
 		animation: none !important;
+	}
+}
+
+/* --------------------------------------------- Select, Combobox, DatePicker */
+
+.ui-trigger {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	text-align: left;
+	cursor: pointer;
+}
+
+.ui-trigger--auto {
+	width: auto;
+	min-width: 120px;
+}
+
+.ui-trigger__text {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.ui-trigger .icon {
+	color: var(--text-secondary);
+	transition: transform 160ms var(--ease);
+}
+
+.ui-trigger[data-state='open'] .icon {
+	transform: rotate(180deg);
+}
+
+.ui-trigger[data-state='open'] {
+	border-color: var(--focus);
+}
+
+.ui-popover {
+	z-index: 50;
+	min-width: var(--bits-select-anchor-width, var(--bits-combobox-anchor-width, 220px));
+	max-width: min(360px, calc(100vw - 24px));
+	max-height: min(320px, var(--bits-floating-available-height, 320px));
+	overflow-y: auto;
+	padding: 4px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-panel);
+	background: var(--surface);
+	box-shadow: var(--shadow-menu);
+	animation: menu-in 160ms var(--ease);
+}
+
+.ui-popover--calendar {
+	min-width: 0;
+	width: max-content;
+	padding: 10px;
+}
+
+.ui-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-height: 36px;
+	padding: 6px 10px;
+	border-radius: var(--radius-control);
+	cursor: pointer;
+	user-select: none;
+}
+
+.ui-item[data-highlighted] {
+	background: var(--surface-2);
+}
+
+.ui-item[data-selected] {
+	font-weight: 650;
+}
+
+.ui-item[data-disabled] {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.ui-item__text {
+	flex: 1;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.ui-item .ui-item__check {
+	flex: none;
+	color: var(--accent);
+}
+
+.ui-note {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 10px;
+	color: var(--text-secondary);
+	font-size: 13px;
+}
+
+.ui-combo {
+	position: relative;
+}
+
+.ui-combo .input {
+	padding-right: 36px;
+}
+
+.ui-combo__trigger {
+	position: absolute;
+	top: 0;
+	right: 0;
+	display: grid;
+	place-items: center;
+	width: 36px;
+	height: 100%;
+	border: 0;
+	background: none;
+	color: var(--text-secondary);
+	cursor: pointer;
+}
+
+.ui-check {
+	display: inline-grid;
+	place-items: center;
+	flex: none;
+	width: 18px;
+	height: 18px;
+	padding: 0;
+	border: 1px solid var(--control-edge);
+	border-radius: 4px;
+	background: var(--surface);
+	color: #fafafa;
+	cursor: pointer;
+}
+
+.ui-check[data-state='checked'] {
+	border-color: var(--primary);
+	background: var(--primary);
+}
+
+.ui-check:disabled {
+	opacity: 0.5;
+}
+
+.ui-cal__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 6px;
+}
+
+.ui-cal__title {
+	font-weight: 650;
+}
+
+.ui-cal__grid {
+	border-collapse: collapse;
+}
+
+.ui-cal__row {
+	display: flex;
+}
+
+.ui-cal__dow,
+.ui-cal__cell {
+	display: grid;
+	place-items: center;
+	width: 36px;
+	height: 36px;
+	padding: 0;
+	color: var(--text-secondary);
+	font-size: 12px;
+	font-weight: 550;
+}
+
+.ui-cal__day {
+	display: grid;
+	place-items: center;
+	width: 34px;
+	height: 34px;
+	border-radius: var(--radius-control);
+	color: var(--text);
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+	cursor: pointer;
+}
+
+.ui-cal__day:hover {
+	background: var(--surface-2);
+}
+
+.ui-cal__day[data-outside-month] {
+	color: var(--placeholder);
+}
+
+.ui-cal__day[data-today] {
+	box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
+.ui-cal__day[data-selected] {
+	background: var(--primary);
+	color: #fafafa;
+	font-weight: 650;
+}
+
+.ui-cal__day[data-disabled] {
+	opacity: 0.4;
+	pointer-events: none;
+}
+
+@media (pointer: coarse) {
+	.ui-item {
+		min-height: 44px;
+	}
+	.ui-cal__dow,
+	.ui-cal__cell {
+		width: 44px;
+		height: 44px;
+	}
+	.ui-cal__day {
+		width: 42px;
+		height: 42px;
+	}
+	.ui-check {
+		width: 22px;
+		height: 22px;
+	}
+}
+
+@media (max-width: 400px) {
+	.ui-cal__dow,
+	.ui-cal__cell {
+		width: min(44px, calc((100vw - 64px) / 7));
 	}
 }

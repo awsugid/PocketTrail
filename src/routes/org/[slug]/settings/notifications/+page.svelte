@@ -1,10 +1,13 @@
 <script lang="ts">
+	import Checkbox from '$lib/components/ui/Checkbox.svelte';
+	import DatePicker from '$lib/components/ui/DatePicker.svelte';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
 	import SettingsNav from '$lib/components/SettingsNav.svelte';
+	import { fmtDate } from '$lib/fmt';
 	import { guard, submit } from '$lib/forms';
 	import { stack } from '$lib/table';
 	import type { PageData } from './$types';
@@ -42,7 +45,7 @@
 					<form method="GET" action={base} class="form form--inline">
 						<div class="field">
 							<label for="cutoff">Transaction-date cutoff</label>
-							<input class="input" id="cutoff" name="cutoff_date" type="date" value={s.notificationPreviewCutoff} required />
+							<DatePicker id="cutoff" name="cutoff_date" value={s.notificationPreviewCutoff} required />
 						</div>
 						<button class="btn" type="submit"><Icon name="filter" size={16} />Preview</button>
 					</form>
@@ -52,7 +55,7 @@
 							<p>
 								<strong>{preview.totalItems}</strong> item{preview.totalItems === 1 ? '' : 's'} pending for
 								<strong>{preview.recipients.length}</strong> recipient{preview.recipients.length === 1 ? '' : 's'} since
-								{s.notificationPreviewCutoff}.
+								{fmtDate(s.notificationPreviewCutoff)}.
 								{#if preview.limited}<span class="muted">Latest 500 movements only.</span>{/if}
 							</p>
 							{#if preview.recipients.length > 0}
@@ -76,12 +79,10 @@
 					<form method="POST" action="?/saveNotifications" class="form" use:submit>
 						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 						<input type="hidden" name="preview_token" value={s.previewToken} />
-						<label class="check">
-							<input type="checkbox" name="enabled" checked={s.notifications.enabled} />Enable notifications for this organization
-						</label>
+						<Checkbox name="enabled" checked={s.notifications.enabled}>Enable notifications for this organization</Checkbox>
 						<div class="field">
 							<label for="cutoff-save">Transaction-date cutoff</label>
-							<input class="input" id="cutoff-save" name="cutoff_date" type="date" value={s.notifications.cutoffDate ?? ''} />
+							<DatePicker id="cutoff-save" name="cutoff_date" value={s.notifications.cutoffDate ?? ''} clearable />
 							<p class="hint">Preview this cutoff first. Mentions ignore the cutoff.</p>
 						</div>
 						<div class="form-actions">

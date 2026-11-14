@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Select from '$lib/components/ui/Select.svelte';
+	import DatePicker from '$lib/components/ui/DatePicker.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
@@ -35,18 +37,11 @@
 					<div class="form-grid">
 						<div class="field">
 							<label for="new-pocket">Pocket</label>
-							<select class="select" id="new-pocket" name="pocket_id" required>
-								{#each data.pockets as pocket (pocket.id)}
-									<option value={pocket.id}>{pocket.name}</option>
-								{/each}
-							</select>
+							<Select id="new-pocket" name="pocket_id" items={data.pockets.map((pocket) => ({ value: String(pocket.id), label: pocket.name }))} required />
 						</div>
 						<div class="field">
 							<label for="new-direction">Direction</label>
-							<select class="select" id="new-direction" name="direction" required>
-								<option value="out">Money out</option>
-								<option value="in">Money in</option>
-							</select>
+							<Select id="new-direction" name="direction" items={[{ value: 'out', label: 'Money out' }, { value: 'in', label: 'Money in' }]} required />
 						</div>
 						<div class="field">
 							<label for="new-amount">Amount (IDR) <span class="req" aria-hidden="true">*</span></label>
@@ -54,7 +49,7 @@
 						</div>
 						<div class="field">
 							<label for="new-date">Date</label>
-							<input class="input" id="new-date" name="date" type="date" value={today} required />
+							<DatePicker id="new-date" name="date" value={today} required />
 						</div>
 						<div class="field">
 							<label for="new-time">Time</label>
@@ -74,12 +69,7 @@
 						</div>
 						<div class="field">
 							<label for="new-responsible">Responsible</label>
-							<select class="select" id="new-responsible" name="responsible_member_id">
-								<option value="">Unassigned</option>
-								{#each data.members as member (member.id)}
-									<option value={member.id}>{member.name}</option>
-								{/each}
-							</select>
+							<Select id="new-responsible" name="responsible_member_id" items={[{ value: '', label: 'Unassigned' }, ...data.members.map((member) => ({ value: String(member.id), label: member.name }))]} />
 						</div>
 					</div>
 					<div class="field">

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Checkbox from '$lib/components/ui/Checkbox.svelte';
+	import Select from '$lib/components/ui/Select.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
@@ -52,10 +54,7 @@
 								<legend class="visually-hidden">Permissions of {role.name}</legend>
 								<div class="checks">
 									{#each s.permissions as permission (permission.id)}
-										<label class="check">
-											<input type="checkbox" name="perm" value={permission.id} checked={role.permissions.includes(permission.id)} />
-											{permission.label}
-										</label>
+										<Checkbox name="perm" value={permission.id} checked={role.permissions.includes(permission.id)}>{permission.label}</Checkbox>
 									{/each}
 								</div>
 							</fieldset>
@@ -80,7 +79,7 @@
 							<legend class="visually-hidden">Permissions</legend>
 							<div class="checks">
 								{#each s.permissions as permission (permission.id)}
-									<label class="check"><input type="checkbox" name="perm" value={permission.id} />{permission.label}</label>
+									<Checkbox name="perm" value={permission.id}>{permission.label}</Checkbox>
 								{/each}
 							</div>
 						</fieldset>
@@ -95,11 +94,7 @@
 							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 							<div class="field">
 								<label for="template-pick">Copy a platform template</label>
-								<select class="select" id="template-pick" name="template_id" required>
-									{#each s.roleTemplates as template (template.id)}
-										<option value={template.id}>{template.name}</option>
-									{/each}
-								</select>
+								<Select id="template-pick" name="template_id" items={s.roleTemplates.map((template) => ({ value: String(template.id), label: template.name }))} required />
 							</div>
 							<button class="btn" type="submit"><Icon name="plus" size={16} />Add as role</button>
 						</form>

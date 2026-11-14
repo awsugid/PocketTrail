@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 	import AccountShell from '$lib/components/AccountShell.svelte';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -125,7 +126,7 @@
 						<legend class="visually-hidden">Permissions</legend>
 						<div class="checks">
 							{#each permissionOptions as [id, label] (id)}
-								<label class="check"><input type="checkbox" name="perm" value={id} />{label}</label>
+								<Checkbox name="perm" value={id}>{label}</Checkbox>
 							{/each}
 						</div>
 					</fieldset>

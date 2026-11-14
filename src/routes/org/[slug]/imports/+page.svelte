@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Select from '$lib/components/ui/Select.svelte';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
@@ -100,11 +101,7 @@
 						<div class="form-grid">
 							<div class="field">
 								<label for="import-pocket">Pocket</label>
-								<select class="select" id="import-pocket" name="pocket_id" required>
-									{#each data.pockets as pocket (pocket.id)}
-										<option value={pocket.id}>{pocket.name}</option>
-									{/each}
-								</select>
+								<Select id="import-pocket" name="pocket_id" items={data.pockets.map((pocket) => ({ value: String(pocket.id), label: pocket.name }))} required />
 							</div>
 							<div class="field">
 								<label for="import-file">Original statement PDF</label>

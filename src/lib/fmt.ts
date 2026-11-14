@@ -34,6 +34,14 @@ export function fmtTs(ms: number): string {
 	return `${pad(y, 4)}-${pad(m)}-${pad(d)} ${pad(Math.floor(rem / 3600))}:${pad(Math.floor((rem % 3600) / 60))}`;
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** ISO `YYYY-MM-DD` -> "1 Jan 2025", the one date format shown to people. */
+export function fmtDate(iso: string): string {
+	const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+	return match ? `${Number(match[3])} ${MONTHS[Number(match[2]) - 1] ?? ''} ${match[1]}` : iso;
+}
+
 /** Like `fmtTs`, but an unset (epoch or earlier) time is "—", never 1970. */
 export function fmtTsOrDash(ms: number): string {
 	return ms > 0 ? fmtTs(ms) : '—';

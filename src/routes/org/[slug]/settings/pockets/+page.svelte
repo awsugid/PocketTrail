@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Select from '$lib/components/ui/Select.svelte';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
@@ -45,11 +46,7 @@
 									<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 									<input type="hidden" name="id" value={pocket.id} />
 									<label class="visually-hidden" for="owner-{pocket.id}">Owner of {pocket.name}</label>
-									<select class="select" id="owner-{pocket.id}" name="owner_membership_id" required style="width: auto">
-										{#each activeMembers as member (member.id)}
-											<option value={member.id} selected={member.id === pocket.ownerMembershipId}>{member.name}</option>
-										{/each}
-									</select>
+									<Select id="owner-{pocket.id}" name="owner_membership_id" items={activeMembers.map((member) => ({ value: String(member.id), label: member.name }))} value={String(pocket.ownerMembershipId ?? '')} required auto />
 									<button class="btn" type="submit"><Icon name="check" size={16} />Save</button>
 								</form>
 							{/if}
@@ -76,11 +73,7 @@
 							</div>
 							<div class="field">
 								<label for="pocket-owner">Owner</label>
-								<select class="select" id="pocket-owner" name="owner_membership_id">
-									{#each activeMembers as member (member.id)}
-										<option value={member.id}>{member.name}</option>
-									{/each}
-								</select>
+								<Select id="pocket-owner" name="owner_membership_id" items={activeMembers.map((member) => ({ value: String(member.id), label: member.name }))} />
 							</div>
 						</div>
 						<div class="form-actions">

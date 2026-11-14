@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Combobox from '$lib/components/ui/Combobox.svelte';
+	import Select from '$lib/components/ui/Select.svelte';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
@@ -12,6 +14,18 @@
 
 	const s = $derived(data.settings);
 	const activeMembers = $derived(s.members.filter((member) => member.active));
+
+	// Known statement labels of the chosen pocket that are not mapped yet. With
+	// none, the field is a plain input; the combobox still accepts a new label.
+	let pickedPocket = $state('');
+	const mappingPocket = $derived(pickedPocket || String(s.pockets[0]?.id ?? ''));
+	let mappingLabel = $state('');
+	const key = (label: string) => label.trim().toLowerCase();
+	const knownLabels = $derived.by(() => {
+		const mapped = new Set(s.mappings.filter((m) => String(m.pocketId) === mappingPocket).map((m) => key(m.pattern)));
+		const labels = s.pockets.find((pocket) => String(pocket.id) === mappingPocket)?.importedLabels ?? [];
+		return labels.filter((label) => !mapped.has(key(label)));
+	});
 </script>
 
 <svelte:head>
@@ -69,23 +83,19 @@
 						<div class="form-grid">
 							<div class="field">
 								<label for="mapping-pattern">Statement label <span class="req" aria-hidden="true">*</span></label>
-								<input class="input" id="mapping-pattern" name="pattern" required maxlength="300" />
+								{#if knownLabels.length > 0}
+									<Combobox id="mapping-pattern" name="pattern" options={knownLabels} bind:value={mappingLabel} required maxlength={300} />
+								{:else}
+									<input class="input" id="mapping-pattern" name="pattern" required maxlength="300" bind:value={mappingLabel} />
+								{/if}
 							</div>
 							<div class="field">
 								<label for="mapping-pocket">Pocket</label>
-								<select class="select" id="mapping-pocket" name="pocket_id" required>
-									{#each s.pockets as pocket (pocket.id)}
-										<option value={pocket.id}>{pocket.name}</option>
-									{/each}
-								</select>
+								<Select id="mapping-pocket" name="pocket_id" items={s.pockets.map((pocket) => ({ value: String(pocket.id), label: pocket.name }))} bind:value={() => mappingPocket, (next) => (pickedPocket = next)} required />
 							</div>
 							<div class="field">
 								<label for="mapping-member">Responsible member</label>
-								<select class="select" id="mapping-member" name="member_id" required>
-									{#each activeMembers as member (member.id)}
-										<option value={member.id}>{member.name}</option>
-									{/each}
-								</select>
+								<Select id="mapping-member" name="member_id" items={activeMembers.map((member) => ({ value: String(member.id), label: member.name }))} required />
 							</div>
 						</div>
 						<div class="form-actions">
@@ -104,12 +114,7 @@
 						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 						<div class="field">
 							<label for="income-role">Income explanation role</label>
-							<select class="select" id="income-role" name="income_explanation_role_id">
-								<option value="">Pocket owners only</option>
-								{#each s.roles as role (role.id)}
-									<option value={role.id} selected={role.id === s.incomeExplanationRoleId}>{role.name}</option>
-								{/each}
-							</select>
+							<Select id="income-role" name="income_explanation_role_id" items={[{ value: '', label: 'Pocket owners only' }, ...s.roles.map((role) => ({ value: String(role.id), label: role.name }))]} value={String(s.incomeExplanationRoleId ?? "")} />
 						</div>
 						<button class="btn" type="submit"><Icon name="check" size={16} />Save</button>
 					</form>

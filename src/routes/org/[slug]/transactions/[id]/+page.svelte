@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Select from '$lib/components/ui/Select.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
@@ -129,12 +130,7 @@
 							{#if !txn.isIncome && txn.can.edit}
 								<div class="field">
 									<label for="responsible">Responsible member <span class="req" aria-hidden="true">*</span></label>
-									<select class="select" id="responsible" name="responsible_member_id" required bind:value={responsible}>
-										<option value="">Choose a member</option>
-										{#each txn.members as member (member.id)}
-											<option value={String(member.id)}>{member.name}</option>
-										{/each}
-									</select>
+									<Select id="responsible" name="responsible_member_id" items={[{ value: '', label: 'Choose a member' }, ...txn.members.map((member) => ({ value: String(member.id), label: member.name }))]} bind:value={responsible} required />
 								</div>
 
 								<fieldset class="form">
@@ -153,12 +149,7 @@
 											</div>
 											<div class="field">
 												<label for="split-member-{index}">Responsible</label>
-												<select class="select" id="split-member-{index}" name="split_member[]" bind:value={row.member} required>
-													<option value="">Choose a member</option>
-													{#each txn.members as member (member.id)}
-														<option value={String(member.id)}>{member.name}</option>
-													{/each}
-												</select>
+												<Select id="split-member-{index}" name="split_member[]" items={[{ value: '', label: 'Choose a member' }, ...txn.members.map((member) => ({ value: String(member.id), label: member.name }))]} bind:value={row.member} required />
 											</div>
 											<button
 												class="btn btn--quiet btn--icon"
