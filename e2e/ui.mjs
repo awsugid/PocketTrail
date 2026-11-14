@@ -423,6 +423,23 @@ await withWorker(async () => {
 		await page.waitForTimeout(5400);
 		check('an inline confirm left alone, focus elsewhere, reverts by itself', (await confirmGroup.count()) === 0);
 
+		// A plain-endpoint rejection stays on the page, inline, focused, with the typed value kept.
+		await page.goto(`${ORIGIN}/org/demo-jakarta/settings/people`);
+		await page.waitForFunction(() => document.querySelector('form[action$="/settings/invitations"]') !== null);
+		await page.waitForTimeout(300);
+		await page.locator('input#invite-email').fill('bob@example.test');
+		await page.getByRole('button', { name: 'Invite' }).click();
+		const inviteAlert = page.locator('form[action$="/settings/invitations"] .form-error');
+		await inviteAlert.waitFor();
+		check(
+			'a rejected invitation shows an inline alert, keeps the typed email and focuses the alert',
+			page.url().endsWith('/settings/people') &&
+				(await page.locator('input#invite-email').inputValue()) === 'bob@example.test' &&
+				(await inviteAlert.evaluate((node) => node === document.activeElement)) &&
+				(await inviteAlert.innerText()).length > 0,
+			await inviteAlert.innerText()
+		);
+
 		// Narrow: the pickers stay inside the viewport.
 		await page.setViewportSize({ width: 375, height: 800 });
 		await page.goto(`${ORIGIN}/org/demo-jakarta/transactions/new`);
