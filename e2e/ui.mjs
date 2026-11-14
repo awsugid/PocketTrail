@@ -198,7 +198,8 @@ await withWorker(async () => {
 		await page.goto(`${ORIGIN}/org/demo-jakarta/transactions/1`);
 		check(
 			'detail page shows purposes and the owed-documentation notice',
-			(await page.getByText('DEMO: workshop supplies').count()) === 1 &&
+			(await page.locator('input[name="split_label[]"]').evaluateAll((inputs) => inputs.map((input) => input.value))).includes('DEMO: workshop supplies') &&
+				(await page.getByText('DEMO: workshop supplies').count()) === 0 &&
 				(await page.getByText(/Needed before review/).count()) === 1,
 			'detail content missing'
 		);

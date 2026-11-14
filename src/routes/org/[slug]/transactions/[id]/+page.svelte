@@ -102,6 +102,9 @@
 			<ul>
 				{#each txn.missing as item (item)}<li>{item}</li>{/each}
 			</ul>
+			{#if txn.can.upload && txn.missing.some((item) => item.startsWith('supporting'))}
+				<a href="#evidence-file">Add evidence</a>
+			{/if}
 		</Notice>
 	{/if}
 
@@ -109,7 +112,7 @@
 		<div class="stack">
 			<section class="panel" aria-labelledby="explain-heading">
 				<div class="panel__head">
-					<Icon name="comment" size={16} /><h2 id="explain-heading">{txn.isIncome ? 'Income notes' : 'Explanation'}</h2>
+					<Icon name="comment" size={16} /><h2 id="explain-heading">{txn.isIncome ? 'Income notes' : txn.can.edit ? 'Details' : 'Explanation'}</h2>
 				</div>
 				<div class="panel__body">
 					{#if !txn.can.edit && !txn.can.incomeNotes}
@@ -123,7 +126,7 @@
 							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 							<input type="hidden" name="revision" value={txn.revision} />
 							<div class="field">
-								<label for="explanation">{txn.isIncome ? 'Notes' : 'Explanation'} <span class="req" aria-hidden="true">*</span></label>
+								<label for="explanation" class:visually-hidden={txn.isIncome}>{txn.isIncome ? 'Notes' : 'Explanation'} <span class="req" aria-hidden="true">*</span></label>
 								<textarea class="input textarea" id="explanation" name="explanation" required>{txn.explanation}</textarea>
 							</div>
 
@@ -135,7 +138,7 @@
 
 								<fieldset class="form">
 									<legend>
-										Purposes <span class="muted count">of {txn.amount}</span>
+										Purposes <span class="muted count">of {txn.amount.replace(/^-/, '')}</span>
 									</legend>
 									{#each splits as row, index (index)}
 										<div class="split-row">
@@ -163,7 +166,7 @@
 										</div>
 									{/each}
 									<div class="form-actions">
-										<button class="btn btn--sm" type="button" onclick={addSplit}><Icon name="plus" size={14} />Purpose</button>
+										<button class="btn btn--sm" type="button" aria-label="Add purpose" onclick={addSplit}><Icon name="plus" size={14} />Purpose</button>
 									</div>
 									{#if txn.totals}
 										<p class="hint" role="status">
@@ -186,7 +189,7 @@
 				</div>
 			</section>
 
-			{#if !txn.isIncome && txn.splits.length > 0}
+			{#if !txn.isIncome && txn.splits.length > 0 && !txn.can.edit}
 				<section class="panel" aria-labelledby="purposes-heading">
 					<div class="panel__head">
 						<Icon name="ledger" size={16} /><h2 id="purposes-heading">Purposes</h2>
@@ -206,10 +209,11 @@
 				</section>
 			{/if}
 
+			{#if txn.evidence.length > 0 || txn.can.upload || txn.evidenceUnavailableReason.trim() !== ''}
 			<section class="panel" aria-labelledby="evidence-heading">
 				<div class="panel__head">
 					<Icon name="file" size={16} /><h2 id="evidence-heading">Evidence</h2>
-					<span class="count">{txn.evidence.length}</span>
+					{#if txn.evidence.length > 0}<span class="count">{txn.evidence.length}</span>{/if}
 				</div>
 				{#if txn.evidence.length > 0}
 					<ul class="rows">
@@ -246,6 +250,7 @@
 					</div>
 				{/if}
 			</section>
+			{/if}
 
 			{#if !txn.isIncome}
 				<section class="panel" aria-labelledby="review-heading">
@@ -286,7 +291,9 @@
 									<button class="btn" type="submit"><Icon name="alert" size={16} />Request changes</button>
 								</form>
 							{:else}
-								<p class="muted">{(txn.approval.ineligibleReason ?? 'You cannot decide this transaction.').replace(/^./, (c) => c.toUpperCase())}</p>
+								{#if txn.missing.length === 0}
+									<p class="muted">{(txn.approval.ineligibleReason ?? 'You cannot decide this transaction.').replace(/^./, (c) => c.toUpperCase())}</p>
+								{/if}
 							{/if}
 						{/if}
 
@@ -301,10 +308,11 @@
 				</section>
 			{/if}
 
+			{#if txn.comments.length > 0 || txn.can.comment}
 			<section class="panel" aria-labelledby="discussion-heading">
 				<div class="panel__head">
 					<Icon name="comment" size={16} /><h2 id="discussion-heading">Discussion</h2>
-					<span class="count">{txn.comments.length}</span>
+					{#if txn.comments.length > 0}<span class="count">{txn.comments.length}</span>{/if}
 				</div>
 				{#if txn.comments.length > 0}
 					<div class="panel__body">
@@ -333,14 +341,15 @@
 					</div>
 				{/if}
 			</section>
+			{/if}
 
+			{#if txn.audit.length > 0}
 			<section class="panel" aria-labelledby="history-heading">
 				<div class="panel__head">
 					<Icon name="history" size={16} /><h2 id="history-heading">History</h2>
 					<span class="count">{txn.audit.length}</span>
 				</div>
-				{#if txn.audit.length > 0}
-					<div class="panel__body">
+				<div class="panel__body">
 						<ol class="timeline">
 							{#each txn.audit as entry, index (index)}
 								<li>
@@ -354,9 +363,9 @@
 								</li>
 							{/each}
 						</ol>
-					</div>
-				{/if}
+				</div>
 			</section>
+			{/if}
 		</div>
 
 		<aside class="stack" aria-labelledby="facts-heading">
@@ -403,7 +412,7 @@
 							<form method="POST" action="?/unsuppress" class="gap-top" use:submit>
 								<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 								<input type="hidden" name="revision" value={txn.revision} />
-								<button class="btn" type="submit">Resume</button>
+								<button class="btn" type="submit">Resume notifications</button>
 							</form>
 						{:else}
 							<form method="POST" action="?/suppress" class="form" use:submit>

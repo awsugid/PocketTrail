@@ -21,7 +21,8 @@
 		href: string;
 		title: string;
 		icon: IconName;
-		status: string;
+		/** Short count shown at the row's right edge. */
+		status?: string;
 		flag?: { tone: string; text: string };
 	}
 
@@ -67,7 +68,6 @@
 					href: `${base}/notifications`,
 					title: 'Notifications',
 					icon: 'bell',
-					status: s.notifications.enabled ? 'On' : 'Off',
 					flag: s.notifications.enabled ? { tone: 'approved', text: 'On' } : { tone: 'muted', text: 'Off' },
 					show: s.can.notifications
 				}
@@ -94,7 +94,7 @@
 							<Icon name={row.icon} class="lead" />
 							<span class="rows__main"><strong>{row.title}</strong></span>
 							{#if row.flag}<span class="badge badge--{row.flag.tone}">{row.flag.text}</span>{/if}
-							{#if !row.flag || row.key !== 'notifications'}<span class="count">{row.status}</span>{/if}
+							{#if row.status}<span class="count">{row.status}</span>{/if}
 							<Icon name="chevron" size={16} class="tail" />
 						</a>
 					</li>

@@ -5,7 +5,7 @@
 	import Notice from '$lib/components/Notice.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
-	import { submit } from '$lib/forms';
+	import { submit, unsavedGuard } from '$lib/forms';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -32,7 +32,7 @@
 	{:else}
 		<div class="panel">
 			<div class="panel__body">
-				<form method="POST" action="/org/{slug}/transactions/new" class="form" use:submit>
+				<form method="POST" action="/org/{slug}/transactions/new" class="form" use:submit={{ reset: true }} use:unsavedGuard>
 					<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 					<div class="form-grid">
 						<div class="field">

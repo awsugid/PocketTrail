@@ -40,14 +40,16 @@
 		</div>
 	{:else}
 		<div class="stack">
+			<Notice tone="info">Roles that work with transactions also need <strong>View transactions</strong>.</Notice>
 			{#each s.roles as role (role.id)}
-				<section class="panel" aria-label={role.name}>
+				<section class="panel" aria-labelledby="role-{role.id}-heading">
+					<div class="panel__head"><Icon name="roles" size={16} /><h2 id="role-{role.id}-heading">{role.name}</h2></div>
 					<div class="panel__body">
 						<form method="POST" action="?/updateRole" class="form" use:submit>
 							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 							<input type="hidden" name="id" value={role.id} />
 							<div class="field">
-								<label for="role-name-{role.id}">Role name</label>
+								<label for="role-name-{role.id}">Name</label>
 								<input class="input" id="role-name-{role.id}" name="name" value={role.name} required maxlength="100" />
 							</div>
 							<fieldset>

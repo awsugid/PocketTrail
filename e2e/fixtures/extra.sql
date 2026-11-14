@@ -19,3 +19,11 @@ VALUES
   (900, 2, 2, 'JPXDEMO0900', '2025-06-09', '08:15', 'Indonesia Vendor', 'Bank Transfer',
    'DEMO: belongs to demo-indonesia only', -7000000, 993000000,
    'DEMO: other-organization movement', '', 3, 'pending', 0, 0);
+
+-- Statement labels already seen on Main Pocket: one is mapped (seed), one is not,
+-- so the routing label picker has something to offer and something to exclude.
+INSERT INTO import_batches (id, org_id, pocket_id, filename, created_by_membership_id, created_at)
+  VALUES (9001, 1, 1, 'DEMO-labels.pdf', 1, 0);
+INSERT INTO import_items (batch_id, status, counterparty, message) VALUES
+  (9001, 'imported', 'Demo Coffee Supplier', ''),
+  (9001, 'imported', 'Demo Print Shop', '');

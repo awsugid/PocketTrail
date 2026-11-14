@@ -37,7 +37,9 @@
 								<strong>{pocket.name}</strong>
 								<span class="rows__sub">
 									{#if pocket.ownerName}<Icon name="user" size={12} /> {pocket.ownerName}{:else}No active owner{/if}
-									{#if pocket.importedLabels.length > 0} · {pocket.importedLabels.join(', ')}{/if}
+									{#if pocket.importedLabels.length > 0}
+								· <span class="muted">Statement labels ({pocket.importedLabels.length}):</span> {pocket.importedLabels.join(', ')}
+							{/if}
 								</span>
 							</div>
 							{#if !pocket.ownerName}<span class="badge badge--needs">No owner</span>{/if}

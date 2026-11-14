@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Empty from '$lib/components/Empty.svelte';
-	import Icon from '$lib/components/Icon.svelte';
+	import Icon, { type IconName } from '$lib/components/Icon.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
 	import { stack } from '$lib/table';
@@ -9,6 +9,8 @@
 	let { data }: { data: PageData } = $props();
 
 	const slug = $derived(data.shell.org.slug);
+	// Status is told apart by icon as well as hue.
+	const statusIcons: Record<string, IconName> = { needs: 'alert', review: 'history', approved: 'check', changes: 'close' };
 	const base = $derived(`/org/${slug}/transactions`);
 	const href = (status: string, page = 1) => {
 		const query = new URLSearchParams();
@@ -81,7 +83,7 @@
 								</td>
 								<td class="cell--num" data-label="Balance after">{entry.balance}</td>
 								<td data-label="Status">
-									<span class="badge badge--{entry.statusTone}">{entry.statusLabel}</span>
+									<span class="badge badge--{entry.statusTone}"><Icon name={statusIcons[entry.statusTone] ?? 'info'} size={12} />{entry.statusLabel}</span>
 									{#if entry.suppressed}
 										<span class="cell__sub">Notifications suppressed</span>
 									{/if}

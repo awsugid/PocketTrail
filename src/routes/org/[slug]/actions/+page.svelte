@@ -20,7 +20,7 @@
 				href: `/org/${slug}/transactions/${task.id}`,
 				title: task.counterparty,
 				sub: `${task.date} · ${task.pocketName}`,
-				badge: task.income ? 'Income notes' : 'Explanation',
+				badge: task.income ? 'Income notes' : 'Needs details',
 				tone: 'needs'
 			}))
 		},
@@ -44,7 +44,7 @@
 				href: `/org/${slug}/imports/${batch.id}`,
 				title: batch.filename || 'Statement import',
 				sub: `Batch #${batch.id}`,
-				badge: batch.status === 'ready' ? 'Ready to confirm' : batch.status,
+				badge: batch.status === 'committed' ? 'Committed' : 'Awaiting confirmation',
 				tone: 'info'
 			}))
 		}

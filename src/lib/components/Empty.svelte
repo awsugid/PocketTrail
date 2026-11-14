@@ -14,6 +14,6 @@
 
 <div class="empty" class:empty--inline={inline}>
 	<Icon name={icon} size={32} />
-	<h2>{title}</h2>
+	{#if inline}<h3>{title}</h3>{:else}<h2>{title}</h2>{/if}
 	{#if children}{@render children()}{/if}
 </div>

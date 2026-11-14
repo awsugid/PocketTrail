@@ -196,3 +196,27 @@ export function guard(form: HTMLFormElement, options: SubmitOptions = {}) {
 		}
 	};
 }
+
+/** `use:unsavedGuard` warns before leaving a form with typed-in values. It is
+ * in-memory only (financial drafts are never persisted) and clears when the
+ * form is reset, which `use:submit={{ reset: true }}` does after a success. Combine with `use:submit` on the same form. */
+export function unsavedGuard(form: HTMLFormElement) {
+	let dirty = false;
+	const mark = () => (dirty = true);
+	const clear = () => (dirty = false);
+	const warn = (event: BeforeUnloadEvent) => {
+		if (dirty) event.preventDefault();
+	};
+	form.addEventListener('input', mark);
+	form.addEventListener('change', mark);
+	form.addEventListener('reset', clear);
+	window.addEventListener('beforeunload', warn);
+	return {
+		destroy() {
+			form.removeEventListener('input', mark);
+			form.removeEventListener('change', mark);
+			form.removeEventListener('reset', clear);
+			window.removeEventListener('beforeunload', warn);
+		}
+	};
+}
