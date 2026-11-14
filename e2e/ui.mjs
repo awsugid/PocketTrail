@@ -319,6 +319,139 @@ await withWorker(async () => {
 				(await page.locator('#org-nav').isVisible())
 		);
 
+
+		// ------------------------------------------------ controls (bits-ui)
+		await page.setViewportSize({ width: 1440, height: 900 });
+		await page.goto(`${ORIGIN}/org/demo-jakarta/transactions/new`);
+		const direction = page.locator('button#new-direction');
+		const date = page.locator('button#new-date');
+		await direction.waitFor();
+
+		// Select: keyboard opens, arrow + Enter selects, Escape closes, value is submitted.
+		await direction.focus();
+		await page.keyboard.press('Enter');
+		check('select opens from the keyboard', (await page.getByRole('listbox').count()) === 1);
+		await page.keyboard.press('ArrowDown');
+		await page.keyboard.press('Enter');
+		check(
+			'select shows the chosen label and submits its value',
+			(await direction.innerText()).includes('Money in') && (await page.locator('input[name="direction"]').inputValue()) === 'in',
+			await direction.innerText()
+		);
+		await direction.focus();
+		await page.keyboard.press('Enter');
+		await page.keyboard.press('Escape');
+		await page.getByRole('listbox').waitFor({ state: 'detached' });
+		check('Escape closes the select and keeps its value', (await page.getByRole('listbox').count()) === 0 && (await page.locator('input[name="direction"]').inputValue()) === 'in');
+
+		// DatePicker: opens as a grid, a day is picked, ISO is submitted, human text is shown.
+		await date.focus();
+		await page.keyboard.press('Enter');
+		check('date picker opens a calendar grid', (await page.getByRole('grid').count()) === 1);
+		await page.keyboard.press('Escape');
+		await page.getByRole('grid').waitFor({ state: 'detached' });
+		check('Escape closes the date picker', (await page.getByRole('grid').count()) === 0);
+		await date.click();
+		await page.getByRole('button', { name: /, [A-Z][a-z]+ 15, \d{4}$/ }).first().click();
+		const picked = await page.locator('input[name="date"]').inputValue();
+		check(
+			'date picker submits ISO and shows a human date',
+			/^\d{4}-\d{2}-15$/.test(picked) && /^15 [A-Z][a-z]{2} \d{4}$/.test((await date.innerText()).trim()),
+			`${picked} / ${await date.innerText()}`
+		);
+		await page.screenshot({ path: `${ROOT}/.wrangler/ui/new-controls-1440.png`, fullPage: true });
+		shots.push('new-controls-1440.png');
+
+		// Combobox: known unmapped labels are offered, mapped ones are not, a new
+		// label is accepted, and the typed or picked text is what is submitted.
+		await page.goto(`${ORIGIN}/org/demo-jakarta/settings/routing`);
+		const label = page.locator('input#mapping-pattern');
+		await label.waitFor();
+		await label.click();
+		await page.getByRole('option', { name: 'Demo Print Shop' }).waitFor();
+		check(
+			'label picker offers unmapped labels only',
+			(await page.getByRole('option', { name: 'Demo Print Shop' }).count()) === 1 &&
+				(await page.getByRole('option', { name: 'Demo Coffee Supplier' }).count()) === 0
+		);
+		await page.keyboard.press('Escape');
+		await page.getByRole('listbox').waitFor({ state: 'detached' });
+		check('Escape closes the label picker', (await page.getByRole('listbox').count()) === 0);
+		await label.fill('Brand new vendor');
+		check(
+			'label picker accepts a new label and submits it as typed',
+			(await page.locator('input[name="pattern"]').inputValue()) === 'Brand new vendor'
+		);
+		await label.fill('Print');
+		await page.keyboard.press('ArrowDown');
+		await page.keyboard.press('Enter');
+		check('label picker fills the chosen label', (await label.inputValue()) === 'Demo Print Shop', await label.inputValue());
+		await page.screenshot({ path: `${ROOT}/.wrangler/ui/routing-1440.png`, fullPage: true });
+		shots.push('routing-1440.png');
+
+		// Notifications: the cutoff shows one human format and submits ISO.
+		await page.goto(`${ORIGIN}/org/demo-jakarta/settings/notifications`);
+		const cutoff = page.locator('button#cutoff');
+		await cutoff.waitFor();
+		check(
+			'cutoff shows a human date and submits ISO',
+			(await cutoff.innerText()).trim() === '1 Jan 2025' && (await page.locator('input[name="cutoff_date"]').first().inputValue()) === '2025-01-01',
+			await cutoff.innerText()
+		);
+
+		// Inline confirm: no dialog; the button becomes Revoke/Cancel with focus on Revoke.
+		await page.goto(`${ORIGIN}/org/demo-jakarta/settings/people`);
+		await page.waitForFunction(() => document.querySelector('form[action="?/removeMember"]') !== null);
+		let dialogs = 0;
+		page.on('dialog', () => (dialogs += 1));
+		const revoke = page.getByRole('button', { name: /Revoke access for Bob/ });
+		await revoke.click();
+		const confirmGroup = page.getByRole('group').filter({ hasText: 'Revoke Bob' });
+		check('revoke asks inline, not in a dialog', (await confirmGroup.count()) === 1 && dialogs === 0 && (await page.locator('dialog[open]').count()) === 0);
+		check('focus moves to the confirm button', (await page.evaluate(() => document.activeElement?.textContent?.trim())) === 'Revoke');
+		await page.screenshot({ path: `${ROOT}/.wrangler/ui/confirm-1440.png`, fullPage: true });
+		shots.push('confirm-1440.png');
+		await page.keyboard.press('Escape');
+		check(
+			'Escape cancels the inline confirm and restores the button focus',
+			(await confirmGroup.count()) === 0 && (await page.evaluate(() => document.activeElement?.textContent?.includes('Revoke')))
+		);
+		await revoke.click();
+		await page.waitForTimeout(5400);
+		check('an inline confirm does not revert while focus is inside it', (await confirmGroup.count()) === 1);
+		await page.locator('main').click({ position: { x: 5, y: 5 } });
+		await page.waitForTimeout(5400);
+		check('an inline confirm left alone, focus elsewhere, reverts by itself', (await confirmGroup.count()) === 0);
+
+		// Narrow: the pickers stay inside the viewport.
+		await page.setViewportSize({ width: 375, height: 800 });
+		await page.goto(`${ORIGIN}/org/demo-jakarta/transactions/new`);
+		await page.locator('button#new-date').click();
+		const calendarBox = await page.getByRole('grid').boundingBox();
+		check('calendar stays inside a 375px viewport', calendarBox !== null && calendarBox.x >= 0 && calendarBox.x + calendarBox.width <= 375, JSON.stringify(calendarBox));
+		await page.screenshot({ path: `${ROOT}/.wrangler/ui/new-date-375.png` });
+		shots.push('new-date-375.png');
+		await page.keyboard.press('Escape');
+		await page.locator('button#new-direction').click();
+		const listBox = await page.getByRole('listbox').boundingBox();
+		check('select list stays inside a 375px viewport', listBox !== null && listBox.x >= 0 && listBox.x + listBox.width <= 375, JSON.stringify(listBox));
+		await page.keyboard.press('Escape');
+
+		// Drawer: overlay with a scrim; focus moves in; Escape closes and returns focus.
+		await page.goto(`${ORIGIN}/org/demo-jakarta/transactions`);
+		await page.getByRole('button', { name: 'Menu' }).click();
+		check(
+			'drawer opens over the page with focus on its first link',
+			(await page.evaluate(() => document.activeElement?.closest('#org-nav') !== null)) && (await page.locator('.scrim').count()) === 1
+		);
+		await page.screenshot({ path: `${ROOT}/.wrangler/ui/drawer-375.png` });
+		shots.push('drawer-375.png');
+		await page.keyboard.press('Escape');
+		check('Escape closes the drawer and returns focus to the menu button', (await page.locator('.scrim').count()) === 0 && (await page.evaluate(() => document.activeElement?.id)) === 'menu-button');
+		await page.getByRole('button', { name: 'Menu' }).click();
+		await page.locator('.scrim').click({ position: { x: 360, y: 400 } });
+		check('a backdrop press closes the drawer', (await page.locator('.scrim').count()) === 0);
+
 		await context.close();
 	} finally {
 		await browser.close();

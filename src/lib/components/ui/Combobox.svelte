@@ -23,7 +23,7 @@
 <input type="hidden" {name} {value} />
 <Combobox.Root type="single" items={options.map((option) => ({ value: option, label: option }))} bind:open inputValue={value} onValueChange={(next: string) => (value = next)}>
 	<div class="ui-combo">
-		<Combobox.Input {id} class="input" {maxlength} aria-required={required || undefined} autocomplete="off" oninput={(event) => ((value = event.currentTarget.value), (open = true))} />
+		<Combobox.Input {id} class="input" {maxlength} aria-required={required || undefined} autocomplete="off" oninput={(event) => ((value = event.currentTarget.value), (open = true))} onclick={() => (open = true)} />
 		<Combobox.Trigger class="ui-combo__trigger" aria-label="Show known labels"><Icon name="caret" size={14} /></Combobox.Trigger>
 	</div>
 	<Combobox.Portal>

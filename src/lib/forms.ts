@@ -23,8 +23,8 @@ let confirmCount = 0;
 /**
  * Two-step confirmation in place: the destructive button is swapped for
  * "message [Confirm] [Cancel]". Focus moves to Confirm; Escape or Cancel
- * restores the button and its focus; an untouched prompt reverts after ~5s,
- * but never while focus is inside it.
+ * restores the button and its focus; a prompt left alone for ~5s reverts, but
+ * never while focus is inside it. Interaction restarts the wait.
  */
 function askConfirm(form: HTMLFormElement, trigger: HTMLElement | null, message: string, label = 'Confirm'): Promise<boolean> {
 	const anchor = trigger ?? form.querySelector<HTMLElement>('button[type=submit], button:not([type])');
@@ -63,10 +63,11 @@ function askConfirm(form: HTMLFormElement, trigger: HTMLElement | null, message:
 		yes.addEventListener('click', () => done(true, false));
 		no.addEventListener('click', () => done(false, true));
 		box.addEventListener('keydown', (event) => {
-			if (event.key !== 'Escape') return;
+			if (event.key !== 'Escape') return arm();
 			event.stopPropagation();
 			done(false, true);
 		});
+		box.addEventListener('pointermove', arm);
 		box.addEventListener('pointerdown', arm);
 
 		anchor.hidden = true;
