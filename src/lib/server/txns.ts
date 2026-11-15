@@ -60,7 +60,7 @@ import {
 	type DomTxn,
 	type DomainError
 } from '$lib/domain';
-import { fmtMoney, fmtSize, fmtTs, parseRupiah, rupiahInput, validDate, validTime } from '$lib/fmt';
+import { fmtMoney, fmtMoment, fmtSize, fmtTs, parseRupiah, rupiahInput, validDate, validTime } from '$lib/fmt';
 import { r2Bytes, type D1PreparedStatement, type R2Bucket } from '$lib/d1';
 
 // --------------------------------------------------------------- request ctx
@@ -623,7 +623,7 @@ export async function txnDetail(ctx: TxnCtx, txnId: number): Promise<TxnDetail> 
 			status: decision.new_status,
 			statusLabel: domainStatusLabel(decision.new_status),
 			authorName: decision.author_name,
-			createdAt: fmtTs(decision.created_at),
+			createdAt: fmtMoment(decision.created_at),
 			note
 		};
 	}
@@ -687,7 +687,7 @@ export async function txnDetail(ctx: TxnCtx, txnId: number): Promise<TxnDetail> 
 			note: d.note,
 			url: `/org/${ctx.org.slug}/documents/${d.id}`
 		})),
-		comments: comments.map((c) => ({ authorName: c.author_name, body: c.body, createdAt: fmtTs(c.created_at) })),
+		comments: comments.map((c) => ({ authorName: c.author_name, body: c.body, createdAt: fmtMoment(c.created_at) })),
 		approval,
 		reviewDecision,
 		audit,

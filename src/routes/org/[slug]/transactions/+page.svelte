@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { fmtDate } from '$lib/fmt';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon, { type IconName } from '$lib/components/Icon.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
@@ -75,7 +76,7 @@
 									</span>
 								</td>
 								<td class="cell--nowrap" data-label="Date">
-									{entry.date}
+									{fmtDate(entry.date)}
 									{#if entry.time}<span class="cell__sub">{entry.time}</span>{/if}
 								</td>
 								<td class="cell--num {entry.amountMinor > 0 ? 'amount--in' : ''}" data-label="Amount">

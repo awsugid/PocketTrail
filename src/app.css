@@ -460,8 +460,12 @@ code,
 
 .auth {
 	max-width: 400px;
-	margin: 48px auto 0;
-	padding: 0 16px;
+	min-height: 100vh;
+	margin: 0 auto;
+	padding: 24px 16px;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
 }
 
 .auth .brand {
@@ -1291,6 +1295,14 @@ table.ledger td a {
 	color: var(--text-secondary);
 }
 
+.check__native {
+	flex: none;
+	width: 18px;
+	height: 18px;
+	margin: 0;
+	accent-color: var(--primary);
+}
+
 .fold summary {
 	display: flex;
 	align-items: center;
@@ -1298,6 +1310,21 @@ table.ledger td a {
 	cursor: pointer;
 	color: var(--text-secondary);
 	font-weight: 550;
+}
+
+.fold summary::before {
+	content: '';
+	width: 6px;
+	height: 6px;
+	margin-right: 10px;
+	border-right: 1.6px solid currentColor;
+	border-bottom: 1.6px solid currentColor;
+	transform: rotate(-45deg);
+	transition: transform 160ms var(--ease);
+}
+
+.fold[open] summary::before {
+	transform: rotate(45deg);
 }
 
 .fold[open] summary {
@@ -1404,17 +1431,30 @@ dl.facts dd {
 	margin: 0;
 }
 
+.split-head {
+	display: none;
+	padding: 0 0 4px;
+	color: var(--text-secondary);
+	font-size: 12px;
+	font-weight: 600;
+}
+
 .split-row {
 	display: grid;
 	gap: 8px;
-	align-items: end;
+	align-items: start;
 	padding-bottom: 12px;
 	border-bottom: 1px solid var(--border);
 }
 
 @media (min-width: 720px) {
+	.split-head,
 	.split-row {
-		grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.4fr) auto;
+		grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.4fr) 36px;
+		gap: 8px;
+	}
+	.split-head {
+		display: grid;
 	}
 }
 

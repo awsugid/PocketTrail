@@ -109,8 +109,8 @@ export async function platformPageData(login: LoginState, url: URL) {
 		events: events.map((e) => ({
 			id: e.id,
 			actorName: e.actor_name,
-			actionLabel: actionLabel(e.action),
-			targetLabel: targetLabel(e.target),
+			actionLabel: e.target === '/unrecognized' ? 'Request to an unknown address' : actionLabel(e.action),
+			targetLabel: e.target === '/unrecognized' ? '—' : targetLabel(e.target),
 			outcomeLabel: outcomeLabel(e.outcome),
 			outcome: e.outcome,
 			createdAt: e.created_at

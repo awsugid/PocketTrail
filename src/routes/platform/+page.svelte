@@ -4,7 +4,7 @@
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
-	import { fmtTsOrDash as fmtTs } from '$lib/fmt';
+	import { fmtMoment, fmtTsOrDash as fmtTs } from '$lib/fmt';
 	import { guard } from '$lib/forms';
 	import { stack } from '$lib/table';
 	import type { PageData } from './$types';
@@ -90,7 +90,9 @@
 				<Icon name="roles" size={16} /><h2 id="templates-heading">Role templates</h2>
 				<span class="count">{p.roleTemplates.length}</span>
 			</div>
-			{#if p.roleTemplates.length > 0}
+			{#if p.roleTemplates.length === 0}
+				<Empty icon="roles" title="No templates yet" inline />
+			{:else}
 				<ul class="rows">
 					{#each p.roleTemplates as template (template.id)}
 						<li>
@@ -134,7 +136,7 @@
 					<li>
 						<div class="rows__main">
 							<strong>{org.name}</strong>
-							<span class="rows__sub">{org.slug} · created {fmtTs(org.created_at)}</span>
+							<span class="rows__sub">{org.slug} · created {fmtMoment(org.created_at)}</span>
 						</div>
 						<span class="count">{org.members} member{org.members === 1 ? '' : 's'}</span>
 					</li>

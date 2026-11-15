@@ -6,14 +6,13 @@ const roles: Record<string, string> = {
 	THEAD: 'rowgroup',
 	TBODY: 'rowgroup',
 	TR: 'row',
-	TH: 'columnheader',
 	TD: 'cell'
 };
 
 export function stack(table: HTMLTableElement) {
 	const apply = () => {
 		for (const element of [table, ...table.querySelectorAll('thead, tbody, tr, th, td')]) {
-			const role = roles[element.tagName];
+			const role = element.tagName === 'TH' ? (element.getAttribute('scope') === 'row' ? 'rowheader' : 'columnheader') : roles[element.tagName];
 			if (role && !element.hasAttribute('role')) element.setAttribute('role', role);
 		}
 	};

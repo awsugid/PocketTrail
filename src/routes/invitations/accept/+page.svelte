@@ -2,7 +2,7 @@
 	import AuthFrame from '$lib/components/AuthFrame.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
-	import { fmtTs } from '$lib/fmt';
+	import { fmtMoment } from '$lib/fmt';
 	import { guard, submit } from '$lib/forms';
 	import type { PageData } from './$types';
 
@@ -26,7 +26,7 @@
 			<dt>Invited</dt>
 			<dd>{inv.email}</dd>
 			<dt>Expires</dt>
-			<dd>{fmtTs(inv.expiresAt)}</dd>
+			<dd>{fmtMoment(inv.expiresAt)}</dd>
 		</dl>
 	</div>
 

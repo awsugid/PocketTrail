@@ -122,7 +122,7 @@ interface GoogleIdentity {
 	{#if data.googleConfigured}
 		<div class="panel gap-top">
 			<div class="panel__body">
-				<div bind:this={googleHost} class="google-host"></div>
+				<div bind:this={googleHost}></div>
 			</div>
 		</div>
 	{:else}

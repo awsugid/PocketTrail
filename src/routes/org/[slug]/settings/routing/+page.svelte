@@ -45,9 +45,7 @@
 					<span class="count">{s.mappings.length}</span>
 				</div>
 				{#if s.mappings.length === 0}
-					<Empty icon="routing" title="No labels mapped" inline>
-						<p>Unmapped expenses go to the pocket owner.</p>
-					</Empty>
+					<Empty icon="routing" title="No labels mapped" inline />
 				{:else}
 					<ul class="rows">
 						{#each s.mappings as mapping (mapping.id)}

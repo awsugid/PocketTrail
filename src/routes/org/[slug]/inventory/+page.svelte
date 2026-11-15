@@ -54,7 +54,7 @@
 										{:else}
 											<ul class="holdings">
 												{#each item.levels as level (level.locationId)}
-													<li>{level.locationName} <strong>{level.qty}</strong></li>
+													<li><strong>{level.qty}</strong> · {level.locationName}</li>
 												{/each}
 											</ul>
 										{/if}

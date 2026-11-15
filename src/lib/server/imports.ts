@@ -7,7 +7,7 @@
 import { error, redirect } from '@sveltejs/kit';
 import { r2Bytes, type D1PreparedStatement, type R2Bucket } from '$lib/d1';
 import { counterpartyDisplay, parseStatement, toPayloadJson, type StatementRowPayload } from './parser';
-import { fmtMoney, fmtTs, validDate, validTime, MAX_SAFE_MINOR } from '$lib/fmt';
+import { fmtMoney, fmtMoment, validDate, validTime, MAX_SAFE_MINOR } from '$lib/fmt';
 import { activeMem, mapCounterparty, mappingsOf, pocketsOf, type MappingRow, type MemRow, type TxnRow } from './rows';
 import { exec, nowMs, qAll, qOne } from './db';
 import { committed } from './audit';
@@ -84,7 +84,7 @@ function batchJson(b: BatchRow) {
 	return {
 		id: b.id,
 		filename: b.filename,
-		createdAt: fmtTs(b.created_at),
+		createdAt: fmtMoment(b.created_at),
 		byName: b.by_name,
 		status: b.status,
 		counts: counts as Record<string, number>

@@ -7,7 +7,7 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { D1Database } from '$lib/d1';
 import { ALL_PERMISSIONS, documentationOwed, incomeComplete, incomeRecipients } from '$lib/domain';
-import { parseRupiah, validDate, fmtTsOrDash as fmtTs } from '$lib/fmt';
+import { parseRupiah, validDate, fmtMoment, fmtTsOrDash as fmtTs } from '$lib/fmt';
 import { digestBody, digestDue } from '$lib/notify_rules';
 import { committed, committedIfChanged, listOrg } from './audit';
 import {
@@ -183,7 +183,7 @@ export async function settingsPageData(ctx: TenantContext, url: URL) {
 			kind: n.kind,
 			toName: n.to_name,
 			subject: n.subject,
-			createdAtLabel: fmtTs(n.created_at)
+			createdAtLabel: fmtMoment(n.created_at)
 		}));
 	}
 

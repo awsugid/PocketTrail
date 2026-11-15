@@ -4,7 +4,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
-	import { fmtTs } from '$lib/fmt';
+	import { fmtMoment } from '$lib/fmt';
 	import { guard, submit } from '$lib/forms';
 	import type { PageData } from './$types';
 
@@ -32,7 +32,7 @@
 						<li>
 							<div class="rows__main">
 								<strong>{invitation.orgName}</strong>
-								<span class="rows__sub">{invitation.roleName} · expires {fmtTs(invitation.expiresAt)}</span>
+								<span class="rows__sub">{invitation.roleName} · expires {fmtMoment(invitation.expiresAt)}</span>
 							</div>
 							<form method="POST" action="/invitations/{invitation.id}/accept" use:guard>
 								<input type="hidden" name="csrf_token" value={data.csrfToken} />

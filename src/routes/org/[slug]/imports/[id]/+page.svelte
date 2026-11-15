@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { fmtDateTime } from '$lib/fmt';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
@@ -99,7 +100,7 @@
 									<span class="cell__sub mono">{item.bankId || '—'}</span>
 								</td>
 								{#if data.preview}
-									<td class="cell--nowrap" data-label="Date">{item.date}{item.time ? ` ${item.time}` : ''}</td>
+									<td class="cell--nowrap" data-label="Date">{fmtDateTime(item.date, item.time)}</td>
 								{/if}
 								<td class="cell--num" data-label="Amount">{item.amount}</td>
 								<td data-label="Responsible">{item.responsibleName ?? 'Unassigned'}</td>

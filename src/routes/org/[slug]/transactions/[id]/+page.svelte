@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { fmtDateTime, fmtMoney, parseRupiah } from '$lib/fmt';
+	import MoneyInput from '$lib/components/ui/MoneyInput.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
-	import Icon from '$lib/components/Icon.svelte';
+	import Icon, { type IconName } from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
@@ -8,6 +10,9 @@
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+
+	// Shape as well as hue: the same icons as the ledger.
+	const statusIcons: Record<string, IconName> = { needs: 'alert', review: 'history', approved: 'check', changes: 'close' };
 
 	const txn = $derived(data.txn);
 	const tone = $derived(
@@ -53,6 +58,18 @@
 		responsible = next.responsible;
 	});
 
+	// The hint follows the draft being typed, not the saved purposes.
+	const bankAbs = $derived(Math.abs(txn.amountMinor));
+	const draftTotal = $derived.by(() => {
+		let total = 0;
+		for (const row of splits) {
+			const minor = parseRupiah(row.amount);
+			if (minor === null) return null;
+			total += minor;
+		}
+		return total;
+	});
+
 	function addSplit() {
 		splits = [...splits, { label: '', amount: '', member: responsible }];
 	}
@@ -86,9 +103,9 @@
 			<p class="amount-total" class:amount--in={txn.amountMinor > 0}>{txn.amount}</p>
 		{/snippet}
 		{#snippet meta()}
-			<span class="badge badge--{tone}">{statusLabel}</span>
+			<span class="badge badge--{tone}"><Icon name={statusIcons[tone] ?? 'info'} size={12} />{statusLabel}</span>
 			{#if txn.suppressed}<span class="badge badge--muted"><Icon name="bell" size={12} />Suppressed</span>{/if}
-			<span>{txn.date}{txn.time ? ` ${txn.time}` : ''}</span>
+			<span>{fmtDateTime(txn.date, txn.time)}</span>
 			<span>{txn.transactionType || 'Movement'}</span>
 			<span>{txn.pocketName}</span>
 		{/snippet}
@@ -140,18 +157,21 @@
 									<legend>
 										Purposes <span class="muted count">of {txn.amount.replace(/^-/, '')}</span>
 									</legend>
+									<div class="split-head" aria-hidden="true">
+										<span>Purpose</span><span>Amount (IDR)</span><span>Responsible</span><span></span>
+									</div>
 									{#each splits as row, index (index)}
 										<div class="split-row">
 											<div class="field">
-												<label for="split-label-{index}">Purpose {index + 1}</label>
-												<input class="input" id="split-label-{index}" name="split_label[]" bind:value={row.label} required />
+												<label class="visually-hidden" for="split-label-{index}">Purpose {index + 1}</label>
+												<input class="input" id="split-label-{index}" name="split_label[]" placeholder="Purpose {index + 1}" bind:value={row.label} required />
 											</div>
 											<div class="field">
-												<label for="split-amount-{index}">Amount (IDR)</label>
-												<input class="input" id="split-amount-{index}" name="split_amount[]" inputmode="decimal" bind:value={row.amount} required />
+												<label class="visually-hidden" for="split-amount-{index}">Amount (IDR) of purpose {index + 1}</label>
+												<MoneyInput id="split-amount-{index}" name="split_amount[]" bind:value={row.amount} required />
 											</div>
 											<div class="field">
-												<label for="split-member-{index}">Responsible</label>
+												<label class="visually-hidden" for="split-member-{index}">Responsible for purpose {index + 1}</label>
 												<Select id="split-member-{index}" name="split_member[]" items={[{ value: '', label: 'Choose a member' }, ...txn.members.map((member) => ({ value: String(member.id), label: member.name }))]} bind:value={row.member} required />
 											</div>
 											<button
@@ -168,11 +188,15 @@
 									<div class="form-actions">
 										<button class="btn btn--sm" type="button" aria-label="Add purpose" onclick={addSplit}><Icon name="plus" size={14} />Purpose</button>
 									</div>
-									{#if txn.totals}
-										<p class="hint" role="status">
-											{txn.totals.splitTotalMinor === txn.totals.amountMinor ? 'Saved purposes match the bank amount.' : 'Saved purposes differ from the bank amount.'}
-										</p>
-									{/if}
+									<p class="hint" role="status">
+										{#if draftTotal === null}
+											Enter every amount to check the total.
+										{:else if draftTotal === bankAbs}
+											Purposes match the bank amount.
+										{:else}
+											Purposes total {fmtMoney(draftTotal)}, {fmtMoney(Math.abs(bankAbs - draftTotal))} {draftTotal < bankAbs ? 'short of' : 'over'} the bank amount.
+										{/if}
+									</p>
 								</fieldset>
 
 								<div class="field">
@@ -373,7 +397,7 @@
 				<div class="panel__head"><Icon name="info" size={16} /><h2 id="facts-heading">Bank facts</h2></div>
 				<dl class="panel__body facts">
 					<dt>Date</dt>
-					<dd>{txn.date}{txn.time ? ` ${txn.time}` : ''}</dd>
+					<dd>{fmtDateTime(txn.date, txn.time)}</dd>
 					<dt>Amount</dt>
 					<dd>{txn.amount}</dd>
 					<dt>Balance</dt>

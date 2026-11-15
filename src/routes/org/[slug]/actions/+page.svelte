@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { fmtDate } from '$lib/fmt';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon, { type IconName } from '$lib/components/Icon.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
@@ -19,7 +20,7 @@
 			rows: data.explain.map((task) => ({
 				href: `/org/${slug}/transactions/${task.id}`,
 				title: task.counterparty,
-				sub: `${task.date} · ${task.pocketName}`,
+				sub: `${fmtDate(task.date)} · ${task.pocketName}`,
 				badge: task.income ? 'Income notes' : 'Needs details',
 				tone: 'needs'
 			}))
@@ -31,7 +32,7 @@
 			rows: data.review.map((task) => ({
 				href: `/org/${slug}/transactions/${task.id}`,
 				title: task.counterparty,
-				sub: `${task.date} · ${task.pocketName}`,
+				sub: `${fmtDate(task.date)} · ${task.pocketName}`,
 				badge: 'Awaiting review',
 				tone: 'review'
 			}))

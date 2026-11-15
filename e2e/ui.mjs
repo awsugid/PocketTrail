@@ -548,7 +548,7 @@ await withWorker(async () => {
 		const noJsText = (await noJsRow.count()) === 1 ? await noJsRow.innerText() : '';
 		check(
 			'a JavaScript-disabled submit records the chosen values',
-			noJsText.includes('123.456') && noJsText.includes('2025-06-07') && noJsText.includes('08:45'),
+			noJsText.includes('123.456') && noJsText.includes('7 Jun 2025') && noJsText.includes('08:45'),
 			noJsText
 		);
 		await noJsEnd.close();

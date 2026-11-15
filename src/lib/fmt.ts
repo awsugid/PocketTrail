@@ -42,6 +42,20 @@ export function fmtDate(iso: string): string {
 	return match ? `${Number(match[3])} ${MONTHS[Number(match[2]) - 1] ?? ''} ${match[1]}` : iso;
 }
 
+/** Epoch milliseconds -> "3 Jun 2025, 10:23" (Jakarta): the one human moment
+ * format. Only the audit trail keeps the sortable `fmtTs` form. An unset
+ * (epoch or earlier) time is "—", never 1970. */
+export function fmtMoment(ms: number): string {
+	if (ms <= 0) return '—';
+	const stamp = fmtTs(ms);
+	return `${fmtDate(stamp.slice(0, 10))}, ${stamp.slice(11)}`;
+}
+
+/** A civil date and optional `HH:MM` as one human string: "3 Jun 2025, 10:23". */
+export function fmtDateTime(iso: string, time?: string | null): string {
+	return time ? `${fmtDate(iso)}, ${time}` : fmtDate(iso);
+}
+
 /** Like `fmtTs`, but an unset (epoch or earlier) time is "—", never 1970. */
 export function fmtTsOrDash(ms: number): string {
 	return ms > 0 ? fmtTs(ms) : '—';

@@ -70,20 +70,20 @@ rounded:
   chip: "16px"
 spacing:
   field-gap: "14px"
-  panel: "20px"
+  panel: "16px"
   section: "16px"
 components:
   button-primary:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.surface}"
     rounded: "{rounded.control}"
-    padding: "8px 14px"
+    padding: "6px 12px"
   button-primary-hover:
     backgroundColor: "{colors.primary-hover}"
   panel:
     backgroundColor: "{colors.surface}"
     rounded: "{rounded.panel}"
-    padding: "20px"
+    padding: "16px"
 ---
 
 # PocketTrail Design System
@@ -193,20 +193,32 @@ are small authored inline SVG with consistent stroke treatment, never emoji.
   zinc borders and warm focus outlines. Read-only/disabled fields use a muted
   surface; invalid fields use an error border. Preserve native validation,
   names, permissions, CSRF and submission semantics when enhancing controls.
-- **Controls:** `Select`, `Combobox`, `DatePicker` and `Checkbox` live in
-  `src/lib/components/ui/` and wrap the headless `bits-ui` primitives (keyboard,
-  ARIA, focus and typeahead come from there); styling is ours, from the tokens in
-  `src/app.css` (`.ui-*`, `.input`, `.btn`). No Tailwind, no shadcn CLI. Triggers
-  look like inputs (`control-edge` border, chevron or calendar icon); popovers use
-  `shadow-menu`, mark the selected item with a check, and stay inside the
-  viewport at 375px. Each renders a hidden input under the same `name`, so forms
-  post exactly what they did natively, and CSRF and server validation are
-  unchanged. `Combobox` is a text input with suggestions: a picked option or a
-  typed new value is submitted as typed (the routing label picker offers the
-  pocket's imported, still-unmapped labels, and is a plain input when there are
-  none). `DatePicker` shows one human format ("1 Jan 2025", `fmtDate`) and submits
-  ISO `YYYY-MM-DD`. Every control keeps a `<label for>` on its trigger or input.
-  Native `<input type=file|time|number>` and `<textarea>` stay native.
+- **Controls:** `Select`, `Combobox`, `DatePicker`, `TimeField`, `Checkbox` and
+  `MoneyInput` live in `src/lib/components/ui/`; the first four wrap the headless
+  `bits-ui` primitives (keyboard, ARIA, focus and typeahead come from there);
+  styling is ours, from the tokens in `src/app.css` (`.ui-*`, `.input`, `.btn`).
+  No Tailwind, no shadcn CLI. **No-JS baseline.** The server renders a native
+  `<select>`, `<input type=date|time|checkbox>` or text input under the same
+  `name`, so every form posts without JavaScript; after hydration
+  (`enhanced` in `src/lib/controls.svelte.ts`) the custom control replaces it, so
+  JavaScript users never see a native select, date or time. A custom control
+  carries `data-field` so a server rejection marks the visible control
+  `aria-invalid`, and resets with its form. Triggers look like inputs
+  (`control-edge` border, chevron or calendar icon); popovers use `shadow-menu`,
+  mark the selected item with a check, and stay inside the viewport at 375px.
+  **Nothing is preselected:** a required `Select` starts on "Choose…" unless the
+  product has a default (Direction, pocket owner = creator, preselected
+  server-side). `Combobox` is a text input with suggestions whose visible input
+  carries `name`, `required` and `maxlength` (no hidden twin): a picked option or
+  a typed new value posts as typed (the routing label picker offers the pocket's
+  imported, still-unmapped labels). `DatePicker` shows one human format
+  ("1 Jan 2025", `fmtDate`) and submits ISO `YYYY-MM-DD`; an optional date clears
+  with Backspace or Delete. `TimeField` is a masked `HH:MM` input.
+  `MoneyInput` shows an `Rp` prefix and posts the digits as typed (the server
+  converts to minor units). Every control keeps a `<label for>`. Native
+  `<input type=file|number>` and `<textarea>` stay native.
+  Dates are human everywhere (`fmtDate`, `fmtMoment`, `fmtDateTime`: "3 Jun 2025,
+  10:23"); only the audit trail keeps the sortable `YYYY-MM-DD HH:MM`.
   Destructive actions (revoke access, revoke invitation, delete mapping, revoke
   platform admin) confirm inline, not in a dialog: see Feedback.
 - **Tables:** sentence-case muted headers, generous rows, subtle hover, aligned
@@ -223,12 +235,15 @@ are small authored inline SVG with consistent stroke treatment, never emoji.
   sign-in forms included, carries one of the two.
   **Inline confirm.** A destructive button turns, in place, into a short
   consequence sentence ("Revoke Bob? Access and notifications end now.") with
-  Revoke and Cancel. Focus moves to the confirming button; Escape or Cancel
-  restores the original button and its focus; a prompt left alone reverts after
+  Revoke and Cancel. The sentence opens on its own line of the row (siblings keep
+  their width) in danger tone, in a polite live region; focus moves to Cancel, the
+  safe choice; Escape or Cancel restores the original button and its focus; a prompt left alone reverts after
   about five seconds, but never while focus is inside it. No modal, no dialog.
   Without JavaScript the form posts directly, as the server stays the authority.
-  A form with typed-in values can warn before the page is left (`unsavedGuard`,
-  memory only; financial drafts are never stored). Domain rejections and audit codes are translated
+  A form with typed-in values warns before the page is left (`unsavedGuard`, memory
+  only; financial drafts are never stored): closing the tab uses the browser's
+  own prompt, an in-app navigation is held and the form shows an inline
+  "Keep editing / Leave" choice. Domain rejections and audit codes are translated
   to organizer wording on the server (`userMessage`, `actionLabel`); internal
   state names such as Draft/Submitted never render.
 - **Motion:** menus enter over 160ms with a short upward offset and slight scale;
