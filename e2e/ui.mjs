@@ -503,6 +503,7 @@ await withWorker(async () => {
 		}
 		// BODY and the skip link (A) are the browser chrome and the page-level skip link, not content behind the scrim.
 		check('Tab stays inside the open drawer and the menu button', trail.every((entry) => entry === 'nav' || entry === 'menu-button' || entry === 'BODY' || entry === 'A'), trail.join(','));
+		await page.waitForTimeout(300);
 		await page.screenshot({ path: `${ROOT}/.wrangler/ui/drawer-375.png` });
 		shots.push('drawer-375.png');
 		await page.keyboard.press('Escape');
@@ -529,6 +530,59 @@ await withWorker(async () => {
 		check('coarse pointer: ledger links are 44px', sizes.coarse && sizes.ledgerLink >= 44, JSON.stringify(sizes));
 		check('coarse pointer: top bar menu triggers are 44px', sizes.trigger >= 44, JSON.stringify(sizes));
 		await touch.close();
+
+		// Settings tab row: clipped edges fade (data-fade-* is styled), and Overview is a tab.
+		await page.setViewportSize({ width: 375, height: 800 });
+		await page.goto(`${ORIGIN}/org/demo-jakarta/settings/notifications`);
+		await page.locator('nav.tabs[data-fade-start], nav.tabs[data-fade-end]').first().waitFor();
+		const fade = await page.evaluate(() => getComputedStyle(document.querySelector('nav.tabs')).maskImage);
+		check('settings tabs fade their clipped edges on a phone', fade.includes('linear-gradient'), fade);
+
+		// A successful Record puts the custom controls back to their defaults.
+		await page.setViewportSize({ width: 1440, height: 900 });
+		await page.goto(`${ORIGIN}/org/demo-jakarta/transactions/new`);
+		await page.locator('button#new-pocket').click();
+		await page.getByRole('option').first().click();
+		await page.locator('button#new-direction').click();
+		await page.getByRole('option', { name: 'Money in' }).click();
+		await page.locator('input#new-amount').fill('5000');
+		await page.locator('input#new-counterparty').fill('RESET-Check');
+		await page.getByRole('button', { name: 'Record' }).click();
+		await page.waitForFunction(() => document.querySelector('input#new-counterparty')?.value === '');
+		check(
+			'Record resets Direction and Pocket along with the text fields',
+			(await page.locator('button#new-direction').innerText()).includes('Money out') && (await page.locator('button#new-pocket').innerText()).includes('Choose'),
+			`${await page.locator('button#new-direction').innerText()} / ${await page.locator('button#new-pocket').innerText()}`
+		);
+
+		// Screenshot pass at both sizes: roles, notifications, new transaction (time
+		// control), routing picker, inline confirm, drawer, 375 form.
+		for (const [width, height] of [[1440, 1000], [375, 900]]) {
+			await page.setViewportSize({ width, height });
+			for (const [name, path] of [
+				['roles', 'settings/roles'],
+				['notifications', 'settings/notifications'],
+				['pockets', 'settings/pockets'],
+				['new-transaction', 'transactions/new']
+			]) {
+				await page.goto(`${ORIGIN}/org/demo-jakarta/${path}`);
+				await page.waitForTimeout(250);
+				await page.screenshot({ path: `${ROOT}/.wrangler/ui/${name}-${width}.png`, fullPage: true });
+				shots.push(`${name}-${width}.png`);
+			}
+			await page.goto(`${ORIGIN}/org/demo-jakarta/settings/routing`);
+			await page.locator('button#mapping-pocket').click();
+			await page.getByRole('option').first().click();
+			await page.locator('input#mapping-pattern').click();
+			await page.getByRole('listbox').waitFor();
+			await page.screenshot({ path: `${ROOT}/.wrangler/ui/routing-picker-${width}.png` });
+			shots.push(`routing-picker-${width}.png`);
+			await page.goto(`${ORIGIN}/org/demo-jakarta/settings/people`);
+			await page.waitForFunction(() => document.querySelector('form[action="?/removeMember"]') !== null);
+			await page.getByRole('button', { name: /Revoke access for Bob/ }).click();
+			await page.screenshot({ path: `${ROOT}/.wrangler/ui/confirm-inline-${width}.png`, fullPage: true });
+			shots.push(`confirm-inline-${width}.png`);
+		}
 
 		// Last, because it adds a ledger row: a JavaScript-disabled context posts native controls.
 		const noJsEnd = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 1440, height: 900 } });

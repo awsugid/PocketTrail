@@ -60,7 +60,7 @@ export async function checks(ctx) {
 	check('the surviving write is one whole version', winnerA !== winnerB, `A=${winnerA} B=${winnerB}`);
 	check(
 		'the losing write left no duplicate child rows',
-		/Saved purposes match the bank amount/.test(settled.replace(/\s+/g, ' ')),
+		/Purposes match the bank amount/.test(settled.replace(/\s+/g, ' ')),
 		'purpose total does not reconcile'
 	);
 
