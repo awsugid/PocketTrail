@@ -67,7 +67,7 @@
 				{#each organizations as candidate (candidate.slug)}
 					<a
 						class="menu__item"
-						href="/org/{candidate.slug}/transactions"
+						href="/org/{candidate.slug}"
 						aria-current={candidate.slug === org.slug ? 'true' : undefined}
 					>
 						<span class="menu__label">{candidate.name}</span>

@@ -11,12 +11,12 @@ import {
 	inventoryLocations
 } from '$lib/server/inventory';
 
-// Inventory pages: viewing requires an active membership (ViewTransactions);
+// Inventory viewing accepts ledger viewers or independent inventory maintainers;
 // recording changes requires UpdateStock. Every mutation re-checks its own
 // permission here — there is no layout-level gate.
 
 export const load: PageServerLoad = async (event) => {
-	const ctx = await requireMember(event, event.params.slug, 'ViewTransactions');
+	const ctx = await requireMember(event, event.params.slug, ['ViewTransactions', 'UpdateStock']);
 	const [items, levels, locations] = await Promise.all([
 		inventoryItems(ctx.db, ctx.org.id),
 		inventoryLevels(ctx.db, ctx.org.id),

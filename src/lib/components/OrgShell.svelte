@@ -8,12 +8,13 @@
 		user: { name: string; email: string; picture: string | null; isPlatformAdmin: boolean };
 		org: { slug: string; name: string; notificationsEnabled: boolean; synthetic: boolean };
 		organizations: Array<{ slug: string; name: string }>;
+		access: { finance: boolean; inventory: boolean };
 		csrfToken: string;
 		active: string;
 		children: Snippet;
 	}
 
-	let { user, org, organizations, csrfToken, active, children }: Props = $props();
+	let { user, org, organizations, access, csrfToken, active, children }: Props = $props();
 
 	let navOpen = $state(false);
 	afterNavigate(() => (navOpen = false));
@@ -60,7 +61,7 @@
 	<Topbar {user} {csrfToken} {org} {organizations} locked={drawerOpen} bind:navOpen />
 	<div class="body">
 		<nav class="sidebar" id="org-nav" aria-label="Organization" inert={narrow && !navOpen} data-open={navOpen ? 'true' : undefined}>
-			{#each nav as item (item.key)}
+			{#each nav.filter((item) => item.key === 'inventory' ? access.inventory : access.finance) as item (item.key)}
 				<a
 					href="/org/{org.slug}/{item.path}"
 					aria-current={active === item.key ? 'page' : undefined}

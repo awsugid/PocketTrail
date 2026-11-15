@@ -20,6 +20,8 @@ export const PERMISSIONS = [
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
+/** Alternative permissions for a surface shared by independent modules. */
+export type PermissionRequirement = Permission | readonly [Permission, ...Permission[]];
 
 import { PERMISSION_LABELS } from '$lib/domain';
 
@@ -91,13 +93,15 @@ export function authorize(
 	members: readonly MemberRef[],
 	roles: readonly RoleRef[],
 	userId: string,
-	required: Permission
+	required: PermissionRequirement
 ): AuthzFailure | null {
 	const member = members.find((candidate) => candidate.userId === userId);
 	if (!member) return { kind: 'NoMembership' };
 	if (!member.active) return { kind: 'InactiveMembership' };
-	if (permissionsFor(members, roles, userId).has(required)) return null;
-	return { kind: 'NotAuthorized', required };
+	const alternatives = typeof required === 'string' ? [required] : required;
+	const granted = permissionsFor(members, roles, userId);
+	if (alternatives.some((permission) => granted.has(permission))) return null;
+	return { kind: 'NotAuthorized', required: alternatives[0]! };
 }
 
 /** Organizer-facing denial text; mirrors user_message in src/domain_map.rs. */

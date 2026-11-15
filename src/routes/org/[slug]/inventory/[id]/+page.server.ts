@@ -6,7 +6,7 @@ import { updateStock } from '$lib/server/stock_action';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
-	const ctx = await requireMember(event, event.params.slug, 'ViewTransactions');
+	const ctx = await requireMember(event, event.params.slug, ['ViewTransactions', 'UpdateStock']);
 	const id = /^[0-9]{1,15}$/.test(event.params.id) ? Number(event.params.id) : null;
 	if (id === null) throw error(404, 'That item does not exist in this organization.');
 	const items = await inventoryItems(ctx.db, ctx.org.id);

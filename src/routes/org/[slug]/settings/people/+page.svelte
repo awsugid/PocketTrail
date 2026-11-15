@@ -83,8 +83,8 @@
 						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 						<div class="form-grid">
 							<div class="field">
-								<label for="member-identity">Email or user id <span class="req" aria-hidden="true">*</span></label>
-								<input class="input" id="member-identity" name="user_id" required />
+								<label for="member-identity">Email <span class="req" aria-hidden="true">*</span></label>
+								<input class="input" id="member-identity" name="email" type="email" required />
 							</div>
 							<div class="field">
 								<label for="member-role">Role</label>
@@ -92,9 +92,9 @@
 							</div>
 						</div>
 						<div class="form-actions">
-							<button class="btn btn--primary" type="submit"><Icon name="plus" size={16} />Add member</button>
+							<button class="btn btn--primary" type="submit"><Icon name="plus" size={16} />Add person</button>
 						</div>
-						<p class="hint">They must have signed in with Google once.</p>
+						<p class="hint">Existing users get access immediately. New users can accept an invitation after signing in with Google; no email is sent in this build.</p>
 					</form>
 				</div>
 			</section>
@@ -142,25 +142,6 @@
 						{/each}
 					</ul>
 				{/if}
-				<div class="panel__body panel__body--ruled">
-					<form method="POST" action="/org/{slug}/settings/invitations" class="form" use:guard>
-						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
-						<div class="form-grid">
-							<div class="field">
-								<label for="invite-email">Email <span class="req" aria-hidden="true">*</span></label>
-								<input class="input" id="invite-email" name="email" type="email" required />
-							</div>
-							<div class="field">
-								<label for="invite-role">Role</label>
-								<Select id="invite-role" name="role_id" items={s.roles.map((role) => ({ value: String(role.id), label: role.name }))} required />
-							</div>
-						</div>
-						<div class="form-actions">
-							<button class="btn" type="submit"><Icon name="mail" size={16} />Invite</button>
-						</div>
-						<p class="hint">Recorded in the local outbox; no email is sent in this build.</p>
-					</form>
-				</div>
 			</section>
 		</div>
 	{/if}

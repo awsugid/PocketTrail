@@ -444,20 +444,20 @@ await withWorker(async () => {
 		await page.waitForTimeout(5400);
 		check('an inline confirm left alone, focus elsewhere, reverts by itself', (await confirmGroup.count()) === 0);
 
-		// A plain-endpoint rejection stays on the page, inline, focused, with the typed value kept.
+		// The unified people form keeps rejected input inline and focused.
 		await page.goto(`${ORIGIN}/org/demo-jakarta/settings/people`);
-		await page.waitForFunction(() => document.querySelector('form[action$="/settings/invitations"]') !== null);
+		await page.waitForFunction(() => document.querySelector('form[action="?/addMember"]') !== null);
 		await page.waitForTimeout(300);
-		await page.locator('input#invite-email').fill('bob@example.test');
-		await page.locator('button#invite-role').click();
+		await page.locator('input#member-identity').fill('bob@example.test');
+		await page.locator('button#member-role').click();
 		await page.getByRole('option').first().click();
-		await page.getByRole('button', { name: 'Invite' }).click();
-		const inviteAlert = page.locator('form[action$="/settings/invitations"] .form-error');
+		await page.getByRole('button', { name: 'Add person' }).click();
+		const inviteAlert = page.locator('form[action="?/addMember"] .form-error');
 		await inviteAlert.waitFor();
 		check(
-			'a rejected invitation shows an inline alert, keeps the typed email and focuses the alert',
+			'a duplicate member shows an inline alert, keeps the typed email and focuses the alert',
 			page.url().endsWith('/settings/people') &&
-				(await page.locator('input#invite-email').inputValue()) === 'bob@example.test' &&
+				(await page.locator('input#member-identity').inputValue()) === 'bob@example.test' &&
 				(await inviteAlert.evaluate((node) => node === document.activeElement)) &&
 				(await inviteAlert.innerText()).length > 0,
 			await inviteAlert.innerText()

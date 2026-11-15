@@ -240,7 +240,7 @@ export async function settingsPageData(ctx: TenantContext, url: URL) {
 // ------------------------------------------------------- permission bundles
 
 /** Validate and serialize a form's `perm` checkbox set. Unknown permissions are
- * rejected; a nonempty working role must include ViewTransactions; the stored
+ * rejected; finance roles require ViewTransactions, inventory-only roles do not; the stored
  * JSON array is sorted (Rust BTreeSet order). */
 export function permissionBundle(form: FormData, field = 'perm'): string {
 	const allowed = new Set<string>(PERMISSIONS);
@@ -251,10 +251,10 @@ export function permissionBundle(form: FormData, field = 'perm'): string {
 	if (![...requested].every((p) => allowed.has(p))) {
 		throw error(400, 'Unknown application permission.');
 	}
-	if (requested.size > 0 && !requested.has('ViewTransactions')) {
+	if ([...requested].some((p) => p !== 'UpdateStock') && !requested.has('ViewTransactions')) {
 		throw error(
 			400,
-			'Working roles require View transactions to open organization pages. Select that permission explicitly.'
+			'Finance and settings permissions require View transactions. Inventory-only roles can use Update stock alone.'
 		);
 	}
 	return JSON.stringify([...requested].sort());
@@ -331,7 +331,10 @@ export async function addMember(ctx: SettingsCtx, form: FormData): Promise<never
 				'INSERT INTO memberships(org_id,user_id,role_id,handle,created_at) VALUES(?1,?2,?3,?4,?5)'
 			)
 			.bind(ctx.org.id, user.id, roleId, handle, nowMs()),
-		committed(ctx.db, ctx.org.id, ctx.user.id, 'member.added', `membership:${handle}`)
+		committed(ctx.db, ctx.org.id, ctx.user.id, 'member.added', `membership:${handle}`),
+		ctx.db.prepare(
+			'UPDATE invitations SET revoked_at=?1 WHERE org_id=?2 AND email=?3 COLLATE NOCASE AND accepted_at IS NULL AND revoked_at IS NULL'
+		).bind(nowMs(), ctx.org.id, user.email)
 	]);
 	return redirect(303, backPath(ctx.org.slug, 'Membership granted', ctx.section));
 }

@@ -51,7 +51,7 @@
 				<ul class="rows rows--link">
 					{#each data.organizations as org (org.slug)}
 						<li>
-							<a href="/org/{org.slug}/transactions">
+							<a href="/org/{org.slug}">
 								<Icon name="org" class="lead" /><strong>{org.name}</strong>
 								<Icon name="chevron" size={16} class="tail" />
 							</a>

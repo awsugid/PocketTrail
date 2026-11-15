@@ -1,11 +1,12 @@
 import type { Actions, PageServerLoad } from './$types';
 
-import { requireMember, shellContext } from '$lib/server/auth';
-import { addMember, removeMember, restoreMember, setRole, settingsPageData } from '$lib/server/settings';
+import { bindings, requireMember, shellContext } from '$lib/server/auth';
+import { removeMember, restoreMember, setRole, settingsPageData } from '$lib/server/settings';
+import { addPerson } from '$lib/server/people';
 import { intField, settingsForm } from '$lib/server/settings_actions';
 
-// People: memberships, roles and pending invitations. Invitation forms post to
-// their own endpoints (/settings/invitations…), which re-check ManageMembers.
+// People: one add action selects immediate membership or a pending invitation.
+// Every action re-checks ManageMembers before reading the form.
 export const load: PageServerLoad = async (event) => {
 	const ctx = await requireMember(event, event.params.slug, 'ViewTransactions');
 	return {
@@ -17,7 +18,7 @@ export const load: PageServerLoad = async (event) => {
 export const actions: Actions = {
 	addMember: async (event) => {
 		const { ctx, form } = await settingsForm(event, 'ManageMembers', 'people');
-		return addMember(ctx, form);
+		return addPerson(ctx, form, bindings(event.platform), event.url.origin);
 	},
 	setRole: async (event) => {
 		const { ctx, form } = await settingsForm(event, 'ManageMembers', 'people');

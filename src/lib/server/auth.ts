@@ -15,6 +15,7 @@ import {
 	permissionsFor,
 	type MemberRef,
 	type Permission,
+	type PermissionRequirement,
 	type RoleRef
 } from './permissions';
 import {
@@ -210,6 +211,10 @@ export async function shellContext(ctx: TenantContext) {
 			synthetic: ctx.org.is_synthetic !== 0
 		},
 		organizations,
+		access: {
+			finance: ctx.can('ViewTransactions'),
+			inventory: ctx.can('ViewTransactions') || ctx.can('UpdateStock')
+		},
 		members: ctx.memberRows.map((m) => ({
 			id: m.id,
 			name: m.name,
@@ -226,7 +231,7 @@ export async function shellContext(ctx: TenantContext) {
 export async function requireMember(
 	event: CtxEvent,
 	slug: string,
-	permission: Permission
+	permission: PermissionRequirement
 ): Promise<TenantContext> {
 	const login = await requireLogin(event);
 	const org = await orgBySlug(login.db, slug);

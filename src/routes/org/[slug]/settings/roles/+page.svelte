@@ -82,7 +82,7 @@
 									<tr>
 										<th scope="row">
 											{permission.label}
-											{#if permission.id === 'ViewTransactions'}<span class="cell__sub">Needed by every working role</span>{/if}
+											{#if permission.id === 'ViewTransactions'}<span class="cell__sub">Not needed for inventory-only roles</span>{/if}
 										</th>
 										{#each s.roles as role (role.id)}
 											<td class="cell--check">

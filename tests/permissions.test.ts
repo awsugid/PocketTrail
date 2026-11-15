@@ -86,6 +86,20 @@ describe('permission evaluation', () => {
 		expect(authorize(members, roles, 'bob', 'ViewTransactions')).toBeNull();
 	});
 
+	it('allows inventory maintenance without widening finance or settings access', () => {
+		const inventoryRoles = [{ id: 4, permissions: '["UpdateStock"]' }];
+		const inventoryMembers = [{ userId: 'stock', roleId: 4, active: true }];
+		expect(authorize(inventoryMembers, inventoryRoles, 'stock', ['ViewTransactions', 'UpdateStock'])).toBeNull();
+		expect(authorize(inventoryMembers, inventoryRoles, 'stock', 'UpdateStock')).toBeNull();
+		for (const permission of ['ViewTransactions', 'ImportStatements', 'ManageMembers', 'ManageRoles'] as const) {
+			expect(authorize(inventoryMembers, inventoryRoles, 'stock', permission)).not.toBeNull();
+		}
+		expect(authorize([{ ...inventoryMembers[0]!, active: false }], inventoryRoles, 'stock', ['ViewTransactions', 'UpdateStock']))
+			.toEqual({ kind: 'InactiveMembership' });
+		expect(authorize([], inventoryRoles, 'stock', ['ViewTransactions', 'UpdateStock']))
+			.toEqual({ kind: 'NoMembership' });
+	});
+
 	it('never treats a removed member as authorized even with a valid role', () => {
 		expect(authorize(members, roles, 'dave', 'ViewTransactions')).not.toBeNull();
 	});

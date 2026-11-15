@@ -110,22 +110,68 @@ export async function checks(ctx) {
 	// ------------------------------------------------------------------ people
 	const unknownMember = await alice.postForm('/org/demo-jakarta/settings/people?/addMember', {
 		csrf_token: csrf,
-		user_id: 'nobody@example.test',
+		email: 'nobody@example.test',
 		role_id: '4'
 	});
-	check('adding an unknown identity is refused', unknownMember.status === 400, String(unknownMember.status));
+	check('a new email is invited without a previous sign-in', unknownMember.status === 303, String(unknownMember.status));
+	const pendingPeople = await (await alice.get('/org/demo-jakarta/settings/people')).text();
+	check('the new email appears as a pending invitation', pendingPeople.includes('nobody@example.test'));
+	const malformedPerson = await alice.postForm('/org/demo-jakarta/settings/people?/addMember', {
+		csrf_token: csrf, email: 'not-an-email', role_id: '4'
+	});
+	check('an invalid email is rejected', malformedPerson.status === 400);
 	const duplicateMember = await alice.postForm('/org/demo-jakarta/settings/people?/addMember', {
 		csrf_token: csrf,
-		user_id: 'dana@example.test',
+		email: 'dana@example.test',
 		role_id: '4'
 	});
 	check('adding an existing membership is refused', duplicateMember.status === 400, String(duplicateMember.status));
 	const addedMember = await alice.postForm('/org/demo-jakarta/settings/people?/addMember', {
 		csrf_token: csrf,
-		user_id: 'admin@example.test',
+		email: ' ADMIN@example.test ',
 		role_id: '4'
 	});
 	check('a signed-in identity can be granted membership', addedMember.status === 303, String(addedMember.status));
+	const peopleAfterAdd = await (await alice.get('/org/demo-jakarta/settings/people')).text();
+	check('an existing account is added directly, not invited', !/settings\/invitations[^]*?<strong>admin@example.test/.test(peopleAfterAdd));
+
+	// Independent module access: a role with UpdateStock alone is valid.
+	const inventoryRole = await alice.postForm('/org/demo-jakarta/settings/roles?/createRole', {
+		csrf_token: csrf, name: 'Inventory Maintainer', perm: 'UpdateStock'
+	});
+	check('an inventory-only role can be created', inventoryRole.status === 303);
+	const rolesHtml = await (await alice.get('/org/demo-jakarta/settings/roles')).text();
+	const inventoryRoleId = rolesHtml.match(/id="role-name-(\d+)"[^>]*value="Inventory Maintainer"/)?.[1];
+	check('the inventory role is available for assignment', Boolean(inventoryRoleId));
+	if (inventoryRoleId) {
+		const assigned = await alice.postForm('/org/demo-jakarta/settings/people?/setRole', {
+			csrf_token: csrf, id: '4', role_id: inventoryRoleId
+		});
+		check('the inventory role can be assigned', assigned.status === 303);
+		const stockPage = await dana.get('/org/demo-jakarta/inventory');
+		const stockHtml = await stockPage.text();
+		const stockCsrf = csrfFrom(stockHtml) ?? '';
+		check('inventory-only members can view inventory and item history',
+			stockPage.status === 200 && (await dana.get('/org/demo-jakarta/inventory/1')).status === 200);
+		check('inventory-only navigation hides financial and settings links',
+			!/<a[^>]*href="\/org\/demo-jakarta\/(?:transactions|imports|settings|actions)"/.test(stockHtml));
+		const landing = await dana.get('/org/demo-jakarta');
+		check('organization entry opens inventory', landing.headers.get('location') === '/org/demo-jakarta/inventory');
+		for (const path of ['transactions', 'imports', 'settings', 'actions']) {
+			check(`inventory-only member cannot open ${path}`, (await dana.get(`/org/demo-jakarta/${path}`)).status === 403);
+		}
+		for (const [action, fields] of [
+			['addItem', { name: 'Synthetic stock-only item' }],
+			['addLocation', { name: 'Synthetic stock-only location' }],
+			['updateStock', { item_id: '1', location_id: '1', delta: '1', reason: 'Synthetic inventory-only adjustment' }]
+		]) {
+			const result = await dana.postForm(`/org/demo-jakarta/inventory?/${action}`, { csrf_token: stockCsrf, ...fields });
+			check(`inventory-only member can ${action}`, result.status === 303, String(result.status));
+		}
+		check('inventory-only member cannot mutate roles', (await dana.postForm('/org/demo-jakarta/settings/roles?/createRole', {
+			csrf_token: stockCsrf, name: 'Unauthorized', perm: 'ViewTransactions'
+		})).status === 403);
+	}
 
 	const revoked = await alice.postForm('/org/demo-jakarta/settings/people?/removeMember', {
 		csrf_token: csrf,
@@ -134,6 +180,7 @@ export async function checks(ctx) {
 	check('access can be revoked', revoked.status === 303, String(revoked.status));
 	const danaAfter = await dana.get('/org/demo-jakarta/transactions');
 	check('revoked access is effective immediately', danaAfter.status === 403, String(danaAfter.status));
+	check('revoking inventory-only membership removes inventory access', (await dana.get('/org/demo-jakarta/inventory')).status === 403);
 	const restore = await alice.postForm('/org/demo-jakarta/settings/people?/restoreMember', {
 		csrf_token: csrf,
 		id: '4'

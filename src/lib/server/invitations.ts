@@ -91,7 +91,7 @@ export async function createInvitation(
 		token,
 		baseUrl
 	});
-	return redirect(303, `/org/${ctx.org.slug}/settings?${msgQuery(outcomeMessage(outcome))}`);
+	return redirect(303, `/org/${ctx.org.slug}/settings/people?${msgQuery(outcomeMessage(outcome))}`);
 }
 
 // ------------------------------------------------------------------ resend

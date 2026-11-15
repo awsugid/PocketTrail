@@ -76,6 +76,9 @@ export async function createOrg(event: CtxEvent, login: LoginState, form: FormDa
 			.prepare(`INSERT INTO roles (org_id, name, permissions) VALUES (${orgId}, 'Admin', ?2)`)
 			.bind(slug, JSON.stringify(all)),
 		login.db
+			.prepare(`INSERT INTO roles (org_id, name, permissions) VALUES (${orgId}, 'Inventory Maintainer', '["UpdateStock"]')`)
+			.bind(slug),
+		login.db
 			.prepare(
 				`INSERT INTO memberships (org_id, user_id, role_id, handle, created_at) SELECT ${orgId}, ?2, id, ?2, ?3 FROM roles WHERE org_id = ${orgId} AND name = 'Admin'`
 			)
