@@ -10,9 +10,11 @@
 		organizations?: Array<{ slug: string; name: string }>;
 		/** Bound by OrgShell so the phone menu button can open the sidebar. */
 		navOpen?: boolean;
+		/** The phone drawer is open: everything but the menu button is inert. */
+		locked?: boolean;
 	}
 
-	let { user, csrfToken, org, organizations = [], navOpen = $bindable(false) }: Props = $props();
+	let { user, csrfToken, org, organizations = [], navOpen = $bindable(false), locked = false }: Props = $props();
 
 	// First letter of up to two words; "Alice (fixture)" must not become "A(".
 	const initials = $derived(
@@ -49,13 +51,13 @@
 			<Icon name={navOpen ? 'close' : 'menu'} />
 		</button>
 	{/if}
-	<a class="brand" href="/orgs" aria-label="PocketTrail, all organizations">
+	<a class="brand" href="/orgs" inert={locked} aria-label="PocketTrail, all organizations">
 		<span class="brand__mark"><Icon name="pocket" size={16} /></span>
 		<span class="brand__text">PocketTrail</span>
 	</a>
 
 	{#if org}
-		<details class="menu" use:menu>
+		<details class="menu" use:menu inert={locked}>
 			<summary class="menu__trigger menu__trigger--bordered" aria-label="Switch organization, current: {org.name}">
 				<Icon name="org" />
 				<span class="menu__label">{org.name}</span>
@@ -84,7 +86,7 @@
 		<span class="badge badge--info topbar__chip" role="status" title="Synthetic demo data, not real records"><Icon name="info" size={12} /><span>Synthetic data</span></span>
 	{/if}
 
-	<details class="menu" use:menu>
+	<details class="menu" use:menu inert={locked}>
 		<summary class="menu__trigger" aria-label="Account: {user.name}">
 			<span class="avatar" aria-hidden="true">
 				{initials}

@@ -18,6 +18,19 @@
 	let navOpen = $state(false);
 	afterNavigate(() => (navOpen = false));
 
+	// At phone width the sidebar is a drawer: out of the tab order and the
+	// accessibility tree while closed; while open, everything behind the scrim is
+	// inert so Tab cannot escape to it.
+	let narrow = $state(false);
+	$effect(() => {
+		const query = matchMedia('(max-width: 800px)');
+		const sync = () => (narrow = query.matches);
+		sync();
+		query.addEventListener('change', sync);
+		return () => query.removeEventListener('change', sync);
+	});
+	const drawerOpen = $derived(narrow && navOpen);
+
 	// Phone drawer: focus the first link on open; closing (Escape, scrim, link)
 	// returns focus to the menu button unless navigation already moved on.
 	let wasOpen = false;
@@ -44,9 +57,9 @@
 <svelte:window onkeydown={onKey} />
 
 <div class="frame">
-	<Topbar {user} {csrfToken} {org} {organizations} bind:navOpen />
+	<Topbar {user} {csrfToken} {org} {organizations} locked={drawerOpen} bind:navOpen />
 	<div class="body">
-		<nav class="sidebar" id="org-nav" aria-label="Organization" data-open={navOpen ? 'true' : undefined}>
+		<nav class="sidebar" id="org-nav" aria-label="Organization" inert={narrow && !navOpen} data-open={navOpen ? 'true' : undefined}>
 			{#each nav as item (item.key)}
 				<a
 					href="/org/{org.slug}/{item.path}"
@@ -58,7 +71,7 @@
 			{/each}
 		</nav>
 		{#if navOpen}<button class="scrim" type="button" tabindex="-1" aria-label="Close menu" onclick={() => { navOpen = false; document.getElementById('menu-button')?.focus(); }}></button>{/if}
-		<main class="main" id="main" tabindex="-1">
+		<main class="main" id="main" tabindex="-1" inert={drawerOpen}>
 			<div class="main__inner">
 				{@render children()}
 			</div>

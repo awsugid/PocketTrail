@@ -454,6 +454,9 @@ await withWorker(async () => {
 		check('select list stays inside a 375px viewport', listBox !== null && listBox.x >= 0 && listBox.x + listBox.width <= 375, JSON.stringify(listBox));
 		await page.keyboard.press('Escape');
 
+		const columns = await page.evaluate(() => getComputedStyle(document.querySelector('.form-grid')).gridTemplateColumns.split(' ').length);
+		check('form grid is one column at 375px', columns === 1, String(columns));
+
 		// Drawer: overlay with a scrim; focus moves in; Escape closes and returns focus.
 		await page.goto(`${ORIGIN}/org/demo-jakarta/transactions`);
 		await page.getByRole('button', { name: 'Menu' }).click();
@@ -461,13 +464,48 @@ await withWorker(async () => {
 			'drawer opens over the page with focus on its first link',
 			(await page.evaluate(() => document.activeElement?.closest('#org-nav') !== null)) && (await page.locator('.scrim').count()) === 1
 		);
+		const drawer = await page.evaluate(() => ({
+			navHeight: document.querySelector('#org-nav')?.getBoundingClientRect().height,
+			viewport: window.innerHeight,
+			mainInert: document.querySelector('#main')?.inert,
+			barInert: [...document.querySelectorAll('.topbar details, .topbar .brand')].every((node) => node.inert),
+			buttonInert: document.querySelector('#menu-button')?.inert
+		}));
+		check('open drawer fills the height under the topbar', drawer.navHeight >= drawer.viewport - 56 - 1, JSON.stringify(drawer));
+		check('open drawer makes the page and top bar inert, not its own button', drawer.mainInert && drawer.barInert && !drawer.buttonInert, JSON.stringify(drawer));
+		const trail = [];
+		for (let i = 0; i < 9; i += 1) {
+			await page.keyboard.press('Tab');
+			trail.push(await page.evaluate(() => (document.activeElement?.closest('#org-nav') ? 'nav' : (document.activeElement?.id || document.activeElement?.tagName))));
+		}
+		// BODY and the skip link (A) are the browser chrome and the page-level skip link, not content behind the scrim.
+		check('Tab stays inside the open drawer and the menu button', trail.every((entry) => entry === 'nav' || entry === 'menu-button' || entry === 'BODY' || entry === 'A'), trail.join(','));
 		await page.screenshot({ path: `${ROOT}/.wrangler/ui/drawer-375.png` });
 		shots.push('drawer-375.png');
 		await page.keyboard.press('Escape');
 		check('Escape closes the drawer and returns focus to the menu button', (await page.locator('.scrim').count()) === 0 && (await page.evaluate(() => document.activeElement?.id)) === 'menu-button');
+		const closedNav = await page.evaluate(() => ({
+			inert: document.querySelector('#org-nav')?.inert,
+			mainInert: document.querySelector('#main')?.inert
+		}));
+		check('closed drawer is inert (out of the tab and accessibility order), page is live', closedNav.inert && !closedNav.mainInert, JSON.stringify(closedNav));
 		await page.getByRole('button', { name: 'Menu' }).click();
 		await page.locator('.scrim').click({ position: { x: 360, y: 400 } });
 		check('a backdrop press closes the drawer', (await page.locator('.scrim').count()) === 0);
+
+		// Coarse pointer: row links and top bar triggers reach 44px (source-order regression).
+		const touch = await browser.newContext({ viewport: { width: 375, height: 800 }, hasTouch: true, isMobile: true });
+		const touchPage = await touch.newPage();
+		await signIn(touchPage, 'Alice');
+		await touchPage.goto(`${ORIGIN}/org/demo-jakarta/transactions`);
+		const sizes = await touchPage.evaluate(() => ({
+			coarse: matchMedia('(pointer: coarse)').matches,
+			ledgerLink: document.querySelector('table.ledger td a')?.getBoundingClientRect().height,
+			trigger: document.querySelector('.topbar .menu__trigger')?.getBoundingClientRect().height
+		}));
+		check('coarse pointer: ledger links are 44px', sizes.coarse && sizes.ledgerLink >= 44, JSON.stringify(sizes));
+		check('coarse pointer: top bar menu triggers are 44px', sizes.trigger >= 44, JSON.stringify(sizes));
+		await touch.close();
 
 		await context.close();
 	} finally {

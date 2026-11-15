@@ -37,6 +37,8 @@
 	--nav-accent: #f0b36b;
 	--placeholder: #71717a;
 	--radius-chip: 16px;
+	--radius-badge: 5px;
+	--radius-check: 4px;
 	--shadow-menu: 0 8px 24px -6px rgb(24 24 27 / 0.22), 0 2px 6px rgb(24 24 27 / 0.08);
 	--ease: cubic-bezier(0.22, 1, 0.36, 1);
 	--topbar-h: 56px;
@@ -197,20 +199,6 @@ code,
 	flex: none;
 }
 
-.menu__trigger--bordered {
-	min-width: 0;
-	width: 100%;
-}
-
-@media (max-width: 480px) {
-	.topbar__chip span {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip: rect(0, 0, 0, 0);
-	}
-}
 
 .topbar__spacer {
 	flex: 1;
@@ -482,99 +470,6 @@ code,
 
 .auth h1 {
 	margin-bottom: 16px;
-}
-
-@media (max-width: 1100px) {
-	.sidebar {
-		width: 64px;
-		padding-inline: 8px;
-	}
-	.sidebar a {
-		justify-content: center;
-		padding-inline: 0;
-	}
-	.sidebar__label {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip: rect(0, 0, 0, 0);
-	}
-	.main {
-		padding: 20px 24px 56px;
-	}
-}
-
-@media (max-width: 800px) {
-	.btn.menu-button {
-		display: inline-flex;
-	}
-	.body {
-		flex-direction: column;
-	}
-	.sidebar {
-		display: none;
-		position: fixed;
-		top: var(--topbar-h);
-		bottom: 0;
-		left: 0;
-		z-index: 35;
-		width: min(280px, 85vw);
-		height: auto;
-		padding: 8px 12px 12px;
-		box-shadow: var(--shadow-menu);
-	}
-	.sidebar[data-open='true'] {
-		display: flex;
-		animation: drawer-in 160ms var(--ease);
-	}
-	.scrim {
-		display: block;
-		position: fixed;
-		inset: var(--topbar-h) 0 0;
-		z-index: 34;
-		background: rgb(24 24 27 / 0.45);
-	}
-	.sidebar a {
-		justify-content: flex-start;
-		padding-inline: 10px;
-		min-height: 44px;
-	}
-	.sidebar__label {
-		position: static;
-		width: auto;
-		height: auto;
-		clip: auto;
-	}
-	.main {
-		padding: 16px 16px 48px;
-	}
-	.brand__text {
-		display: none;
-	}
-	.menu__trigger {
-		max-width: 52vw;
-	}
-}
-
-@media (max-width: 640px) {
-	code,
-	.mono,
-	.mono-area {
-		font-size: 13px;
-	}
-}
-
-@media (max-width: 480px) {
-	.form-grid {
-		grid-template-columns: minmax(0, 1fr);
-	}
-	.main {
-		padding: 12px 12px 40px;
-	}
-	h1 {
-		font-size: 22px;
-	}
 }
 
 /* --------------------------------------------------------------- page head */
@@ -998,7 +893,6 @@ legend {
 	font-size: 12px;
 }
 
-p.gap-top,
 .gap-top {
 	margin-top: 16px;
 }
@@ -1022,12 +916,6 @@ fieldset {
 	gap: 8px;
 	min-height: 32px;
 	font-size: 14px;
-}
-
-.check input {
-	width: 18px;
-	height: 18px;
-	accent-color: var(--primary);
 }
 
 .select,
@@ -1080,9 +968,9 @@ fieldset {
 	flex: 1 1 200px;
 }
 
-.form--inline .select,
-.form--inline .input {
-	width: 100%;
+.form-error:focus-visible {
+	outline: 2px solid var(--danger);
+	outline-offset: 2px;
 }
 
 .form-error {
@@ -1191,31 +1079,6 @@ form[aria-busy='true'] .btn[type='submit'] {
 	width: 32px;
 }
 
-@media (pointer: coarse) {
-	.btn,
-	.btn--sm,
-	.chip,
-	.crumb,
-	.check,
-	.fold summary,
-	.menu__item,
-	.tabs a,
-	table.ledger td a {
-		min-height: 44px;
-	}
-	.btn--icon,
-	.btn--sm.btn--icon {
-		width: 44px;
-	}
-	.input,
-	.select {
-		min-height: 44px;
-	}
-	.check input {
-		width: 22px;
-		height: 22px;
-	}
-}
 
 .form-actions {
 	display: flex;
@@ -1330,7 +1193,7 @@ table.ledger td a {
 	align-items: center;
 	gap: 4px;
 	padding: 1px 7px;
-	border-radius: 5px;
+	border-radius: var(--radius-badge);
 	font-size: 12px;
 	font-weight: 600;
 	line-height: 1.5;
@@ -1607,8 +1470,14 @@ dl.facts dd {
 	transform: rotate(180deg);
 }
 
+.ui-trigger:focus-visible,
 .ui-trigger[data-state='open'] {
 	border-color: var(--focus);
+}
+
+.ui-trigger:focus-visible {
+	outline: 2px solid var(--focus);
+	outline-offset: 0;
 }
 
 .ui-popover {
@@ -1698,6 +1567,7 @@ dl.facts dd {
 }
 
 .ui-check {
+	position: relative;
 	display: inline-grid;
 	place-items: center;
 	flex: none;
@@ -1705,10 +1575,16 @@ dl.facts dd {
 	height: 18px;
 	padding: 0;
 	border: 1px solid var(--control-edge);
-	border-radius: 4px;
+	border-radius: var(--radius-check);
 	background: var(--surface);
 	color: #fafafa;
 	cursor: pointer;
+}
+
+.ui-check::after {
+	content: '';
+	position: absolute;
+	inset: -4px;
 }
 
 .ui-check[data-state='checked'] {
@@ -1786,7 +1662,137 @@ dl.facts dd {
 	pointer-events: none;
 }
 
+/* ------------------------------------------------------------ responsive
+   Every viewport and input-method override lives here, after the component
+   rules it overrides, so source order never silently beats a media query. */
+
+@media (max-width: 1100px) {
+	.sidebar {
+		width: 64px;
+		padding-inline: 8px;
+	}
+	.sidebar a {
+		justify-content: center;
+		padding-inline: 0;
+	}
+	.sidebar__label {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+	}
+	.main {
+		padding: 20px 24px 56px;
+	}
+}
+
+@media (max-width: 800px) {
+	.btn.menu-button {
+		display: inline-flex;
+	}
+	.body {
+		flex-direction: column;
+	}
+	.sidebar {
+		display: none;
+		position: fixed;
+		top: var(--topbar-h);
+		bottom: 0;
+		left: 0;
+		z-index: 35;
+		align-self: auto;
+		width: min(280px, 85vw);
+		height: auto;
+		padding: 8px 12px 12px;
+		box-shadow: var(--shadow-menu);
+	}
+	.sidebar[data-open='true'] {
+		display: flex;
+		animation: drawer-in 160ms var(--ease);
+	}
+	.scrim {
+		display: block;
+		position: fixed;
+		inset: var(--topbar-h) 0 0;
+		z-index: 34;
+		background: rgb(24 24 27 / 0.45);
+	}
+	.sidebar a {
+		justify-content: flex-start;
+		padding-inline: 10px;
+		min-height: 44px;
+	}
+	.sidebar__label {
+		position: static;
+		width: auto;
+		height: auto;
+		clip: auto;
+	}
+	.main {
+		padding: 16px 16px 48px;
+	}
+	.brand__text {
+		display: none;
+	}
+	.menu__trigger {
+		max-width: 52vw;
+	}
+}
+
+@media (max-width: 640px) {
+	code,
+	.mono,
+	.mono-area {
+		font-size: 13px;
+	}
+}
+
+@media (max-width: 480px) {
+	.form-grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.main {
+		padding: 12px 12px 40px;
+	}
+	h1 {
+		font-size: 22px;
+	}
+	/* The menu button and the brand mark read as two dark squares side by side. */
+	.menu-button + .brand {
+		display: none;
+	}
+	.topbar__chip span {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+	}
+}
+
 @media (pointer: coarse) {
+	.btn,
+	.btn--sm,
+	.chip,
+	.crumb,
+	.check,
+	.fold summary,
+	.menu__trigger,
+	.menu__item,
+	.tabs a,
+	.notice a,
+	table.ledger td a {
+		min-height: 44px;
+	}
+	.btn--icon,
+	.btn--sm.btn--icon {
+		width: 44px;
+	}
+	.input,
+	.select {
+		min-height: 44px;
+	}
 	.ui-item {
 		min-height: 44px;
 	}
@@ -1798,10 +1804,6 @@ dl.facts dd {
 	.ui-cal__day {
 		width: 42px;
 		height: 42px;
-	}
-	.ui-check {
-		width: 22px;
-		height: 22px;
 	}
 }
 

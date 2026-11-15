@@ -242,7 +242,8 @@ function acceptAudit(
 }
 
 /** In-app acceptance from Organizations (POST /invitations/:id/accept). The
- * caller has already gated login, same-origin, and CSRF. */
+ * caller has already gated login and called `verifiedForm` (same-origin and
+ * CSRF); this function checks neither. */
 export async function acceptFromOrganizations(
 	event: CtxEvent,
 	id: string,
