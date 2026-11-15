@@ -141,10 +141,11 @@ client-side copy of permission authority; hiding a control is never the gate.
 - Real statements and invoices must never be committed to the public repository.
 - Use synthetic workspaces for screenshots. Create a separate organization
   before working with real community records.
-- `wrangler.toml` has no `account_id` and no `[[routes]]`, and its D1 identifier
-  is a local placeholder, so `wrangler deploy` and `--remote` commands cannot
-  reach the live PocketTrail service or data. Provisioning Cloudflare resources
-  and deployment require separate configuration and explicit authorization.
+- `wrangler.toml` points at configured Cloudflare resources; `--remote` commands
+  can affect live data and require explicit authorization.
+- Cloudflare Workers Builds should use `npm run deploy` as its production deploy
+  command to apply pending D1 migrations before deploying the Worker. See
+  [deployment setup](docs/deployment.md#cloudflare-builds-commands).
 - Free-tier allowances are not a promise of permanently free operation.
 
 ## Project context

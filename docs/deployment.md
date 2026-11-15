@@ -8,16 +8,10 @@ publishing community financial data. Deployment requires explicit authorization
 from the organization that owns the Cloudflare account, and every step below is
 a reference for that approved operation rather than an instruction to run now.
 
-`wrangler.toml` deliberately contains:
-
-- no `account_id`,
-- no `[[routes]]` (so it cannot claim `pocket.awscommunity.id`),
-- a placeholder D1 `database_id` (`00000000-0000-4000-8000-000000000000`),
-- a non-production R2 bucket name.
-
-With those values, `wrangler deploy` and any `--remote` command fail rather than
-touching live resources. Replacing them is the first step of an approved
-deployment, and belongs in that operation's own change review.
+`wrangler.toml` contains a configured D1 database identifier and R2 bucket.
+Do not assume that omitting `account_id` or `[[routes]]` prevents remote changes:
+Wrangler can resolve the account from its credentials. Local checks must use
+`--local`; remote commands require an approved deployment.
 
 ## Application shape
 
@@ -35,9 +29,29 @@ separate frontend build. `npm ci && npm run build` is the whole build.
 
 ## Cloudflare Builds commands
 
-If the project uses Cloudflare Workers Builds instead of a local deployment, the
-build command is `npm ci && npm run build` and the deploy command is
-`npx wrangler deploy` (after review). The dry-run check is:
+This project uses Cloudflare Workers Builds directly. Configure the production
+branch's commands in the Worker's **Settings → Build**:
+
+- Build command: `npm ci && npm run check && npm run test:unit && npm run build`
+- Deploy command: `npm run deploy`
+
+The deploy script runs `wrangler d1 migrations apply DB --remote` before
+`wrangler deploy`. Wrangler records applied migrations and skips them on later
+builds; `&&` prevents deploying the Worker if a migration fails. Do not use bare
+`npx wrangler deploy`, which does not apply D1 migrations. Never run this
+production deploy command for preview branches; they need separate resources.
+
+The Cloudflare Builds API token needs permission to deploy this Worker and its
+assets and write to the configured D1 database. Store credentials
+in Cloudflare's build configuration, not this repository. The dashboard command
+and token permissions have not been verified here.
+
+Keep schema changes backward-compatible: the currently deployed Worker continues
+serving requests while migrations run, and a failed Worker deployment does not
+undo a successful migration. Do not seed remote databases with local fixtures.
+
+For an approved initial rollout, update the deploy command and retry the build
+for the intended production commit. The dry-run check is:
 
 ```sh
 printf 'n\n' | CI=1 npx wrangler deploy --dry-run --outdir /tmp/pt-dry
@@ -60,14 +74,16 @@ bindings, quotas, Google login, secrets, or delivery readiness.
 
 Only after the owning organization authorizes a specific deployment:
 
-1. Replace the placeholder `database_id` with the real D1 database id, and the
-   R2 `bucket_name` with the real bucket, in `wrangler.toml`.
+1. Verify the D1 database id and R2 bucket in `wrangler.toml` belong to the
+   intended Cloudflare account and environment.
 2. Provide secrets out of band: `SECRET_SESSION_KEY` (32+ chars) and, if Google
    sign-in is enabled, `GOOGLE_CLIENT_ID`. Never commit them.
-3. Apply migrations with review: `npx wrangler d1 migrations apply DB --remote`.
-   Do **not** run `db:seed:local` against remote data.
-4. `npx wrangler deploy`, then confirm the Worker's health endpoint and that the
-   deployed assets/bindings match the reviewed commit.
+3. Use the Cloudflare Builds commands above so pending migrations run before
+   deployment. For an approved manual deployment, build first with
+   `npm ci && npm run build`, then run `npm run deploy`.
+4. Confirm the Worker's health endpoint and that the deployed assets/bindings
+   match the reviewed commit. Verify the remote migration history in the build
+   logs; do **not** run `db:seed:local` against remote data.
 5. Enable Google OAuth authorized origins for the deployed hostname before
    relying on Google sign-in.
 6. Leave `EMAIL_DELIVERY_ENABLED` unset/false. Invitation delivery and
