@@ -5,6 +5,7 @@
 	import Notice from '$lib/components/Notice.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
+	import { enhanced } from '$lib/controls.svelte';
 	import { submit } from '$lib/forms';
 	import { stack } from '$lib/table';
 	import type { PageData } from './$types';
@@ -18,6 +19,11 @@
 	let status = $state('');
 	let busy = $state(false);
 	let extractionFailed = $state(false);
+	// Set once extraction has run or failed: the text fold has nothing to show before.
+	let extractionRan = $state(false);
+	// A password-protected PDF asks for its password inline, then retries extract().
+	let needsPassword = $state(false);
+	let password = $state('');
 
 	type PdfModule = {
 		GlobalWorkerOptions: { workerSrc: string };
@@ -36,7 +42,9 @@
 		return (await import(/* @vite-ignore */ path)) as T;
 	}
 
-	async function readFile(file: File): Promise<{ text: string; pages: number }> {
+	class PasswordNeeded extends Error {}
+
+	async function readFile(file: File, pdfPassword: string): Promise<{ text: string; pages: number }> {
 		const lib = await loadModule<PdfModule>('/vendor/pdf.min.mjs');
 		lib.GlobalWorkerOptions.workerSrc = '/vendor/pdf.worker.min.mjs';
 		const helper = (window as unknown as { PocketTrailExtraction?: ExtractionApi }).PocketTrailExtraction;
@@ -44,12 +52,10 @@
 		const buffer = await file.arrayBuffer();
 		let pdf: PdfDocument;
 		try {
-			pdf = await lib.getDocument({ data: buffer, isEvalSupported: false }).promise;
+			pdf = await lib.getDocument({ data: buffer, password: pdfPassword || undefined, isEvalSupported: false }).promise;
 		} catch (cause) {
-			if ((cause as { name?: string } | null)?.name !== 'PasswordException') throw cause;
-			const password = window.prompt('This statement PDF is password-protected. Enter its password:');
-			if (password === null) throw cause;
-			pdf = await lib.getDocument({ data: buffer, password, isEvalSupported: false }).promise;
+			if ((cause as { name?: string } | null)?.name === 'PasswordException') throw new PasswordNeeded();
+			throw cause;
 		}
 		const pages: string[] = [];
 		for (let page = 1; page <= pdf.numPages; page += 1) {
@@ -64,18 +70,32 @@
 		if (!file) return;
 		busy = true;
 		extractionFailed = false;
+		needsPassword = false;
 		statementText = '';
 		status = `Extracting ${file.name}…`;
 		try {
-			const result = await readFile(file);
+			const result = await readFile(file, password);
+			extractionRan = true;
+			password = '';
 			statementText = result.text;
 			status = `Extracted ${file.name} (${result.pages} page${result.pages === 1 ? '' : 's'}) with preserved rows.`;
 		} catch (cause) {
+			if (cause instanceof PasswordNeeded) {
+				status = `${file.name} is password-protected${password ? '; that password did not open it' : ''}.`;
+				needsPassword = true;
+				password = '';
+				return;
+			}
+			extractionRan = true;
 			extractionFailed = true;
 			status = `Could not read the file${cause instanceof Error && cause.message ? `: ${cause.message.replace(/[.\s]+$/, '')}` : ''}. Paste the statement text manually instead.`;
 		} finally {
 			busy = false;
 		}
+	}
+
+	function focusOnMount(node: HTMLElement) {
+		node.focus();
 	}
 </script>
 
@@ -118,11 +138,35 @@
 								/>
 							</div>
 						</div>
-						<p class="hint" id="import-status" role="status" aria-live="polite">{status}</p>
-						<details class="fold" open={extractionFailed}>
-							<summary>Extracted text</summary>
-							<textarea class="input textarea mono-area" name="statement_text" rows="8" aria-label="Extracted statement text" bind:value={statementText}></textarea>
-						</details>
+						{#if needsPassword}
+					<div class="field">
+						<label for="import-password">PDF password</label>
+						<div class="input-row">
+							<input
+								class="input"
+								id="import-password"
+								type="password"
+								autocomplete="off"
+								bind:value={password}
+								onkeydown={(event) => {
+									if (event.key === 'Enter') {
+										event.preventDefault();
+										extract();
+									}
+								}}
+								use:focusOnMount
+							/>
+							<button class="btn" type="button" disabled={busy || password === ''} onclick={extract}><Icon name="check" size={16} />Unlock</button>
+						</div>
+					</div>
+				{/if}
+				<p class="hint" id="import-status" role="status" aria-live="polite">{status}</p>
+						{#if extractionRan || !enhanced.on}
+							<details class="fold" open={extractionFailed || !enhanced.on}>
+								<summary>Extracted text</summary>
+								<textarea class="input textarea mono-area" name="statement_text" rows="8" aria-label="Extracted statement text" bind:value={statementText}></textarea>
+							</details>
+						{/if}
 						<div class="form-actions">
 							<button class="btn btn--primary" type="submit" disabled={busy || (extractionFailed && statementText.trim() === '')}>
 								<Icon name="upload" size={16} />Stage statement

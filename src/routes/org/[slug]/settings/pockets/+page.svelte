@@ -1,4 +1,5 @@
 <script lang="ts">
+	import MoneyInput from '$lib/components/ui/MoneyInput.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -38,7 +39,7 @@
 								<span class="rows__sub">
 									{#if pocket.ownerName}<Icon name="user" size={12} /> {pocket.ownerName}{:else}No active owner{/if}
 									{#if pocket.importedLabels.length > 0}
-								· <span class="muted">Statement labels ({pocket.importedLabels.length}):</span> {pocket.importedLabels.join(', ')}
+								· <a href="/org/{data.shell.org.slug}/settings/routing">{pocket.importedLabels.length} {pocket.importedLabels.length === 1 ? 'label' : 'labels'}</a>
 							{/if}
 								</span>
 							</div>
@@ -48,7 +49,7 @@
 									<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 									<input type="hidden" name="id" value={pocket.id} />
 									<label class="visually-hidden" for="owner-{pocket.id}">Owner of {pocket.name}</label>
-									<Select id="owner-{pocket.id}" name="owner_membership_id" items={activeMembers.map((member) => ({ value: String(member.id), label: member.name }))} value={String(pocket.ownerMembershipId ?? '')} required auto />
+									<Select id="owner-{pocket.id}" name="owner_membership_id" items={activeMembers.map((member) => ({ value: String(member.id), label: member.name }))} value={pocket.ownerName ? String(pocket.ownerMembershipId) : ''} required auto />
 									<button class="btn" type="submit"><Icon name="check" size={16} />Save</button>
 								</form>
 							{/if}
@@ -71,11 +72,11 @@
 							</div>
 							<div class="field">
 								<label for="pocket-opening">Opening balance (IDR)</label>
-								<input class="input" id="pocket-opening" name="opening_balance" inputmode="decimal" value="0" required />
+								<MoneyInput id="pocket-opening" name="opening_balance" value="0" required />
 							</div>
 							<div class="field">
 								<label for="pocket-owner">Owner</label>
-								<Select id="pocket-owner" name="owner_membership_id" items={activeMembers.map((member) => ({ value: String(member.id), label: member.name }))} />
+								<Select id="pocket-owner" name="owner_membership_id" items={activeMembers.map((member) => ({ value: String(member.id), label: member.name }))} value={String(s.defaultOwnerId ?? '')} required />
 							</div>
 						</div>
 						<div class="form-actions">

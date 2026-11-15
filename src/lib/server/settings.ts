@@ -207,6 +207,8 @@ export async function settingsPageData(ctx: TenantContext, url: URL) {
 			memberName: m.member_name
 		})),
 		incomeExplanationRoleId: org.income_explanation_role_id,
+		/** New pockets default to the organization creator while they are active. */
+		defaultOwnerId: activeMem(ctx.memberRows, org.creator_membership_id)?.id ?? null,
 		pockets: pockets.map((p) => {
 			const owner = activeMem(ctx.memberRows, p.owner_membership_id);
 			return {

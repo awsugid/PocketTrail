@@ -59,6 +59,13 @@ await withWorker(async () => {
 		);
 		await noJsPage.screenshot({ path: `${ROOT}/.wrangler/ui/orgs-1440-nojs.png`, fullPage: true });
 		shots.push('orgs-1440-nojs.png');
+		// Native baseline: selects, date and time render server-side and post the right values.
+		await noJsPage.goto(`${ORIGIN}/org/demo-jakarta/transactions/new`);
+		check(
+			'without JavaScript the form uses native controls',
+			(await noJsPage.locator('select[name=pocket_id], select[name=direction], input[type=date][name=date], input[type=time][name=time]').count()) === 4 &&
+				(await noJsPage.locator('button.ui-trigger').count()) === 0
+		);
 		await noJs.close();
 
 		const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -367,6 +374,9 @@ await withWorker(async () => {
 		await page.goto(`${ORIGIN}/org/demo-jakarta/settings/routing`);
 		const label = page.locator('input#mapping-pattern');
 		await label.waitFor();
+		// Nothing is preselected: the known labels depend on the pocket, chosen first.
+		await page.locator('button#mapping-pocket').click();
+		await page.getByRole('option').first().click();
 		await label.click();
 		await page.getByRole('option', { name: 'Demo Print Shop' }).waitFor();
 		check(
@@ -408,7 +418,7 @@ await withWorker(async () => {
 		await revoke.click();
 		const confirmGroup = page.getByRole('group').filter({ hasText: 'Revoke Bob' });
 		check('revoke asks inline, not in a dialog', (await confirmGroup.count()) === 1 && dialogs === 0 && (await page.locator('dialog[open]').count()) === 0);
-		check('focus moves to the confirm button', (await page.evaluate(() => document.activeElement?.textContent?.trim())) === 'Revoke');
+		check('focus moves to Cancel, the safe choice, not the destructive button', (await page.evaluate(() => document.activeElement?.textContent?.trim())) === 'Cancel');
 		await page.screenshot({ path: `${ROOT}/.wrangler/ui/confirm-1440.png`, fullPage: true });
 		shots.push('confirm-1440.png');
 		await page.keyboard.press('Escape');
@@ -428,6 +438,8 @@ await withWorker(async () => {
 		await page.waitForFunction(() => document.querySelector('form[action$="/settings/invitations"]') !== null);
 		await page.waitForTimeout(300);
 		await page.locator('input#invite-email').fill('bob@example.test');
+		await page.locator('button#invite-role').click();
+		await page.getByRole('option').first().click();
 		await page.getByRole('button', { name: 'Invite' }).click();
 		const inviteAlert = page.locator('form[action$="/settings/invitations"] .form-error');
 		await inviteAlert.waitFor();
@@ -506,6 +518,29 @@ await withWorker(async () => {
 		check('coarse pointer: ledger links are 44px', sizes.coarse && sizes.ledgerLink >= 44, JSON.stringify(sizes));
 		check('coarse pointer: top bar menu triggers are 44px', sizes.trigger >= 44, JSON.stringify(sizes));
 		await touch.close();
+
+		// Last, because it adds a ledger row: a JavaScript-disabled context posts native controls.
+		const noJsEnd = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 1440, height: 900 } });
+		const noJsPage2 = await noJsEnd.newPage();
+		await signIn(noJsPage2, 'Alice');
+		await noJsPage2.goto(`${ORIGIN}/org/demo-jakarta/transactions/new`);
+		await noJsPage2.locator('select[name=pocket_id]').selectOption({ index: 1 });
+		await noJsPage2.locator('select[name=direction]').selectOption('in');
+		await noJsPage2.locator('input[name=amount]').fill('123456');
+		await noJsPage2.locator('input[name=date]').fill('2025-06-07');
+		await noJsPage2.locator('input[name=time]').fill('08:45');
+		await noJsPage2.locator('input[name=counterparty]').fill('NOJS-Counterparty');
+		await noJsPage2.getByRole('button', { name: 'Record' }).click();
+		await noJsPage2.waitForLoadState('load');
+		await noJsPage2.goto(`${ORIGIN}/org/demo-jakarta/transactions`);
+		const noJsRow = noJsPage2.locator('table.ledger tbody tr', { hasText: 'NOJS-Counterparty' });
+		const noJsText = (await noJsRow.count()) === 1 ? await noJsRow.innerText() : '';
+		check(
+			'a JavaScript-disabled submit records the chosen values',
+			noJsText.includes('123.456') && noJsText.includes('2025-06-07') && noJsText.includes('08:45'),
+			noJsText
+		);
+		await noJsEnd.close();
 
 		await context.close();
 	} finally {

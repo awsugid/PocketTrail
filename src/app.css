@@ -968,6 +968,28 @@ fieldset {
 	flex: 1 1 200px;
 }
 
+.money-input {
+	position: relative;
+	display: block;
+}
+
+.money-input__unit {
+	position: absolute;
+	inset: 0 auto 0 0;
+	display: grid;
+	place-items: center;
+	width: 36px;
+	color: var(--text-secondary);
+	font-size: 13px;
+	font-weight: 550;
+	pointer-events: none;
+}
+
+.money-input .input {
+	padding-left: 36px;
+	font-variant-numeric: tabular-nums;
+}
+
 .form-error:focus-visible {
 	outline: 2px solid var(--danger);
 	outline-offset: 2px;
@@ -1094,16 +1116,19 @@ form[aria-busy='true'] .btn[type='submit'] {
 }
 
 .confirm {
-	display: inline-flex;
+	display: flex;
+	flex-basis: 100%;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: 6px 8px;
+	gap: 8px 8px;
+	width: 100%;
 }
 
 .confirm__text {
+	flex: 1 1 100%;
 	color: var(--danger);
-	font-size: 13px;
-	font-weight: 550;
+	font-size: 14px;
+	font-weight: 600;
 }
 
 /* ---------------------------------------------------------------- tables */

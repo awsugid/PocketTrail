@@ -18,12 +18,11 @@
 	// Known statement labels of the chosen pocket that are not mapped yet. With
 	// none, the field is a plain input; the combobox still accepts a new label.
 	let pickedPocket = $state('');
-	const mappingPocket = $derived(pickedPocket || String(s.pockets[0]?.id ?? ''));
 	let mappingLabel = $state('');
 	const key = (label: string) => label.trim().toLowerCase();
 	const knownLabels = $derived.by(() => {
-		const mapped = new Set(s.mappings.filter((m) => String(m.pocketId) === mappingPocket).map((m) => key(m.pattern)));
-		const labels = s.pockets.find((pocket) => String(pocket.id) === mappingPocket)?.importedLabels ?? [];
+		const mapped = new Set(s.mappings.filter((m) => String(m.pocketId) === pickedPocket).map((m) => key(m.pattern)));
+		const labels = s.pockets.find((pocket) => String(pocket.id) === pickedPocket)?.importedLabels ?? [];
 		return labels.filter((label) => !mapped.has(key(label)));
 	});
 </script>
@@ -82,16 +81,16 @@
 						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 						<div class="form-grid">
 							<div class="field">
+								<label for="mapping-pocket">Pocket</label>
+								<Select id="mapping-pocket" name="pocket_id" items={s.pockets.map((pocket) => ({ value: String(pocket.id), label: pocket.name }))} bind:value={pickedPocket} required />
+							</div>
+							<div class="field">
 								<label for="mapping-pattern">Statement label <span class="req" aria-hidden="true">*</span></label>
 								{#if knownLabels.length > 0}
 									<Combobox id="mapping-pattern" name="pattern" options={knownLabels} bind:value={mappingLabel} required maxlength={300} />
 								{:else}
 									<input class="input" id="mapping-pattern" name="pattern" required maxlength="300" bind:value={mappingLabel} />
 								{/if}
-							</div>
-							<div class="field">
-								<label for="mapping-pocket">Pocket</label>
-								<Select id="mapping-pocket" name="pocket_id" items={s.pockets.map((pocket) => ({ value: String(pocket.id), label: pocket.name }))} bind:value={() => mappingPocket, (next) => (pickedPocket = next)} required />
 							</div>
 							<div class="field">
 								<label for="mapping-member">Responsible member</label>

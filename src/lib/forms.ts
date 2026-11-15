@@ -7,7 +7,7 @@
 // - a rejection renders inline in a focused alert and keeps what was typed,
 //   instead of replacing the page with the error screen.
 import { applyAction, enhance } from '$app/forms';
-import { goto } from '$app/navigation';
+import { beforeNavigate, goto } from '$app/navigation';
 
 export interface SubmitOptions {
 	/** Short consequence, asked inline before posting: "Revoke Alice? Access ends now." */
@@ -21,21 +21,25 @@ export interface SubmitOptions {
 let confirmCount = 0;
 
 /**
- * Two-step confirmation in place: the destructive button is swapped for
- * "message [Confirm] [Cancel]". Focus moves to Confirm; Escape or Cancel
- * restores the button and its focus; a prompt left alone for ~5s reverts, but
- * never while focus is inside it. Interaction restarts the wait.
+ * Two-step confirmation: the destructive button is held in place (hidden, but
+ * keeping its width, so siblings do not move) and "message [Confirm] [Cancel]"
+ * opens on its own line below it, in the same row. Focus moves to Cancel, the
+ * safe choice; Escape or Cancel restores the button and its focus; a prompt
+ * left alone for ~5s reverts, but never while focus is inside it. Interaction
+ * restarts the wait.
  */
 function askConfirm(form: HTMLFormElement, trigger: HTMLElement | null, message: string, label = 'Confirm'): Promise<boolean> {
 	const anchor = trigger ?? form.querySelector<HTMLElement>('button[type=submit], button:not([type])');
 	if (!anchor) return Promise.resolve(true);
 	return new Promise((resolve) => {
-		const box = document.createElement('span');
+		const box = document.createElement('div');
 		box.className = 'confirm';
 		box.setAttribute('role', 'group');
 		const text = document.createElement('span');
 		text.className = 'confirm__text';
 		text.id = `confirm-${++confirmCount}`;
+		text.setAttribute('role', 'status');
+		text.setAttribute('aria-live', 'polite');
 		text.textContent = message;
 		box.setAttribute('aria-labelledby', text.id);
 		const yes = document.createElement('button');
@@ -46,13 +50,13 @@ function askConfirm(form: HTMLFormElement, trigger: HTMLElement | null, message:
 		no.type = 'button';
 		no.className = 'btn btn--sm';
 		no.textContent = 'Cancel';
-		box.append(text, yes, no);
+		box.append(text, no, yes);
 
 		let timer: ReturnType<typeof setTimeout>;
 		const done = (ok: boolean, refocus: boolean) => {
 			clearTimeout(timer);
 			box.remove();
-			anchor.hidden = false;
+			anchor.style.visibility = '';
 			if (refocus) anchor.focus();
 			resolve(ok);
 		};
@@ -70,15 +74,34 @@ function askConfirm(form: HTMLFormElement, trigger: HTMLElement | null, message:
 		box.addEventListener('pointermove', arm);
 		box.addEventListener('pointerdown', arm);
 
-		anchor.hidden = true;
-		anchor.after(box);
-		yes.focus();
+		anchor.style.visibility = 'hidden';
+		(form.closest('li') ?? form).append(box);
+		no.focus();
 		arm();
 	});
 }
 
+/** The control a person sees for a named field: the Select, DatePicker or
+ * Combobox trigger carries `data-field`; otherwise the named element itself. */
+function controlFor(form: HTMLFormElement, field: string): HTMLElement | null {
+	const visible = Array.from(form.querySelectorAll<HTMLElement>('[data-field]')).find((node) => node.dataset.field === field);
+	if (visible) return visible;
+	const named = form.elements.namedItem(field);
+	return named instanceof HTMLElement ? named : null;
+}
+
+/** Adds or removes one id in a space-separated token list attribute. */
+function toggleToken(element: HTMLElement, attribute: string, token: string, on: boolean) {
+	const tokens = new Set((element.getAttribute(attribute) ?? '').split(/\s+/).filter(Boolean));
+	if (on) tokens.add(token);
+	else tokens.delete(token);
+	if (tokens.size > 0) element.setAttribute(attribute, [...tokens].join(' '));
+	else element.removeAttribute(attribute);
+}
+
 /** Shows `message` in the form's alert, focuses it and scrolls it into view.
- * `field` (when the server names it) is marked invalid and described by it. */
+ * `field` (when the server names it) is marked invalid and described by it,
+ * alongside whatever hints already describe it. */
 function showError(form: HTMLFormElement, message: string, field?: string) {
 	let slot = form.querySelector<HTMLElement>(':scope > .form-error');
 	if (!slot) {
@@ -92,21 +115,23 @@ function showError(form: HTMLFormElement, message: string, field?: string) {
 		else form.append(slot);
 	}
 	slot.textContent = message;
-	const control = field ? form.elements.namedItem(field) : null;
-	if (control instanceof HTMLElement) {
+	const control = field ? controlFor(form, field) : null;
+	if (control) {
 		control.setAttribute('aria-invalid', 'true');
-		control.setAttribute('aria-describedby', slot.id);
+		toggleToken(control, 'aria-describedby', slot.id, true);
 	}
 	slot.scrollIntoView({ block: 'nearest' });
 	slot.focus({ preventScroll: true });
+	form.dispatchEvent(new CustomEvent('formerror'));
 }
 
 function clearError(form: HTMLFormElement) {
-	form.querySelector(':scope > .form-error')?.remove();
-	for (const control of form.querySelectorAll('[aria-invalid]')) {
+	const slot = form.querySelector<HTMLElement>(':scope > .form-error');
+	for (const control of form.querySelectorAll<HTMLElement>('[aria-invalid]')) {
 		control.removeAttribute('aria-invalid');
-		control.removeAttribute('aria-describedby');
+		if (slot) toggleToken(control, 'aria-describedby', slot.id, false);
 	}
+	slot?.remove();
 }
 
 const submitterOf = (submitter: HTMLElement | null) => (submitter instanceof HTMLButtonElement ? submitter : null);
@@ -177,8 +202,8 @@ export function guard(form: HTMLFormElement, options: SubmitOptions = {}) {
 				if (current.reset) form.reset();
 				await goto(response.url, { invalidateAll: true, noScroll: true, keepFocus: true });
 			} else {
-				const body = (await response.json().catch(() => null)) as { message?: string } | null;
-				showError(form, body?.message ?? 'Not saved.');
+				const body = (await response.json().catch(() => null)) as { message?: unknown; field?: unknown } | null;
+				showError(form, String(body?.message ?? 'Not saved.'), typeof body?.field === 'string' ? body.field : undefined);
 			}
 		} catch {
 			showError(form, 'Could not reach the server. Nothing was saved.');
@@ -198,25 +223,99 @@ export function guard(form: HTMLFormElement, options: SubmitOptions = {}) {
 	};
 }
 
-/** `use:unsavedGuard` warns before leaving a form with typed-in values. It is
- * in-memory only (financial drafts are never persisted) and clears when the
- * form is reset, which `use:submit={{ reset: true }}` does after a success. Combine with `use:submit` on the same form. */
+// Forms with typed-in, unsent values. `LeaveGuard` (mounted once, in the root
+// layout) consults this on in-app navigation; `beforeunload` covers leaving the
+// site. Memory only: financial drafts are never stored.
+const dirtyForms = new Map<HTMLFormElement, (leave: () => void) => void>();
+
+/** Called once from the root layout: an in-app navigation away from a dirty
+ * form is held and the form shows an inline "Keep editing / Leave" choice. */
+export function leaveGuard() {
+	beforeNavigate((navigation) => {
+		if (!navigation.to || navigation.willUnload || navigation.type === 'leave') return;
+		const [form, prompt] = [...dirtyForms].find(([node]) => node.isConnected) ?? [];
+		if (!form || !prompt) return;
+		const target = navigation.to.url;
+		navigation.cancel();
+		prompt(() => {
+			dirtyForms.delete(form);
+			void goto(target);
+		});
+	});
+}
+
+/** `use:unsavedGuard` warns before a form with typed-in values is left: by
+ * closing the tab (`beforeunload`) or by an in-app link (inline choice). It
+ * clears on reset and when the form is submitted, and returns when a rejected
+ * submit leaves the typed values on screen. Combine with `use:submit`. */
 export function unsavedGuard(form: HTMLFormElement) {
 	let dirty = false;
-	const mark = () => (dirty = true);
-	const clear = () => (dirty = false);
+	let bar: HTMLElement | null = null;
+	const closeBar = () => {
+		bar?.remove();
+		bar = null;
+	};
+	const set = (value: boolean) => {
+		dirty = value;
+		if (value) dirtyForms.set(form, prompt);
+		else {
+			dirtyForms.delete(form);
+			closeBar();
+		}
+	};
+	function prompt(leave: () => void) {
+		closeBar();
+		const box = document.createElement('div');
+		box.className = 'confirm confirm--leave';
+		box.setAttribute('role', 'group');
+		const text = document.createElement('span');
+		text.className = 'confirm__text';
+		text.id = `leave-${++confirmCount}`;
+		text.setAttribute('role', 'status');
+		text.setAttribute('aria-live', 'polite');
+		text.textContent = 'Unsaved changes will be lost.';
+		box.setAttribute('aria-labelledby', text.id);
+		const keep = document.createElement('button');
+		keep.type = 'button';
+		keep.className = 'btn btn--sm';
+		keep.textContent = 'Keep editing';
+		const go = document.createElement('button');
+		go.type = 'button';
+		go.className = 'btn btn--sm btn--danger btn--solid';
+		go.textContent = 'Leave';
+		box.append(text, keep, go);
+		keep.addEventListener('click', () => {
+			closeBar();
+			form.querySelector<HTMLElement>('input, textarea, button')?.focus();
+		});
+		go.addEventListener('click', leave);
+		box.addEventListener('keydown', (event) => {
+			if (event.key === 'Escape') keep.click();
+		});
+		bar = box;
+		form.append(box);
+		box.scrollIntoView({ block: 'nearest' });
+		keep.focus();
+	}
+	const mark = () => set(true);
+	const clear = () => set(false);
 	const warn = (event: BeforeUnloadEvent) => {
 		if (dirty) event.preventDefault();
 	};
 	form.addEventListener('input', mark);
 	form.addEventListener('change', mark);
+	form.addEventListener('formerror', mark);
 	form.addEventListener('reset', clear);
+	form.addEventListener('submit', clear);
 	window.addEventListener('beforeunload', warn);
 	return {
 		destroy() {
+			dirtyForms.delete(form);
 			form.removeEventListener('input', mark);
 			form.removeEventListener('change', mark);
+			form.removeEventListener('formerror', mark);
 			form.removeEventListener('reset', clear);
+			form.removeEventListener('submit', clear);
 			window.removeEventListener('beforeunload', warn);
 		}
 	};

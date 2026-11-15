@@ -86,7 +86,7 @@
 							<div class="form-grid">
 								<div class="field">
 									<label for="stock-direction">Direction</label>
-									<Select id="stock-direction" name="direction" items={[{ value: 'add', label: 'Add' }, { value: 'remove', label: 'Remove' }]} />
+									<Select id="stock-direction" name="direction" items={[{ value: 'add', label: 'Add' }, { value: 'remove', label: 'Remove' }]} value="add" required />
 								</div>
 								<div class="field">
 									<label for="stock-quantity">Quantity</label>

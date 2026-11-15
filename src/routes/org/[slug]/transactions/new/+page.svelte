@@ -1,6 +1,8 @@
 <script lang="ts">
 	import Select from '$lib/components/ui/Select.svelte';
 	import DatePicker from '$lib/components/ui/DatePicker.svelte';
+	import MoneyInput from '$lib/components/ui/MoneyInput.svelte';
+	import TimeField from '$lib/components/ui/TimeField.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
@@ -11,7 +13,6 @@
 	let { data }: { data: PageData } = $props();
 
 	const slug = $derived(data.shell.org.slug);
-	const today = new Date().toISOString().slice(0, 10);
 </script>
 
 <svelte:head>
@@ -41,19 +42,19 @@
 						</div>
 						<div class="field">
 							<label for="new-direction">Direction</label>
-							<Select id="new-direction" name="direction" items={[{ value: 'out', label: 'Money out' }, { value: 'in', label: 'Money in' }]} required />
+							<Select id="new-direction" name="direction" items={[{ value: 'out', label: 'Money out' }, { value: 'in', label: 'Money in' }]} value="out" required />
 						</div>
 						<div class="field">
 							<label for="new-amount">Amount (IDR) <span class="req" aria-hidden="true">*</span></label>
-							<input class="input" id="new-amount" name="amount" inputmode="decimal" required placeholder="150000" />
+							<MoneyInput id="new-amount" name="amount" required />
 						</div>
 						<div class="field">
 							<label for="new-date">Date</label>
-							<DatePicker id="new-date" name="date" value={today} required />
+							<DatePicker id="new-date" name="date" value={data.today} required />
 						</div>
 						<div class="field">
 							<label for="new-time">Time</label>
-							<input class="input" id="new-time" name="time" type="time" />
+							<TimeField id="new-time" name="time" />
 						</div>
 						<div class="field">
 							<label for="new-counterparty">Counterparty <span class="req" aria-hidden="true">*</span></label>
@@ -65,7 +66,7 @@
 						</div>
 						<div class="field">
 							<label for="new-balance">Balance after</label>
-							<input class="input" id="new-balance" name="balance" inputmode="decimal" />
+							<MoneyInput id="new-balance" name="balance" />
 						</div>
 						<div class="field">
 							<label for="new-responsible">Responsible</label>

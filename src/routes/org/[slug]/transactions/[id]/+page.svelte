@@ -4,7 +4,7 @@
 	import Notice from '$lib/components/Notice.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
-	import { submit } from '$lib/forms';
+	import { submit, unsavedGuard } from '$lib/forms';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -122,7 +122,7 @@
 							<p class="muted">Nothing recorded.</p>
 						{/if}
 					{:else}
-						<form method="POST" action="?/details" class="form" use:submit>
+						<form method="POST" action="?/details" class="form" use:submit use:unsavedGuard>
 							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 							<input type="hidden" name="revision" value={txn.revision} />
 							<div class="field">

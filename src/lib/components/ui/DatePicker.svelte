@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Calendar, Popover } from 'bits-ui';
 	import { CalendarDate, type DateValue } from '@internationalized/date';
+	import { enhanced, onFormReset } from '$lib/controls.svelte';
 	import { fmtDate } from '$lib/fmt';
 	import Icon from '../Icon.svelte';
 
@@ -14,6 +15,7 @@
 	}
 
 	let { id, name, value = $bindable(''), required = false, clearable = false }: Props = $props();
+	const initial = value;
 
 	const parse = (iso: string): CalendarDate | undefined => {
 		const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
@@ -26,12 +28,27 @@
 	});
 </script>
 
+{#if !enhanced.on}
+	<!-- No-JS baseline: the browser's own date control posts the same ISO value. -->
+	<input class="input" {id} {name} {required} type="date" bind:value />
+{:else}
+<span hidden {@attach onFormReset(() => (value = initial))}></span>
 <Popover.Root bind:open>
-	<Popover.Trigger {id} class="input ui-trigger" aria-required={required || undefined}>
+	<Popover.Trigger
+		{id}
+		data-field={name}
+		class="input ui-trigger"
+		aria-required={required || undefined}
+		onkeydown={(event) => {
+			// Optional dates clear from the keyboard; a required date is corrected by picking another.
+			if (clearable && value && (event.key === 'Backspace' || event.key === 'Delete')) value = '';
+		}}
+	>
 		<span class="ui-trigger__text" class:muted={!value}>{value ? fmtDate(value) : 'Pick a date'}</span>
 		<Icon name="calendar" size={16} class="ui-trigger__caret" />
 	</Popover.Trigger>
-	<input type="hidden" {name} {value} />
+	<!-- Visually hidden, not type=hidden, so native required validation still applies. -->
+	<input class="visually-hidden" tabindex="-1" aria-hidden="true" {name} {value} {required} onfocus={() => document.getElementById(id)?.focus()} />
 	<Popover.Portal>
 		<Popover.Content class="ui-popover ui-popover--calendar" sideOffset={4} collisionPadding={12} aria-label="Choose a date">
 			<Calendar.Root
@@ -88,3 +105,4 @@
 		</Popover.Content>
 	</Popover.Portal>
 </Popover.Root>
+{/if}
