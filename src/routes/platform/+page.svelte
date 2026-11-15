@@ -12,19 +12,6 @@
 	let { data }: { data: PageData } = $props();
 
 	const p = $derived(data.platform);
-
-	const permissionOptions = [
-		['ViewTransactions', 'View transactions'],
-		['CommentTransactions', 'Comment on transactions'],
-		['DocumentTransactions', 'Document transactions'],
-		['ApproveTransactions', 'Approve or request changes'],
-		['ImportStatements', 'Import statements'],
-		['ManageRoles', 'Manage roles'],
-		['ManageMembers', 'Manage members'],
-		['ManageNotifications', 'Manage notifications'],
-		['SuppressNotifications', 'Suppress notifications'],
-		['UpdateStock', 'Update stock']
-	] as const;
 </script>
 
 <svelte:head>
@@ -125,8 +112,8 @@
 					<fieldset>
 						<legend class="visually-hidden">Permissions</legend>
 						<div class="checks">
-							{#each permissionOptions as [id, label] (id)}
-								<Checkbox name="perm" value={id}>{label}</Checkbox>
+							{#each p.permissions as permission (permission.id)}
+								<Checkbox name="perm" value={permission.id}>{permission.label}</Checkbox>
 							{/each}
 						</div>
 					</fieldset>

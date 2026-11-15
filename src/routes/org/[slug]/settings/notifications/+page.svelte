@@ -39,15 +39,21 @@
 		<Notice tone="warning">Notification settings need the manage-notifications permission.</Notice>
 	{:else}
 		<div class="stack">
-			<section class="panel" aria-labelledby="preview-heading">
-				<div class="panel__head"><Icon name="people" size={16} /><h2 id="preview-heading">Preview recipients</h2></div>
+			<section class="panel" aria-labelledby="settings-heading">
+				<div class="panel__head"><Icon name="settings" size={16} /><h2 id="settings-heading">Delivery</h2></div>
 				<div class="panel__body stack">
-					<form method="GET" action={base} class="form form--inline">
+					<form method="POST" action="?/saveNotifications" class="form" use:submit>
+						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
+						<input type="hidden" name="preview_token" value={s.previewToken} />
+						<Checkbox name="enabled" checked={s.notifications.enabled}>Enable notifications for this organization</Checkbox>
 						<div class="field">
 							<label for="cutoff">Transaction-date cutoff</label>
-							<DatePicker id="cutoff" name="cutoff_date" value={s.notificationPreviewCutoff} required />
+							<DatePicker id="cutoff" name="cutoff_date" value={s.notificationPreviewCutoff} clearable />
 						</div>
-						<button class="btn" type="submit"><Icon name="filter" size={16} />Preview</button>
+						<div class="form-actions">
+							<button class="btn" type="submit" formaction="?/preview"><Icon name="filter" size={16} />Preview</button>
+							<button class="btn btn--primary" type="submit"><Icon name="check" size={16} />Save</button>
+						</div>
 					</form>
 
 					{#if preview}
@@ -70,30 +76,13 @@
 							{/if}
 						</div>
 					{/if}
-				</div>
-			</section>
 
-			<section class="panel" aria-labelledby="settings-heading">
-				<div class="panel__head"><Icon name="settings" size={16} /><h2 id="settings-heading">Delivery</h2></div>
-				<div class="panel__body stack">
-					<form method="POST" action="?/saveNotifications" class="form" use:submit>
+					<form method="POST" action="/org/{slug}/notifications/digest" class="form form--inline" use:guard>
 						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
-						<input type="hidden" name="preview_token" value={s.previewToken} />
-						<Checkbox name="enabled" checked={s.notifications.enabled}>Enable notifications for this organization</Checkbox>
-						<div class="field">
-							<label for="cutoff-save">Transaction-date cutoff</label>
-							<DatePicker id="cutoff-save" name="cutoff_date" value={s.notifications.cutoffDate ?? ''} clearable />
-							<p class="hint">Preview this cutoff first. Mentions ignore the cutoff.</p>
-						</div>
-						<div class="form-actions">
-							<button class="btn btn--primary" type="submit"><Icon name="check" size={16} />Save</button>
-						</div>
-					</form>
-					<form method="POST" action="/org/{slug}/notifications/digest" use:guard>
-						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
-						<button class="btn" type="submit" disabled={!s.notifications.enabled}>
+						<button class="btn" type="submit" disabled={!s.notifications.enabled} aria-describedby="digest-why">
 							<Icon name="mail" size={16} />Capture weekly digests
 						</button>
+						{#if !s.notifications.enabled}<span class="hint" id="digest-why">Turn notifications on first.</span>{/if}
 					</form>
 				</div>
 			</section>

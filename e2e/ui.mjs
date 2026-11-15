@@ -254,8 +254,9 @@ await withWorker(async () => {
 		check(
 			'settings overview links each section once, with status',
 			(await page.locator('h1').count()) === 1 &&
-				(await page.locator('nav[aria-label="Settings sections"] a[href*="/settings/"]').count()) === 5,
-			String(await page.locator('nav[aria-label="Settings sections"] a').count())
+				(await page.locator('nav[aria-label="Settings status"] a[href*="/settings/"]').count()) === 5 &&
+					(await page.locator('nav[aria-label="Settings sections"] a[aria-current="page"]').innerText()).trim() === 'Overview',
+			String(await page.locator('nav[aria-label="Settings status"] a').count())
 		);
 		for (const section of ['pockets', 'routing', 'people', 'roles', 'notifications']) {
 			await page.goto(`${ORIGIN}/org/demo-jakarta/settings/${section}`);
@@ -265,6 +266,16 @@ await withWorker(async () => {
 					(await page.locator('h1').first().innerText()).toLowerCase() === section
 			);
 		}
+		await page.goto(`${ORIGIN}/org/demo-jakarta/settings/roles`);
+		await page.locator('table.matrix').waitFor();
+		const matrix = await page.evaluate(() => ({
+			forms: document.querySelectorAll('main form[action="?/saveRoles"]').length,
+			saves: document.querySelectorAll('main form[action="?/saveRoles"] button[type=submit]').length,
+			disabled: document.querySelector('main form[action="?/saveRoles"] button[type=submit]')?.disabled
+		}));
+		check('roles are one matrix form with one Save, disabled until something changes', matrix.forms === 1 && matrix.saves === 1 && matrix.disabled === true, JSON.stringify(matrix));
+		await page.locator('table.matrix tbody .ui-check').first().click();
+		check('editing the matrix enables Save', await page.locator('main form[action="?/saveRoles"] button[type=submit]').isEnabled());
 		await page.goto(`${ORIGIN}/org/demo-jakarta/settings`);
 		await page.screenshot({ path: `${ROOT}/.wrangler/ui/settings-1440.png`, fullPage: true });
 		shots.push('settings-1440.png');
@@ -405,7 +416,7 @@ await withWorker(async () => {
 		await cutoff.waitFor();
 		check(
 			'cutoff shows a human date and submits ISO',
-			(await cutoff.innerText()).trim() === '1 Jan 2025' && (await page.locator('input[name="cutoff_date"]').first().inputValue()) === '2025-01-01',
+			(await cutoff.innerText()).trim() === '1 Jan 2025' && (await page.locator('input[name="cutoff_date"]').count()) === 1 && (await page.locator('input[name="cutoff_date"]').first().inputValue()) === '2025-01-01',
 			await cutoff.innerText()
 		);
 

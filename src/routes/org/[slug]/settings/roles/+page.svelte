@@ -6,12 +6,32 @@
 	import OrgShell from '$lib/components/OrgShell.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
 	import SettingsNav from '$lib/components/SettingsNav.svelte';
-	import { submit } from '$lib/forms';
+	import { enhanced } from '$lib/controls.svelte';
+	import { submit, unsavedGuard } from '$lib/forms';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
 	const s = $derived(data.settings);
+	const labelOf = $derived(new Map(s.permissions.map((permission) => [permission.id, permission.label])));
+
+	// The matrix draft: name and granted permissions per role. Save is enabled
+	// only while the draft differs from what is stored.
+	type Draft = Record<number, { name: string; granted: Record<string, boolean> }>;
+	const saved = (): Draft =>
+		Object.fromEntries(
+			s.roles.map((role) => [role.id, { name: role.name, granted: Object.fromEntries(s.permissions.map((permission) => [permission.id, role.permissions.includes(permission.id)])) }])
+		);
+	let draft = $state<Draft>(saved());
+	$effect(() => {
+		draft = saved();
+	});
+	const dirty = $derived(
+		s.roles.some((role) => {
+			const row = draft[role.id];
+			return !row || row.name !== role.name || s.permissions.some((permission) => row.granted[permission.id] !== role.permissions.includes(permission.id));
+		})
+	);
 </script>
 
 <svelte:head>
@@ -25,14 +45,13 @@
 	{#if s.msg}<Notice tone="success">{s.msg}</Notice>{/if}
 
 	{#if !s.can.roles}
-		<Notice tone="warning">Editing roles needs the manage-roles permission.</Notice>
 		<div class="panel">
 			<ul class="rows">
 				{#each s.roles as role (role.id)}
 					<li>
 						<div class="rows__main">
 							<strong>{role.name}</strong>
-							<span class="rows__sub">{role.permissions.join(', ') || 'No permissions'}</span>
+							<span class="rows__sub">{role.permissions.map((id) => labelOf.get(id) ?? id).join(' · ') || 'No permissions'}</span>
 						</div>
 					</li>
 				{/each}
@@ -40,33 +59,50 @@
 		</div>
 	{:else}
 		<div class="stack">
-			<Notice tone="info">Roles that work with transactions also need <strong>View transactions</strong>.</Notice>
-			{#each s.roles as role (role.id)}
-				<section class="panel" aria-labelledby="role-{role.id}-heading">
-					<div class="panel__head"><Icon name="roles" size={16} /><h2 id="role-{role.id}-heading">{role.name}</h2></div>
-					<div class="panel__body">
-						<form method="POST" action="?/updateRole" class="form" use:submit>
-							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
-							<input type="hidden" name="id" value={role.id} />
-							<div class="field">
-								<label for="role-name-{role.id}">Name</label>
-								<input class="input" id="role-name-{role.id}" name="name" value={role.name} required maxlength="100" />
-							</div>
-							<fieldset>
-								<legend class="visually-hidden">Permissions of {role.name}</legend>
-								<div class="checks">
-									{#each s.permissions as permission (permission.id)}
-										<Checkbox name="perm" value={permission.id} checked={role.permissions.includes(permission.id)}>{permission.label}</Checkbox>
+			<section class="panel" aria-labelledby="matrix-heading">
+				<div class="panel__head"><Icon name="roles" size={16} /><h2 id="matrix-heading">Roles</h2><span class="count">{s.roles.length}</span></div>
+				<form method="POST" action="?/saveRoles" use:submit use:unsavedGuard>
+					<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
+					<div class="table-scroll">
+						<table class="ledger matrix">
+							<caption class="visually-hidden">Permissions granted by each role</caption>
+							<thead>
+								<tr>
+									<th scope="col">Permission</th>
+									{#each s.roles as role (role.id)}
+										<th scope="col">
+											<label class="visually-hidden" for="role-name-{role.id}">Name of {role.name}</label>
+											<input class="input" id="role-name-{role.id}" name="name:{role.id}" bind:value={draft[role.id]!.name} required maxlength="100" />
+										</th>
 									{/each}
-								</div>
-							</fieldset>
-							<div class="form-actions">
-								<button class="btn" type="submit"><Icon name="check" size={16} />Save<span class="visually-hidden"> {role.name}</span></button>
-							</div>
-						</form>
+								</tr>
+							</thead>
+							<tbody>
+								{#each s.permissions as permission (permission.id)}
+									<tr>
+										<th scope="row">
+											{permission.label}
+											{#if permission.id === 'ViewTransactions'}<span class="cell__sub">Needed by every working role</span>{/if}
+										</th>
+										{#each s.roles as role (role.id)}
+											<td class="cell--check">
+												<Checkbox name="perm:{role.id}" value={permission.id} bind:checked={draft[role.id]!.granted[permission.id]}>
+													<span class="visually-hidden">{role.name}: {permission.label}</span>
+												</Checkbox>
+											</td>
+										{/each}
+									</tr>
+								{/each}
+							</tbody>
+						</table>
 					</div>
-				</section>
-			{/each}
+					<div class="panel__body panel__body--ruled">
+						<div class="form-actions">
+							<button class="btn btn--primary" type="submit" disabled={enhanced.on && !dirty}><Icon name="check" size={16} />Save</button>
+						</div>
+					</div>
+				</form>
+			</section>
 
 			<section class="panel" aria-labelledby="new-role-heading">
 				<div class="panel__head"><Icon name="plus" size={16} /><h2 id="new-role-heading">New role</h2></div>

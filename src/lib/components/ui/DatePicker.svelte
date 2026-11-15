@@ -12,9 +12,11 @@
 		value?: string;
 		required?: boolean;
 		clearable?: boolean;
+		/** Id of a form elsewhere on the page that this field belongs to. */
+		form?: string;
 	}
 
-	let { id, name, value = $bindable(''), required = false, clearable = false }: Props = $props();
+	let { id, name, value = $bindable(''), required = false, clearable = false, form }: Props = $props();
 	const initial = value;
 
 	const parse = (iso: string): CalendarDate | undefined => {
@@ -30,7 +32,7 @@
 
 {#if !enhanced.on}
 	<!-- No-JS baseline: the browser's own date control posts the same ISO value. -->
-	<input class="input" {id} {name} {required} type="date" bind:value />
+	<input class="input" {id} {name} {form} {required} type="date" bind:value />
 {:else}
 <span hidden {@attach onFormReset(() => (value = initial))}></span>
 <Popover.Root bind:open>
@@ -48,7 +50,7 @@
 		<Icon name="calendar" size={16} class="ui-trigger__caret" />
 	</Popover.Trigger>
 	<!-- Visually hidden, not type=hidden, so native required validation still applies. -->
-	<input class="visually-hidden" tabindex="-1" aria-hidden="true" {name} {value} {required} onfocus={() => document.getElementById(id)?.focus()} />
+	<input class="visually-hidden" tabindex="-1" aria-hidden="true" {name} {form} {value} {required} onfocus={() => document.getElementById(id)?.focus()} />
 	<Popover.Portal>
 		<Popover.Content class="ui-popover ui-popover--calendar" sideOffset={4} collisionPadding={12} aria-label="Choose a date">
 			<Calendar.Root

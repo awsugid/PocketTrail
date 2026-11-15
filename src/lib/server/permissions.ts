@@ -21,19 +21,9 @@ export const PERMISSIONS = [
 
 export type Permission = (typeof PERMISSIONS)[number];
 
-/** Organizer-facing wording; mirrors perm_label in src/domain_map.rs. */
-export const PERMISSION_LABELS: Record<Permission, string> = {
-	ViewTransactions: 'View transactions',
-	CommentTransactions: 'Comment on transactions',
-	DocumentTransactions: 'Document transactions',
-	ApproveTransactions: 'Approve or request changes',
-	ImportStatements: 'Import statements and manage actor mappings',
-	ManageRoles: 'Manage roles',
-	ManageMembers: 'Manage members',
-	ManageNotifications: 'Manage notifications',
-	SuppressNotifications: 'Suppress transaction notifications',
-	UpdateStock: 'Update stock'
-};
+import { PERMISSION_LABELS } from '$lib/domain';
+
+export { PERMISSION_LABELS };
 
 const KNOWN = new Set<string>(PERMISSIONS);
 

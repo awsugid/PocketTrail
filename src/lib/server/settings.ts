@@ -242,10 +242,10 @@ export async function settingsPageData(ctx: TenantContext, url: URL) {
 /** Validate and serialize a form's `perm` checkbox set. Unknown permissions are
  * rejected; a nonempty working role must include ViewTransactions; the stored
  * JSON array is sorted (Rust BTreeSet order). */
-export function permissionBundle(form: FormData): string {
+export function permissionBundle(form: FormData, field = 'perm'): string {
 	const allowed = new Set<string>(PERMISSIONS);
 	const requested = new Set<string>();
-	for (const value of form.getAll('perm')) {
+	for (const value of form.getAll(field)) {
 		if (typeof value === 'string') requested.add(value);
 	}
 	if (![...requested].every((p) => allowed.has(p))) {
@@ -262,35 +262,47 @@ export function permissionBundle(form: FormData): string {
 
 // ---------------------------------------------------------------- roles
 
-export async function saveRole(ctx: SettingsCtx, form: FormData, id: number | null): Promise<never> {
+export async function saveRole(ctx: SettingsCtx, form: FormData): Promise<never> {
 	const name = str(form, 'name').trim();
 	if (name === '' || name.length > 100) throw error(400, 'Role name must be 1–100 characters.');
 	const permissions = permissionBundle(form);
 	const roles = await rolesOfOrg(ctx.db, ctx.org.id);
-	if (id !== null && !roles.some((r) => r.id === id)) {
-		throw error(404, 'Role not found in this organization.');
-	}
-	if (roles.some((r) => r.id !== id && r.name.toLowerCase() === name.toLowerCase())) {
+	if (roles.some((r) => r.name.toLowerCase() === name.toLowerCase())) {
 		throw error(400, 'An organization role already uses that name.');
 	}
-	if (id !== null) {
+	await ctx.db.batch([
+		ctx.db.prepare('INSERT INTO roles(org_id,name,permissions) VALUES(?1,?2,?3)').bind(ctx.org.id, name, permissions),
+		committed(ctx.db, ctx.org.id, ctx.user.id, 'role.created', `role:${name}`)
+	]);
+	return redirect(303, backPath(ctx.org.slug, 'Role saved', ctx.section));
+}
+
+/** The roles matrix: every role's name and permission set in one submit, one
+ * atomic batch. Fields are `name:<roleId>` and `perm:<roleId>` (repeated). */
+export async function saveRoles(ctx: SettingsCtx, form: FormData): Promise<never> {
+	const roles = await rolesOfOrg(ctx.db, ctx.org.id);
+	const next = roles.map((role) => {
+		const name = str(form, `name:${role.id}`).trim();
+		if (name === '' || name.length > 100) throw error(400, 'Role name must be 1–100 characters.');
+		return { role, name, permissions: permissionBundle(form, `perm:${role.id}`) };
+	});
+	const seen = new Set<string>();
+	for (const { name } of next) {
+		if (seen.has(name.toLowerCase())) throw error(400, 'An organization role already uses that name.');
+		seen.add(name.toLowerCase());
+	}
+	const changed = next.filter(({ role, name, permissions }) => role.name !== name || role.permissions !== permissions);
+	if (changed.length > 0) {
 		// Change-gated audit: a role deleted by a concurrent request matches zero
 		// rows and must not record a committed event.
-		await ctx.db.batch([
-			ctx.db
-				.prepare('UPDATE roles SET name=?1,permissions=?2 WHERE id=?3 AND org_id=?4')
-				.bind(name, permissions, id, ctx.org.id),
-			committedIfChanged(ctx.db, ctx.org.id, ctx.user.id, 'role.updated', `role:${id}`)
-		]);
-	} else {
-		await ctx.db.batch([
-			ctx.db
-				.prepare('INSERT INTO roles(org_id,name,permissions) VALUES(?1,?2,?3)')
-				.bind(ctx.org.id, name, permissions),
-			committed(ctx.db, ctx.org.id, ctx.user.id, 'role.created', `role:${name}`)
-		]);
+		await ctx.db.batch(
+			changed.flatMap(({ role, name, permissions }) => [
+				ctx.db.prepare('UPDATE roles SET name=?1,permissions=?2 WHERE id=?3 AND org_id=?4').bind(name, permissions, role.id, ctx.org.id),
+				committedIfChanged(ctx.db, ctx.org.id, ctx.user.id, 'role.updated', `role:${role.id}`)
+			])
+		);
 	}
-	return redirect(303, backPath(ctx.org.slug, 'Role saved', ctx.section));
+	return redirect(303, backPath(ctx.org.slug, 'Roles saved', ctx.section));
 }
 
 // --------------------------------------------------------------- members

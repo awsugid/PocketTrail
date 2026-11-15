@@ -4,6 +4,7 @@
 	import Notice from '$lib/components/Notice.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
+	import SettingsNav from '$lib/components/SettingsNav.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -22,7 +23,9 @@
 		title: string;
 		icon: IconName;
 		/** Short count shown at the row's right edge. */
-		status?: string;
+		count?: string;
+		/** Longer facts shown under the title. */
+		detail?: string;
 		flag?: { tone: string; text: string };
 	}
 
@@ -34,7 +37,7 @@
 					href: `${base}/pockets`,
 					title: 'Pockets',
 					icon: 'pocket',
-					status: `${s.pockets.length}`,
+					count: `${s.pockets.length}`,
 					flag: noOwner > 0 ? { tone: 'needs', text: `${noOwner} without owner` } : undefined,
 					show: true
 				},
@@ -43,7 +46,8 @@
 					href: `${base}/routing`,
 					title: 'Routing',
 					icon: 'routing',
-					status: `${s.mappings.length} mapping${s.mappings.length === 1 ? '' : 's'} · income → ${incomeRole ?? 'pocket owner'}`,
+					count: `${s.mappings.length}`,
+					detail: `Income notes → ${incomeRole ?? 'pocket owners'}`,
 					show: s.can.mappings || s.can.roles
 				},
 				{
@@ -51,7 +55,7 @@
 					href: `${base}/people`,
 					title: 'People',
 					icon: 'people',
-					status: `${activeMembers} active`,
+					count: `${activeMembers} active`,
 					flag: s.invitations.length > 0 ? { tone: 'review', text: `${s.invitations.length} invited` } : undefined,
 					show: s.can.members
 				},
@@ -60,7 +64,7 @@
 					href: `${base}/roles`,
 					title: 'Roles',
 					icon: 'roles',
-					status: `${s.roles.length}`,
+					count: `${s.roles.length}`,
 					show: s.can.roles
 				},
 				{
@@ -82,19 +86,20 @@
 
 <OrgShell {...data.shell} active="settings">
 	<PageHead title="Settings" icon="settings" />
+	<SettingsNav current="overview" can={s.can} slug={slug} />
 
 	{#if s.msg}<Notice tone="success">{s.msg}</Notice>{/if}
 
 	<div class="stack">
-		<nav class="panel" aria-label="Settings sections">
+		<nav class="panel" aria-label="Settings status">
 			<ul class="rows rows--link">
 				{#each rows as row (row.key)}
 					<li>
 						<a href={row.href}>
 							<Icon name={row.icon} class="lead" />
-							<span class="rows__main"><strong>{row.title}</strong>{#if row.status && row.status.length > 12}<span class="rows__sub">{row.status}</span>{/if}</span>
+							<span class="rows__main"><strong>{row.title}</strong>{#if row.detail}<span class="rows__sub">{row.detail}</span>{/if}</span>
 							{#if row.flag}<span class="badge badge--{row.flag.tone}">{row.flag.text}</span>{/if}
-							{#if row.status && row.status.length <= 12}<span class="count">{row.status}</span>{/if}
+							{#if row.count}<span class="count">{row.count}</span>{/if}
 							<Icon name="chevron" size={16} class="tail" />
 						</a>
 					</li>

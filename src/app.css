@@ -905,9 +905,9 @@ fieldset {
 }
 
 .checks {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 8px 20px;
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+	gap: 4px 20px;
 }
 
 .check {
@@ -1166,6 +1166,42 @@ table.ledger tbody tr:last-child td {
 
 table.ledger tbody tr:hover td {
 	background: var(--row-hover);
+}
+
+table.ledger.matrix th[scope='row'] {
+	border-bottom: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--text);
+	font-size: 14px;
+	font-weight: 550;
+	white-space: normal;
+}
+
+table.ledger.matrix thead th:not(:first-child) {
+	min-width: 148px;
+	background: var(--surface);
+}
+
+table.ledger.matrix th:first-child {
+	position: sticky;
+	left: 0;
+	z-index: 1;
+	min-width: 200px;
+}
+
+table.ledger.matrix tbody tr:last-child th,
+table.ledger.matrix tbody tr:last-child td {
+	border-bottom: 0;
+}
+
+.cell--check {
+	text-align: center;
+	vertical-align: middle;
+}
+
+.cell--check .check {
+	justify-content: center;
+	min-height: 24px;
 }
 
 table.ledger th:first-child,

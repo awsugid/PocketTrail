@@ -9,7 +9,7 @@ import { assertFormCsrf, assertSameOrigin, requireLogin } from './auth';
 import { committed, listPlatform } from './audit';
 import { actionLabel, outcomeLabel, pageNumber, targetLabel } from './audit_rules';
 import { nowMs, qAll, qOne } from './db';
-import { parseRolePermissions, PERMISSION_LABELS } from './permissions';
+import { parseRolePermissions, PERMISSIONS, PERMISSION_LABELS } from './permissions';
 import { permissionBundle } from './settings';
 
 export async function requirePlatformAdmin(event: CtxEvent): Promise<LoginState> {
@@ -100,6 +100,7 @@ export async function platformPageData(login: LoginState, url: URL) {
 		usersTotal,
 		usersPrev: usersPage > 1 ? usersAt(usersPage - 1) : null,
 		usersNext: usersPage < pages(usersTotal) ? usersAt(usersPage + 1) : null,
+		permissions: PERMISSIONS.map((id) => ({ id, label: PERMISSION_LABELS[id] })),
 		roleTemplates: templates.map((t) => ({
 			id: t.id,
 			name: t.name,
