@@ -20,12 +20,28 @@ describe('invitation email', () => {
 			expect(content).toContain(invitation.organization);
 			expect(content).toContain(invitation.role);
 			expect(content).toContain(invitation.email);
-			expect(content).toContain('23 Nov 2026, 07:35 UTC');
+			expect(content).toContain('23 Nov 2026, 14:35 WIB (UTC+07:00)');
 			expect(content).toContain('Financial details stay in PocketTrail');
 		}
 		expect(message.body).toContain(invitation.acceptUrl);
 		expect(message.html).toContain('role="presentation"');
 		expect(message.html).not.toMatch(/<script|<img|<link|@import/i);
+	});
+
+	it('uses the Jakarta calendar date when expiry crosses midnight there', () => {
+		const message = invitationMessage({ ...invitation, expiresAt: Date.UTC(2026, 10, 23, 20, 35) });
+		for (const content of [message.body, message.html]) {
+			expect(content).toContain('24 Nov 2026, 03:35 WIB (UTC+07:00)');
+		}
+	});
+
+	it('centers the wordmark, content, button and footer with email-compatible alignment', () => {
+		const { html } = invitationMessage(invitation);
+		expect(html).toContain('text-align:center;">PocketTrail</td>');
+		expect(html).toContain('<tr><td align="center" style="padding:32px 24px;text-align:center;">');
+		expect(html).toContain('<table role="presentation" align="center"');
+		expect(html).toContain('style="margin:0 auto;"');
+		expect(html).toContain('padding:20px 24px 0;font-size:12px;line-height:20px;color:#62626b;text-align:center;');
 	});
 
 	it('escapes organization, role, mailbox and link data before inserting HTML', () => {
