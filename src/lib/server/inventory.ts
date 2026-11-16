@@ -2,8 +2,7 @@
 // who/what/when movement history, and the per-item movement page. Ported from
 // src/web/inventory.rs.
 //
-// Viewing requires an active membership (ViewTransactions stands in for stock
-// viewing, exactly as in Rust until the domain gains a dedicated permission).
+// Viewing accepts ledger viewers or independent inventory maintainers.
 // Recording changes requires UpdateStock. Every query is org-scoped, including
 // join conditions: inventory_levels has no org_id column, so scope rides the
 // item/location joins.
@@ -11,13 +10,14 @@
 import type { D1Database, D1PreparedStatement } from '$lib/d1';
 import { parseMinor } from '$lib/fmt';
 import { committedIfChanged } from './audit';
-import { nowMs, qAll, qOne } from './db';
+import { nowMs, qAll } from './db';
 import { memActive, type MemRow } from './rows';
 
 export interface InventoryItemRow {
 	id: number;
 	name: string;
 	variant: string;
+	archived_at: number | null;
 }
 
 export interface LevelRow {
@@ -30,9 +30,11 @@ export interface LevelRow {
 export interface LocationRow {
 	id: number;
 	name: string;
+	archived_at: number | null;
 }
 
 export interface MovementRow {
+	id: number;
 	created_at: number;
 	delta: number;
 	to_qty: number;
@@ -67,20 +69,11 @@ export function stockUpdateInput(
 	return { delta, reason };
 }
 
-async function orgRowExists(db: D1Database, table: 'inventory_items' | 'inventory_locations', id: number, orgId: number): Promise<boolean> {
-	const row = await qOne<{ id: number }>(
-		db,
-		`SELECT id FROM ${table} WHERE id = ?1 AND org_id = ?2`,
-		[id, orgId]
-	);
-	return row !== null;
-}
-
-export async function inventoryItems(db: D1Database, orgId: number): Promise<InventoryItemRow[]> {
+export async function inventoryItems(db: D1Database, orgId: number, includeArchived = false): Promise<InventoryItemRow[]> {
 	return qAll<InventoryItemRow>(
 		db,
-		'SELECT id, name, variant FROM inventory_items WHERE org_id = ?1 ORDER BY name, variant, id',
-		[orgId]
+		'SELECT id, name, variant, archived_at FROM inventory_items WHERE org_id = ?1 AND (?2=1 OR archived_at IS NULL) ORDER BY name, variant, id',
+		[orgId, includeArchived ? 1 : 0]
 	);
 }
 
@@ -96,18 +89,18 @@ export async function inventoryLevels(db: D1Database, orgId: number): Promise<Le
 	);
 }
 
-export async function inventoryLocations(db: D1Database, orgId: number): Promise<LocationRow[]> {
+export async function inventoryLocations(db: D1Database, orgId: number, includeArchived = false): Promise<LocationRow[]> {
 	return qAll<LocationRow>(
 		db,
-		'SELECT id, name FROM inventory_locations WHERE org_id = ?1 ORDER BY name',
-		[orgId]
+		'SELECT id, name, archived_at FROM inventory_locations WHERE org_id = ?1 AND (?2=1 OR archived_at IS NULL) ORDER BY name',
+		[orgId, includeArchived ? 1 : 0]
 	);
 }
 
 export async function itemMovements(db: D1Database, orgId: number, itemId: number): Promise<MovementRow[]> {
 	return qAll<MovementRow>(
 		db,
-		`SELECT sm.created_at, sm.delta, sm.to_qty, sm.reason, loc.name AS location_name, u.name AS member_name
+		`SELECT sm.id, sm.created_at, sm.delta, sm.to_qty, sm.reason, loc.name AS location_name, u.name AS member_name
 		 FROM stock_movements sm
 		 JOIN inventory_locations loc ON loc.id = sm.location_id AND loc.org_id = ?1
 		 JOIN memberships mem ON mem.id = sm.by_membership_id AND mem.org_id = ?1
@@ -157,7 +150,7 @@ export interface StockUpdate {
 	org_id: number;
 }
 
-/** The four-statement update chain, ported verbatim. The batch commits
+/** The four-statement update chain. The batch commits
  * atomically and serializes against concurrent writers: statement 2's
  * changes() decides accept/reject, and statements 3-4 only write when it
  * applied. */
@@ -165,13 +158,13 @@ export function stockUpdateStatements(db: D1Database, update: StockUpdate): D1Pr
 	const now = nowMs();
 	return [
 		db
-			.prepare('INSERT OR IGNORE INTO inventory_levels (item_id, location_id, qty) VALUES (?1, ?2, 0)')
-			.bind(update.item_id, update.location_id),
+			.prepare('INSERT OR IGNORE INTO inventory_levels (item_id, location_id, qty) SELECT ?1, ?2, 0 WHERE EXISTS(SELECT 1 FROM inventory_items WHERE id=?1 AND org_id=?3 AND archived_at IS NULL) AND EXISTS(SELECT 1 FROM inventory_locations WHERE id=?2 AND org_id=?3 AND archived_at IS NULL)')
+			.bind(update.item_id, update.location_id, update.org_id),
 		db
 			.prepare(
-				'UPDATE inventory_levels SET qty = qty + ?1 WHERE item_id = ?2 AND location_id = ?3 AND qty + ?1 >= 0 AND qty + ?1 <= 9000000000000000'
+				'UPDATE inventory_levels SET qty = qty + ?1 WHERE item_id = ?2 AND location_id = ?3 AND qty + ?1 >= 0 AND qty + ?1 <= 9000000000000000 AND EXISTS(SELECT 1 FROM inventory_items WHERE id=?2 AND org_id=?4 AND archived_at IS NULL) AND EXISTS(SELECT 1 FROM inventory_locations WHERE id=?3 AND org_id=?4 AND archived_at IS NULL)'
 			)
-			.bind(update.delta, update.item_id, update.location_id),
+			.bind(update.delta, update.item_id, update.location_id, update.org_id),
 		db
 			.prepare(
 				'INSERT INTO stock_movements (org_id, item_id, location_id, delta, from_qty, to_qty, reason, by_membership_id, created_at) SELECT ?1, ?2, ?3, ?4, qty - ?4, qty, ?5, ?6, ?7 FROM inventory_levels WHERE item_id = ?2 AND location_id = ?3 AND changes() = 1'

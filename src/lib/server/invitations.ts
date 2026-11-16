@@ -148,7 +148,7 @@ export async function resendInvitation(
 	const inserted = changesOf(results[1]) === 1;
 	if (!inserted) throw error(404, 'Invitation is no longer open.');
 	const outcome = await deliverMail(env, ctx.db, { invitationId: id, token, baseUrl });
-	return redirect(303, `/org/${ctx.org.slug}/settings?${msgQuery(outcomeMessage(outcome))}`);
+	return redirect(303, `/org/${ctx.org.slug}/settings/people?${msgQuery(outcomeMessage(outcome))}`);
 }
 
 // ------------------------------------------------------------------ revoke

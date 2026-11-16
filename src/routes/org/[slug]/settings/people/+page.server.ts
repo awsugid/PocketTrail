@@ -11,6 +11,7 @@ export const load: PageServerLoad = async (event) => {
 	const ctx = await requireMember(event, event.params.slug, 'ViewTransactions');
 	return {
 		shell: await shellContext(ctx),
+		invitationDeliveryEnabled: bindings(event.platform).EMAIL_DELIVERY_ENABLED === 'true',
 		settings: await settingsPageData(ctx, event.url)
 	};
 };

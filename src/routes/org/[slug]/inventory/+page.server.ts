@@ -3,6 +3,7 @@ import type { Actions, PageServerLoad } from './$types';
 
 import { requireMember, shellContext, verifiedForm, type TenantContext } from '$lib/server/auth';
 import { updateStock } from '$lib/server/stock_action';
+import { maintainInventory } from '$lib/server/inventory_actions';
 import {
 	addItemStatements,
 	addLocationStatements,
@@ -17,10 +18,11 @@ import {
 
 export const load: PageServerLoad = async (event) => {
 	const ctx = await requireMember(event, event.params.slug, ['ViewTransactions', 'UpdateStock']);
+	const showArchived = event.url.searchParams.get('archived') === '1';
 	const [items, levels, locations] = await Promise.all([
-		inventoryItems(ctx.db, ctx.org.id),
+		inventoryItems(ctx.db, ctx.org.id, true),
 		inventoryLevels(ctx.db, ctx.org.id),
-		inventoryLocations(ctx.db, ctx.org.id)
+		inventoryLocations(ctx.db, ctx.org.id, true)
 	]);
 	const byItem = new Map<number, Array<{ locationId: number; locationName: string; qty: number }>>();
 	const totals = new Map<number, number>();
@@ -33,14 +35,18 @@ export const load: PageServerLoad = async (event) => {
 	return {
 		shell: await shellContext(ctx),
 		message: event.url.searchParams.get('msg') ?? '',
-		items: items.map((item) => ({
+		showArchived,
+		stockItems: items.filter((item) => item.archived_at === null),
+		items: items.filter((item) => (item.archived_at !== null) === showArchived).map((item) => ({
 			id: item.id,
 			name: item.name,
 			variant: item.variant,
+			archived: item.archived_at !== null,
 			levels: byItem.get(item.id) ?? [],
 			totalQty: totals.get(item.id) ?? 0
 		})),
-		locations,
+		locations: locations.filter((location) => location.archived_at === null),
+		managedLocations: locations.filter((location) => (location.archived_at !== null) === showArchived),
 		can: { updateStock: ctx.can('UpdateStock') }
 	};
 };
@@ -58,9 +64,11 @@ export const actions: Actions = {
 		if (own === null) return fail(403, { message: 'Active membership required.' });
 		const form = await verifiedForm(event, ctx.session);
 		const name = String(form.get('name') ?? '').trim();
-		if (name === '') return fail(400, { message: 'Item name is required.' });
+		if (name === '' || name.length > 100) return fail(400, { message: 'Item name must be 1–100 characters.' });
 		const variant = String(form.get('variant') ?? '').trim();
-		await ctx.db.batch(addItemStatements(ctx.db, ctx.org.id, ctx.user.id, own, name, variant));
+		if (variant.length > 100) return fail(400, { message: 'Variant must be at most 100 characters.' });
+		const results = await ctx.db.batch(addItemStatements(ctx.db, ctx.org.id, ctx.user.id, own, name, variant));
+		if (results[0]?.meta?.changes !== 1) return fail(400, { message: 'This item already exists. Check Archived and restore it if needed.' });
 		throw redirect(303, `/org/${ctx.org.slug}/inventory?msg=Added`);
 	},
 
@@ -68,10 +76,14 @@ export const actions: Actions = {
 		const ctx = await requireMember(event, event.params.slug, 'UpdateStock');
 		const form = await verifiedForm(event, ctx.session);
 		const name = String(form.get('name') ?? '').trim();
-		if (name === '') return fail(400, { message: 'Location name is required.' });
-		await ctx.db.batch(addLocationStatements(ctx.db, ctx.org.id, ctx.user.id, name));
+		if (name === '' || name.length > 100) return fail(400, { message: 'Location name must be 1–100 characters.' });
+		const results = await ctx.db.batch(addLocationStatements(ctx.db, ctx.org.id, ctx.user.id, name));
+		if (results[0]?.meta?.changes !== 1) return fail(400, { message: 'This location already exists. Check Archived and restore it if needed.' });
 		throw redirect(303, `/org/${ctx.org.slug}/inventory?msg=Added`);
 	},
 
-	updateStock: (event) => updateStock(event, (slug) => `/org/${slug}/inventory?msg=Updated`)
+	updateStock: (event) => updateStock(event, (slug) => `/org/${slug}/inventory?msg=Updated`),
+	saveLocation: (event) => maintainInventory(event, 'location', 'save'),
+	archiveLocation: (event) => maintainInventory(event, 'location', 'archive'),
+	restoreLocation: (event) => maintainInventory(event, 'location', 'restore')
 };

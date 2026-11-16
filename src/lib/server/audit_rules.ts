@@ -144,7 +144,13 @@ export function actionLabel(action: string): string {
 		case 'role.updated': return 'Role updated';
 		case 'pocket.created': return 'Pocket added';
 		case 'item.added': return 'Inventory item added';
+		case 'item.updated': return 'Inventory item updated';
+		case 'item.archived': return 'Inventory item archived';
+		case 'item.restored': return 'Inventory item restored';
 		case 'location.added': return 'Inventory location added';
+		case 'location.updated': return 'Inventory location updated';
+		case 'location.archived': return 'Inventory location archived';
+		case 'location.restored': return 'Inventory location restored';
 		case 'stock.changed': return 'Stock changed';
 		case 'transaction.commented': return 'Comment posted';
 		case 'transaction.details_updated': return 'Transaction details saved';

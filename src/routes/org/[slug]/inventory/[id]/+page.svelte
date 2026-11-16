@@ -2,6 +2,7 @@
 	import Select from '$lib/components/ui/Select.svelte';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import Notice from '$lib/components/Notice.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
 	import { submit } from '$lib/forms';
@@ -22,6 +23,9 @@
 		back={{ href: `/org/${data.shell.org.slug}/inventory`, label: 'Inventory' }}
 	/>
 
+	{#if data.message}<Notice tone="success">{data.message}</Notice>{/if}
+	{#if data.item.archived}<Notice>Archived. Stock history is retained.</Notice>{/if}
+
 	<div class="stack">
 		<div class="detail-grid">
 			<section class="panel" aria-labelledby="stock-now-heading">
@@ -41,7 +45,7 @@
 				{/if}
 			</section>
 
-			{#if data.can.updateStock}
+			{#if data.can.updateStock && !data.item.archived}
 				<section class="panel" aria-labelledby="stock-change-heading">
 					<div class="panel__head"><Icon name="history" size={16} /><h2 id="stock-change-heading">Stock change</h2></div>
 					<div class="panel__body">
@@ -75,6 +79,39 @@
 			{/if}
 		</div>
 
+		{#if data.can.updateStock}
+			<section class="panel" aria-labelledby="edit-item-heading">
+				<div class="panel__head"><Icon name="inventory" size={16} /><h2 id="edit-item-heading">Item details</h2></div>
+				<div class="panel__body stack">
+					{#if data.item.archived}
+						<form method="POST" action="?/restoreItem" use:submit>
+							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
+							<button class="btn" type="submit">Restore item</button>
+						</form>
+					{:else}
+						<form method="POST" action="?/saveItem" class="form" use:submit>
+							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
+							<div class="form-grid">
+								<div class="field">
+									<label for="edit-item-name">Name <span class="req" aria-hidden="true">*</span></label>
+									<input class="input" id="edit-item-name" name="name" value={data.item.name} maxlength="100" required />
+								</div>
+								<div class="field">
+									<label for="edit-item-variant">Variant</label>
+									<input class="input" id="edit-item-variant" name="variant" value={data.item.variant} maxlength="100" />
+								</div>
+							</div>
+							<div class="form-actions"><button class="btn btn--primary" type="submit"><Icon name="check" size={16} />Save item</button></div>
+						</form>
+						<form method="POST" action="?/archiveItem" use:submit={{ confirm: `Archive ${data.item.name}? Stock must be zero. History is retained.`, confirmLabel: 'Archive' }}>
+							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
+							<button class="btn btn--danger" type="submit">Archive item</button>
+						</form>
+					{/if}
+				</div>
+			</section>
+		{/if}
+
 		<section class="panel" aria-labelledby="history-heading">
 			<div class="panel__head"><Icon name="history" size={16} /><h2 id="history-heading">History</h2></div>
 		{#if data.movements.length === 0}
@@ -94,7 +131,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.movements as movement (movement.at + movement.locationName)}
+						{#each data.movements as movement (movement.id)}
 							<tr>
 								<td class="cell--nowrap" data-label="When">{movement.at}</td>
 								<td data-label="Who">{movement.memberName}</td>

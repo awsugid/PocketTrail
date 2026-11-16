@@ -94,7 +94,7 @@
 						<div class="form-actions">
 							<button class="btn btn--primary" type="submit"><Icon name="plus" size={16} />Add person</button>
 						</div>
-						<p class="hint">Existing users get access immediately. New users can accept an invitation after signing in with Google; no email is sent in this build.</p>
+						<p class="hint">Existing users get access immediately. New users accept an invitation after signing in with Google.{#if !data.invitationDeliveryEnabled} Email delivery is disabled; no email is sent.{/if}</p>
 					</form>
 				</div>
 			</section>

@@ -1,3 +1,5 @@
+import type { SmtpEnv } from './server/smtp';
+
 // Structural types for the Cloudflare bindings declared in
 // migration/wrangler.toml. Deliberately minimal: only the surface this slice
 // calls, so a binding change shows up as a type error rather than as silent
@@ -61,7 +63,7 @@ export interface ExecutionContextLike {
 }
 
 /** The `env` contract of wrangler.toml plus .dev.vars. */
-export interface Bindings {
+export interface Bindings extends SmtpEnv {
 	DB: D1Database;
 	DOCUMENTS: R2Bucket;
 	SECRET_SESSION_KEY?: string;

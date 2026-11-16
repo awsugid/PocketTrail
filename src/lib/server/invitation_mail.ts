@@ -1,12 +1,12 @@
-// Invitation email delivery rows, ported from the durable half of
-// src/smtp.rs and src/web/invitation_mail.rs. The SMTP transport itself is not
-// ported: rows are written to D1 and shown on the settings page; nothing is
-// ever sent. Raw tokens live in links only; D1 stores the SHA-256 hash.
+// Durable invitation email delivery. Raw tokens live in emailed links only;
+// D1 stores the SHA-256 hash. SMTP is explicitly enabled per environment.
 
 import type { D1Database } from '$lib/d1';
 import { hashToken } from './tokens';
+import { nowMs, qOne } from './db';
+import { sendSmtp, smtpConfig, SmtpError, type SmtpEnv } from './smtp';
 
-export interface MailEnv {
+export interface MailEnv extends SmtpEnv {
 	EMAIL_DELIVERY_ENABLED?: string;
 }
 
@@ -19,7 +19,7 @@ export interface MailOutcome {
 /** Flash message shown after create/resend. Never carries credentials. */
 export function outcomeMessage(outcome: MailOutcome): string {
 	if (outcome.sent) return 'Invitation created. Email sent.';
-	if (outcome.disabled) return 'Invitation created. Email delivery is not connected.';
+	if (outcome.disabled) return 'Invitation created. Email delivery is disabled.';
 	return `Invitation created. Email delivery failed - use Resend. (${outcome.error ?? 'unknown error'})`;
 }
 
@@ -47,13 +47,12 @@ async function mark(
 /** Request origin that may appear in an emailed link: http(s) only, no
  * whitespace or control characters. */
 export function usableBaseUrl(origin: string): boolean {
-	if (origin === '') return false;
-	for (const ch of origin) {
-		const code = ch.charCodeAt(0);
-		if (code < 32 || code === 127) return false; // control
-		if (code === 32 || code === 9 || code === 10 || code === 11 || code === 12 || code === 13) return false;
+	try {
+		const url = new URL(origin);
+		return ['https:', 'http:'].includes(url.protocol) && url.origin === origin;
+	} catch {
+		return false;
 	}
-	return origin.startsWith('https://') || origin.startsWith('http://');
 }
 
 export interface DeliverArgs {
@@ -64,11 +63,7 @@ export interface DeliverArgs {
 
 /** Store the invitation email durably (the pending row already exists), then
  * record the delivery attempt's outcome on the row. Failures are recorded,
- * never thrown: the invitation itself was already accepted into D1.
- *
- * The SMTP transport is not ported: when delivery is enabled, the attempt is
- * recorded as failed rather than sending anything, and SMTP_PASSWORD is never
- * read. */
+ * never thrown for SMTP failures: the invitation is already committed to D1. */
 export async function deliverMail(
 	env: MailEnv,
 	db: D1Database,
@@ -98,13 +93,30 @@ export async function deliverMail(
 				: null
 		};
 	}
-	// No SMTP transport in this port: bump attempts, record an honest failure.
-	await db
-		.prepare('UPDATE invitation_mail SET attempts=attempts+1 WHERE invitation_id=?1 AND token_hash=?2')
-		.bind(args.invitationId, tokenHash)
+	const invitation = await qOne<{ email: string; org_name: string; role_name: string; expires_at: number }>(
+		db,
+		"SELECT i.email,o.name AS org_name,r.name AS role_name,i.expires_at FROM invitations i JOIN organizations o ON o.id=i.org_id JOIN roles r ON r.id=i.role_id AND r.org_id=i.org_id JOIN invitation_mail im ON im.invitation_id=i.id WHERE i.id=?1 AND im.token_hash=?2 AND im.status='pending' AND i.accepted_at IS NULL AND i.revoked_at IS NULL AND i.expires_at>?3",
+		[args.invitationId, tokenHash, nowMs()]
+	);
+	if (!invitation) return { sent: false, disabled: false, error: 'This invitation is no longer available.' };
+	const attempt = await db
+		.prepare("UPDATE invitation_mail SET attempts=attempts+1 WHERE invitation_id=?1 AND token_hash=?2 AND status='pending' AND EXISTS(SELECT 1 FROM invitations i WHERE i.id=?1 AND i.accepted_at IS NULL AND i.revoked_at IS NULL AND i.expires_at>?3)")
+		.bind(args.invitationId, tokenHash, nowMs())
 		.run();
-	const msg = 'SMTP transport is not available in this deployment.';
-	const changed = await mark(db, args.invitationId, tokenHash, 'failed', msg, null);
+	if (attempt.meta?.changes !== 1) return { sent: false, disabled: false, error: 'This invitation is no longer available.' };
+	let failure: string | null = null;
+	try {
+		const config = smtpConfig(env);
+		const { connect } = await import('cloudflare:sockets');
+		await sendSmtp(config, {
+			to: invitation.email,
+			subject: `Join ${invitation.org_name} on PocketTrail`,
+			body: `You have been invited to join ${invitation.org_name} on PocketTrail as ${invitation.role_name}.\n\nOpen this single-use link and sign in with the Google account for ${invitation.email}:\n\n${args.baseUrl}/invitations/accept?token=${encodeURIComponent(args.token)}\n\nThe link expires ${new Date(invitation.expires_at).toUTCString()}.\nIf you were not expecting this invitation, you can ignore it.\n\nFinancial details stay in PocketTrail; this email carries none.\n`
+		}, connect);
+	} catch (cause) {
+		failure = cause instanceof SmtpError ? cause.message : 'SMTP delivery failed.';
+	}
+	const changed = await mark(db, args.invitationId, tokenHash, failure ? 'failed' : 'sent', failure, failure ? null : nowMs());
 	if (changed === 0) {
 		return {
 			sent: false,
@@ -112,7 +124,7 @@ export async function deliverMail(
 			error: 'Result discarded; the link was superseded by a newer resend.'
 		};
 	}
-	return { sent: false, disabled: false, error: msg };
+	return { sent: failure === null, disabled: false, error: failure };
 }
 
 /** Percent-encoded `?msg=` query value for settings redirects. */

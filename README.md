@@ -71,6 +71,25 @@ does not.
 
 Merchandise inventory records an item, optional variant, quantity by location or
 holder, and an attributed change history. It is not an equipment-lending system.
+Inventory Maintainers can edit names/variants and archive or restore items and
+locations without access to financial records. Archiving requires zero stock;
+records and movement history are retained.
+
+### Invitation email
+
+Existing accounts receive membership directly from **People → Add person**.
+New emails receive an invitation, accepted using the matching Google account.
+With `EMAIL_DELIVERY_ENABLED=true`, invitation creation and Resend use the
+existing `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, and
+`SMTP_FROM` Worker settings. Port 465 uses implicit TLS; other supported ports
+require STARTTLS. Workers blocks port 25. Keep local email delivery disabled.
+
+Store SMTP credentials as Worker secrets, never in Git or build logs. Failed
+delivery retains the invitation and records a safe error for Resend. A successful
+SMTP response means the server accepted the email, not guaranteed inbox delivery.
+Existing pending invitations need **Resend** after deploying this transport.
+Transaction reminders remain outbox-only; enabling invitation SMTP does not
+automatically send them.
 
 ## Notification safety
 

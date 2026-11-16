@@ -22,6 +22,11 @@
 
 	{#if data.message}<Notice tone="success">{data.message}</Notice>{/if}
 
+	<nav class="chips" aria-label="Inventory status">
+		<a class="chip" href="/org/{slug}/inventory" aria-current={!data.showArchived ? 'true' : undefined}>Active</a>
+		<a class="chip" href="/org/{slug}/inventory?archived=1" aria-current={data.showArchived ? 'true' : undefined}>Archived</a>
+	</nav>
+
 	<div class="stack">
 		<section class="panel" aria-labelledby="items-heading">
 			<div class="panel__head">
@@ -29,7 +34,7 @@
 				<span class="count">{data.items.length}</span>
 			</div>
 			{#if data.items.length === 0}
-				<Empty icon="inventory" title="No items yet" inline />
+				<Empty icon="inventory" title={data.showArchived ? 'No archived items' : 'No items yet'} inline />
 			{:else}
 				<div class="table-scroll">
 					<table class="ledger stack" use:stack>
@@ -47,6 +52,7 @@
 									<td class="row-identity">
 										<a href="/org/{slug}/inventory/{item.id}">{item.name}</a>
 										{#if item.variant}<span class="cell__sub">{item.variant}</span>{/if}
+										{#if item.archived}<span class="badge badge--muted">Archived</span>{/if}
 									</td>
 									<td data-label="Holdings">
 										{#if item.levels.length === 0}
@@ -68,7 +74,54 @@
 			{/if}
 		</section>
 
-		{#if data.can.updateStock}
+		<section class="panel" aria-labelledby="locations-heading">
+			<div class="panel__head"><Icon name="org" size={16} /><h2 id="locations-heading">Locations</h2><span class="count">{data.managedLocations.length}</span></div>
+			{#if data.managedLocations.length === 0}
+				<Empty icon="org" title={data.showArchived ? 'No archived locations' : 'No locations yet'} inline />
+			{:else}
+				<ul class="rows">
+					{#each data.managedLocations as location (location.id)}
+						<li>
+							<div class="rows__main">
+								<strong>{location.name}</strong>
+								{#if location.archived_at !== null}<span class="badge badge--muted">Archived</span>{/if}
+								{#if data.can.updateStock && location.archived_at === null}
+									<details>
+										<summary>Edit location<span class="visually-hidden"> {location.name}</span></summary>
+										<form method="POST" action="?/saveLocation" class="form" use:submit>
+											<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
+											<input type="hidden" name="id" value={location.id} />
+											<div class="field">
+												<label for="location-name-{location.id}">Name</label>
+												<input class="input" id="location-name-{location.id}" name="name" value={location.name} maxlength="100" required />
+											</div>
+											<div class="form-actions"><button class="btn" type="submit"><Icon name="check" size={14} />Save location</button></div>
+										</form>
+									</details>
+								{/if}
+							</div>
+							{#if data.can.updateStock}
+								{#if location.archived_at !== null}
+									<form method="POST" action="?/restoreLocation" use:submit>
+										<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
+										<input type="hidden" name="id" value={location.id} />
+										<button class="btn btn--sm" type="submit">Restore<span class="visually-hidden"> {location.name}</span></button>
+									</form>
+								{:else}
+									<form method="POST" action="?/archiveLocation" use:submit={{ confirm: `Archive ${location.name}? Stock must be zero. History is retained.`, confirmLabel: 'Archive' }}>
+										<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
+										<input type="hidden" name="id" value={location.id} />
+										<button class="btn btn--sm btn--danger" type="submit">Archive<span class="visually-hidden"> {location.name}</span></button>
+									</form>
+								{/if}
+							{/if}
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</section>
+
+		{#if data.can.updateStock && !data.showArchived}
 			<div class="two-up">
 				<section class="panel" aria-labelledby="stock-heading">
 					<div class="panel__head"><Icon name="history" size={16} /><h2 id="stock-heading">Stock change</h2></div>
@@ -77,7 +130,7 @@
 							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 							<div class="field">
 								<label for="stock-item">Item</label>
-								<Select id="stock-item" name="item_id" items={data.items.map((item) => ({ value: String(item.id), label: item.name + (item.variant ? ` — ${item.variant}` : '') }))} required />
+								<Select id="stock-item" name="item_id" items={data.stockItems.map((item) => ({ value: String(item.id), label: item.name + (item.variant ? ` — ${item.variant}` : '') }))} required />
 							</div>
 							<div class="field">
 								<label for="stock-location">Location</label>
@@ -113,11 +166,11 @@
 								<div class="form-grid">
 									<div class="field">
 										<label for="item-name">Name <span class="req" aria-hidden="true">*</span></label>
-										<input class="input" id="item-name" name="name" required />
+										<input class="input" id="item-name" name="name" maxlength="100" required />
 									</div>
 									<div class="field">
 										<label for="item-variant">Variant</label>
-										<input class="input" id="item-variant" name="variant" placeholder="Size M" />
+										<input class="input" id="item-variant" name="variant" maxlength="100" placeholder="Size M" />
 									</div>
 								</div>
 								<div class="form-actions">
@@ -134,7 +187,7 @@
 								<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 								<div class="field">
 									<label for="location-name">Name <span class="req" aria-hidden="true">*</span></label>
-									<input class="input" id="location-name" name="name" required placeholder="Storage or holder" />
+									<input class="input" id="location-name" name="name" maxlength="100" required placeholder="Storage or holder" />
 								</div>
 								<div class="form-actions">
 									<button class="btn" type="submit"><Icon name="plus" size={16} />Add location</button>

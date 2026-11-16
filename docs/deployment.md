@@ -86,9 +86,20 @@ Only after the owning organization authorizes a specific deployment:
    logs; do **not** run `db:seed:local` against remote data.
 5. Enable Google OAuth authorized origins for the deployed hostname before
    relying on Google sign-in.
-6. Leave `EMAIL_DELIVERY_ENABLED` unset/false. Invitation delivery and
-   notification transport remain outbox-only in this rewrite; connecting the
-   existing mail server is a separate integration gate.
+6. Invitation SMTP uses the existing Worker settings `SMTP_HOST`, `SMTP_PORT`,
+   `SMTP_USERNAME`, `SMTP_PASSWORD`, and `SMTP_FROM`, gated by
+   `EMAIL_DELIVERY_ENABLED=true`. Preserve existing production settings;
+   `keep_vars = true` in `wrangler.toml` retains dashboard-managed variables
+   during deployment. Keep local delivery disabled. Use port 465 (implicit TLS) or 587 (mandatory
+   STARTTLS), not port 25 (blocked by Workers). The host must resolve to a
+   reachable mail server, not a Cloudflare-proxied or private address.
+   Set credentials as Worker secrets, never in committed files. See
+   [Cloudflare TCP restrictions](https://developers.cloudflare.com/workers/runtime-apis/tcp-sockets/#considerations).
+   After deployment, an operator can Resend an existing invitation to a
+   consenting recipient and check its mail status. No live SMTP delivery was
+   performed during local validation.
+   Transaction notification delivery remains outbox-only; this transport sends
+   invitations only and does not enable a reminder scheduler.
 
 Rollback: redeploy the previous commit's build. D1 migrations are append-only
 history; this repository does not ship a down-migration.
@@ -107,7 +118,8 @@ synthetic fixtures in a staging organization before real records are handled.
   from this repository.
 - Google ID-token verification is implemented and unit-tested against synthetic
   JWKS material, but a live Google sign-in has not been exercised here.
-- Local outbox capture is not email/SMTP delivery and has no scheduler.
+- Scripted SMTP tests do not establish real mail-server connectivity, credential
+  validity, or inbox delivery. Transaction notifications have no email scheduler.
 - Rendered checks used a system Chrome over synthetic fixtures; they are not a
   full accessibility audit.
 

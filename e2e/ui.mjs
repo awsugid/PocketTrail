@@ -555,6 +555,51 @@ await withWorker(async () => {
 			`${await page.locator('button#new-direction').innerText()} / ${await page.locator('button#new-pocket').innerText()}`
 		);
 
+		// Inventory metadata actions work through the rendered enhanced forms.
+		await page.goto(`${ORIGIN}/org/demo-jakarta/inventory`);
+		await page.locator('input#item-name').fill('Synthetic browser item');
+		await page.getByRole('button', { name: 'Add item', exact: true }).click();
+		const itemLink = page.getByRole('link', { name: 'Synthetic browser item', exact: true });
+		await itemLink.waitFor();
+		await itemLink.click();
+		await page.locator('input#edit-item-name').fill('Synthetic browser item edited');
+		await page.locator('input#edit-item-variant').fill('Blue');
+		await page.getByRole('button', { name: 'Save item', exact: true }).click();
+		await page.getByRole('heading', { name: 'Synthetic browser item edited — Blue', exact: true }).waitFor();
+		check('inventory item names and variants save through the browser', (await page.locator('input#edit-item-variant').inputValue()) === 'Blue');
+		await page.getByRole('button', { name: 'Archive item', exact: true }).click();
+		const archiveConfirm = page.getByRole('group').filter({ hasText: 'Archive Synthetic browser item edited?' });
+		check('inventory archive asks inline and focuses Cancel',
+			await archiveConfirm.isVisible() && (await page.evaluate(() => document.activeElement?.textContent?.trim())) === 'Cancel');
+		await archiveConfirm.getByRole('button', { name: 'Archive', exact: true }).click();
+		await page.getByRole('button', { name: 'Restore item', exact: true }).waitFor();
+		check('archived item retains history and hides stock editing',
+			await page.getByRole('heading', { name: 'History', exact: true }).isVisible() &&
+			(await page.locator('form[action="?/updateStock"]').count()) === 0);
+		await page.getByRole('button', { name: 'Restore item', exact: true }).click();
+		await page.getByRole('button', { name: 'Save item', exact: true }).waitFor();
+		check('restoring an item restores editing controls', await page.locator('form[action="?/updateStock"]').isVisible());
+
+		await page.goto(`${ORIGIN}/org/demo-jakarta/inventory`);
+		await page.locator('input#location-name').fill('Synthetic browser location');
+		await page.getByRole('button', { name: 'Add location', exact: true }).click();
+		let locationRow = page.locator('li').filter({ has: page.locator('strong', { hasText: /^Synthetic browser location$/ }) });
+		await locationRow.locator('summary').click();
+		await locationRow.locator('input[name="name"]').fill('Synthetic browser location edited');
+		await locationRow.getByRole('button', { name: 'Save location', exact: true }).click();
+		locationRow = page.locator('li').filter({ has: page.locator('strong', { hasText: /^Synthetic browser location edited$/ }) });
+		await locationRow.waitFor();
+		check('location names save through the browser', await locationRow.isVisible());
+		await locationRow.getByRole('button', { name: 'Archive Synthetic browser location edited', exact: true }).click();
+		await locationRow.getByRole('group').getByRole('button', { name: 'Archive', exact: true }).click();
+		await locationRow.waitFor({ state: 'detached' });
+		await page.getByRole('link', { name: 'Archived', exact: true }).click();
+		const archivedLocation = page.locator('li').filter({ hasText: 'Synthetic browser location edited' });
+		await archivedLocation.getByRole('button', { name: /Restore/ }).click();
+		await page.getByRole('link', { name: 'Active', exact: true }).click();
+		await page.locator('li').filter({ hasText: 'Synthetic browser location edited' }).waitFor();
+		check('locations archive and restore through the browser', true);
+
 		// Screenshot pass at both sizes: roles, notifications, new transaction (time
 		// control), routing picker, inline confirm, drawer, 375 form.
 		for (const [width, height] of [[1440, 1000], [375, 900]]) {
@@ -563,6 +608,8 @@ await withWorker(async () => {
 				['roles', 'settings/roles'],
 				['notifications', 'settings/notifications'],
 				['pockets', 'settings/pockets'],
+				['inventory', 'inventory'],
+				['inventory-item', 'inventory/1'],
 				['new-transaction', 'transactions/new']
 			]) {
 				await page.goto(`${ORIGIN}/org/demo-jakarta/${path}`);

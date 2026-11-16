@@ -55,6 +55,9 @@ export async function checks(ctx) {
 	        const forged = [
 	                ['addItem', { ...bad, name: 'FORGED item' }],
 	                ['addLocation', { ...bad, name: 'FORGED place' }],
+	                ['saveLocation', { ...bad, id: '1', name: 'FORGED place' }],
+	                ['archiveLocation', { ...bad, id: '1' }],
+	                ['restoreLocation', { ...bad, id: '1' }],
 	                ['updateStock', { ...bad, item_id: '1', location_id: '1', direction: 'add', quantity: '7', reason: 'forged' }]
 	        ];
 	        for (const [action, fields] of forged) {
@@ -127,6 +130,66 @@ export async function checks(ctx) {
 	check('split responsible sees own explanation task', bobActions.includes('Demo Coffee Supplier'), 'missing own task');
 	// Without any submitted transaction in the seed, no review section renders.
 	check('no review section without submitted work', !bobActions.includes('Ready for your review'), 'unexpected review section');
+
+	// Metadata CRUD uses archive/restore, never deletion of referenced history.
+	for (const [action, fields] of [
+		['addItem', { name: 'Synthetic archive item', variant: '' }],
+		['addLocation', { name: 'Synthetic archive location' }]
+	]) {
+		const response = await alice.postForm(`/org/demo-jakarta/inventory?/${action}`, { csrf_token: csrfToken, ...fields });
+		check(`${action} creates an archival test record`, response.status === 303, String(response.status));
+	}
+	const createdHtml = await (await alice.get('/org/demo-jakarta/inventory')).text();
+	const newItem = createdHtml.match(/href="\/org\/demo-jakarta\/inventory\/(\d+)">Synthetic archive item/)?.[1];
+	const newLocation = createdHtml.match(/id="location-name-(\d+)"[^>]*value="Synthetic archive location"/)?.[1];
+	check('new inventory records are addressable', Boolean(newItem && newLocation));
+	if (newItem && newLocation) {
+		const postItem = (action, fields = {}, token = csrfToken) => alice.postForm(`/org/demo-jakarta/inventory/${newItem}?/${action}`, { csrf_token: token, ...fields });
+		const postLocation = (action, fields = {}) => alice.postForm(`/org/demo-jakarta/inventory?/${action}`, { csrf_token: csrfToken, id: newLocation, ...fields });
+		for (const action of ['saveItem', 'archiveItem', 'restoreItem']) {
+			check(`${action} rejects forged CSRF`, (await postItem(action, { name: 'FORGED' }, 'f'.repeat(32))).status === 403);
+		}
+		check('item names and variants can be edited', (await postItem('saveItem', { name: 'Synthetic renamed item', variant: 'Blue' })).status === 303);
+		check('duplicate item identity is rejected', (await postItem('saveItem', { name: 'DEMO T-shirt', variant: 'M' })).status === 400);
+		check('location names can be edited', (await postLocation('saveLocation', { name: 'Synthetic renamed location' })).status === 303);
+		check('duplicate location name is rejected', (await postLocation('saveLocation', { name: 'DEMO storage box' })).status === 400);
+		check('blank item name is rejected', (await postItem('saveItem', { name: ' ' })).status === 400);
+		check('foreign organization metadata cannot be changed', (await alice.postForm('/org/demo-jakarta/inventory/999999?/saveItem', {
+			csrf_token: csrfToken, name: 'Foreign'
+		})).status === 404);
+		for (const action of ['saveItem', 'archiveItem', 'restoreItem']) {
+			check(`read-only member cannot ${action}`, (await bob.postForm(`/org/demo-jakarta/inventory/${newItem}?/${action}`, { csrf_token: csrfToken, name: 'Unauthorized' })).status === 403);
+		}
+		for (const action of ['saveLocation', 'archiveLocation', 'restoreLocation']) {
+			check(`read-only member cannot ${action}`, (await bob.postForm(`/org/demo-jakarta/inventory?/${action}`, { csrf_token: csrfToken, id: newLocation, name: 'Unauthorized' })).status === 403);
+		}
+		const adjust = (delta) => alice.postForm(`/org/demo-jakarta/inventory/${newItem}?/updateStock`, {
+			csrf_token: csrfToken, item_id: newItem, location_id: newLocation, delta, reason: 'Synthetic archive test'
+		});
+		check('stock can be recorded for the renamed item', (await adjust('1')).status === 303);
+		check('an item with stock cannot be archived', (await postItem('archiveItem')).status === 400);
+		check('a location with stock cannot be archived', (await postLocation('archiveLocation')).status === 400);
+		check('stock can be brought to zero with history', (await adjust('-1')).status === 303);
+		check('zero-stock item can be archived', (await postItem('archiveItem')).status === 303);
+		check('archived items cannot receive stock', (await adjust('1')).status === 400);
+		check('archived item metadata cannot be edited', (await postItem('saveItem', { name: 'Hidden edit' })).status === 400);
+		const archivedDetail = await (await alice.get(`/org/demo-jakarta/inventory/${newItem}`)).text();
+		check('archived item history remains readable', archivedDetail.includes('Synthetic archive test') && archivedDetail.includes('Archived'));
+		check('archived items leave active lists', !(await (await alice.get('/org/demo-jakarta/inventory')).text()).includes('Synthetic renamed item'));
+		check('archived items are discoverable', (await (await alice.get('/org/demo-jakarta/inventory?archived=1')).text()).includes('Synthetic renamed item'));
+		check('archived item can be restored', (await postItem('restoreItem')).status === 303);
+		check('zero-stock location can be archived', (await postLocation('archiveLocation')).status === 303);
+		check('archived locations cannot receive stock', (await adjust('1')).status === 400);
+		check('archived locations are discoverable', (await (await alice.get('/org/demo-jakarta/inventory?archived=1')).text()).includes('Synthetic renamed location'));
+		check('archived location can be restored', (await postLocation('restoreLocation')).status === 303);
+		check('restored inventory can receive stock again', (await adjust('1')).status === 303);
+		// Concurrent archive vs stock mutation: exactly one can win on zero stock.
+		await adjust('-1');
+		const race = await Promise.all([postItem('archiveItem'), adjust('1')]);
+		check('archive and stock writes serialize without hidden stock',
+			race.filter((response) => response.status === 303).length === 1 &&
+			race.filter((response) => response.status === 400).length === 1);
+	}
 
 	return failures;
 }

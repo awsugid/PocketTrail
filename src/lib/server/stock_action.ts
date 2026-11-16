@@ -27,10 +27,10 @@ export async function updateStock(event: RequestEvent, landOn: (slug: string) =>
 	const reasonValue = form.get('reason');
 	const input = stockUpdateInput(signed, typeof reasonValue === 'string' ? reasonValue : null);
 	if ('error' in input) return fail(400, { message: input.error });
-	if (!(await qOne(ctx.db, 'SELECT id FROM inventory_items WHERE id = ?1 AND org_id = ?2', [itemId, ctx.org.id]))) {
+	if (!(await qOne(ctx.db, 'SELECT id FROM inventory_items WHERE id = ?1 AND org_id = ?2 AND archived_at IS NULL', [itemId, ctx.org.id]))) {
 		return fail(400, { message: 'Unknown item for this organization.' });
 	}
-	if (!(await qOne(ctx.db, 'SELECT id FROM inventory_locations WHERE id = ?1 AND org_id = ?2', [locationId, ctx.org.id]))) {
+	if (!(await qOne(ctx.db, 'SELECT id FROM inventory_locations WHERE id = ?1 AND org_id = ?2 AND archived_at IS NULL', [locationId, ctx.org.id]))) {
 		return fail(400, { message: 'Unknown location for this organization.' });
 	}
 	const results = await ctx.db.batch(

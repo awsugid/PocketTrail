@@ -9,6 +9,10 @@ compatibility_date = "2025-09-01"
 # adapter documentation requires this flag for that import graph.
 compatibility_flags = ["nodejs_compat"]
 
+# SMTP and other environment-specific variables are already managed in the
+# production dashboard. Preserve them on deployment; secrets stay out of Git.
+keep_vars = true
+
 [assets]
 directory = ".svelte-kit/cloudflare"
 binding = "ASSETS"
