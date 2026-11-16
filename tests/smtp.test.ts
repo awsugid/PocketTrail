@@ -139,4 +139,22 @@ describe('SMTP configuration and MIME', () => {
 			expect(() => composeMessage(env.SMTP_FROM, { ...message, [field]: 'bad\r\nBcc: victim@example.test' })).toThrow();
 		}
 	});
+
+	it('packages HTML after plain text as a base64 multipart alternative', () => {
+		const html = '<html><body><a href="https://example.test/?token=synthetic">Accept invitation</a></body></html>';
+		const composed = composeMessage(env.SMTP_FROM, { ...message, html });
+		const boundary = composed.match(/Content-Type: multipart\/alternative; boundary="([^"]+)"/)?.[1];
+		expect(boundary).toMatch(/^pockettrail-/);
+		const parts = composed.split(`--${boundary}`).slice(1, -1);
+		expect(parts).toHaveLength(2);
+		expect(parts[0]).toContain('Content-Type: text/plain; charset=UTF-8');
+		expect(parts[1]).toContain('Content-Type: text/html; charset=UTF-8');
+		for (const [index, content] of [message.body, html].entries()) {
+			const [headers, encoded] = parts[index]!.split('\r\n\r\n');
+			expect(headers).toContain('Content-Transfer-Encoding: base64');
+			expect(Buffer.from(encoded!.trim(), 'base64').toString()).toBe(content.replace(/\r\n|\r|\n/g, '\r\n'));
+			expect(encoded!.trim().split('\r\n').every((line) => line.length <= 76)).toBe(true);
+		}
+		expect(composed).toMatch(new RegExp(`--${boundary}--\\r\\n$`));
+	});
 });

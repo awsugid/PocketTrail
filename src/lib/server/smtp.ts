@@ -63,6 +63,7 @@ export interface SmtpMessage {
 	to: string;
 	subject: string;
 	body: string;
+	html?: string;
 }
 
 /** Base64 MIME avoids 8BITMIME/SMTPUTF8 requirements and SMTP dot injection.
@@ -82,7 +83,33 @@ export function composeMessage(from: string, message: SmtpMessage): string {
 		chunk += ch;
 	}
 	if (chunk) words.push(`=?UTF-8?B?${Buffer.from(chunk).toString('base64')}?=`);
-	const body = Buffer.from(message.body.replace(/\r\n|\r|\n/g, '\r\n')).toString('base64');
+	function encodedPart(content: string): string {
+		const base64 = Buffer.from(content.replace(/\r\n|\r|\n/g, '\r\n')).toString('base64');
+		return base64.match(/.{1,76}/g)?.join('\r\n') ?? '';
+	}
+	const boundary = `pockettrail-${crypto.randomUUID()}`;
+	const content = message.html === undefined
+		? [
+			'Content-Type: text/plain; charset=UTF-8',
+			'Content-Transfer-Encoding: base64',
+			'',
+			encodedPart(message.body)
+		]
+		: [
+			`Content-Type: multipart/alternative; boundary="${boundary}"`,
+			'',
+			`--${boundary}`,
+			'Content-Type: text/plain; charset=UTF-8',
+			'Content-Transfer-Encoding: base64',
+			'',
+			encodedPart(message.body),
+			`--${boundary}`,
+			'Content-Type: text/html; charset=UTF-8',
+			'Content-Transfer-Encoding: base64',
+			'',
+			encodedPart(message.html),
+			`--${boundary}--`
+		];
 	return [
 		`From: ${from}`,
 		`To: ${message.to}`,
@@ -90,10 +117,7 @@ export function composeMessage(from: string, message: SmtpMessage): string {
 		`Date: ${new Date().toUTCString()}`,
 		`Message-ID: <${crypto.randomUUID()}@${from.split('@')[1]}>`,
 		'MIME-Version: 1.0',
-		'Content-Type: text/plain; charset=UTF-8',
-		'Content-Transfer-Encoding: base64',
-		'',
-		body.match(/.{1,76}/g)?.join('\r\n') ?? ''
+		...content
 	].join('\r\n') + '\r\n';
 }
 

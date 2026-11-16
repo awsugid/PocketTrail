@@ -43,6 +43,8 @@ describe('durable invitation SMTP delivery', () => {
 		const message = vi.mocked(sendSmtp).mock.calls[0]![1];
 		expect(message.body).toContain('Inventory Maintainer');
 		expect(message.body).toContain('expires');
+		expect(message.html).toContain('Accept invitation</a>');
+		expect(message.html).toContain(`${args.baseUrl}/invitations/accept?token=${args.token}`);
 		expect(row()).toEqual({ status: 'sent', error: null, attempts: 1, sent_at: expect.any(Number) });
 		expect(JSON.stringify(database.sqlite.prepare('SELECT * FROM invitation_mail').all())).not.toContain(args.token);
 	});

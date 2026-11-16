@@ -5,6 +5,7 @@ import type { D1Database } from '$lib/d1';
 import { hashToken } from './tokens';
 import { nowMs, qOne } from './db';
 import { sendSmtp, smtpConfig, SmtpError, type SmtpEnv } from './smtp';
+import { invitationMessage } from './invitation_email';
 
 export interface MailEnv extends SmtpEnv {
 	EMAIL_DELIVERY_ENABLED?: string;
@@ -108,11 +109,13 @@ export async function deliverMail(
 	try {
 		const config = smtpConfig(env);
 		const { connect } = await import('cloudflare:sockets');
-		await sendSmtp(config, {
-			to: invitation.email,
-			subject: `Join ${invitation.org_name} on PocketTrail`,
-			body: `You have been invited to join ${invitation.org_name} on PocketTrail as ${invitation.role_name}.\n\nOpen this single-use link and sign in with the Google account for ${invitation.email}:\n\n${args.baseUrl}/invitations/accept?token=${encodeURIComponent(args.token)}\n\nThe link expires ${new Date(invitation.expires_at).toUTCString()}.\nIf you were not expecting this invitation, you can ignore it.\n\nFinancial details stay in PocketTrail; this email carries none.\n`
-		}, connect);
+		await sendSmtp(config, invitationMessage({
+			email: invitation.email,
+			organization: invitation.org_name,
+			role: invitation.role_name,
+			expiresAt: invitation.expires_at,
+			acceptUrl: `${args.baseUrl}/invitations/accept?token=${encodeURIComponent(args.token)}`
+		}), connect);
 	} catch (cause) {
 		failure = cause instanceof SmtpError ? cause.message : 'SMTP delivery failed.';
 	}
