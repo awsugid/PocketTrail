@@ -5,6 +5,7 @@ import type { D1Database } from '$lib/d1';
 import { hashToken } from './tokens';
 import { nowMs, qOne } from './db';
 import { sendSmtp, smtpConfig, SmtpError, type SmtpEnv } from './smtp';
+import type { SmtpConnect } from './smtp';
 import { invitationMessage } from './invitation_email';
 
 export interface MailEnv extends SmtpEnv {
@@ -108,7 +109,7 @@ export async function deliverMail(
 	let failure: string | null = null;
 	try {
 		const config = smtpConfig(env);
-		const { connect } = await import('cloudflare:sockets');
+		const connect = await workerConnect();
 		await sendSmtp(config, invitationMessage({
 			email: invitation.email,
 			organization: invitation.org_name,
@@ -128,6 +129,13 @@ export async function deliverMail(
 		};
 	}
 	return { sent: failure === null, disabled: false, error: failure };
+}
+
+/** The Workers TCP connect function. The only import site of the runtime
+ * module, shared by every SMTP sender so the build keeps it external. */
+export async function workerConnect(): Promise<SmtpConnect> {
+	const { connect } = await import('cloudflare:sockets');
+	return connect;
 }
 
 /** Percent-encoded `?msg=` query value for settings redirects. */

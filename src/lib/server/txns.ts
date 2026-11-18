@@ -46,6 +46,7 @@ import {
 	type TxnRow
 } from './rows';
 import { enqueueAssignment, enqueueMentions } from './txns_notify';
+import { scheduleDelivery } from './notification_mail';
 import {
 	approveTransaction,
 	ALL_PERMISSIONS,
@@ -79,6 +80,10 @@ export interface TxnCtx {
 	memberRows: MemRow[];
 	roleRows: RoleRow[];
 	can(permission: Permission): boolean;
+	/** Schedule outbox email delivery for this org after queueing notices
+	 * (notification_mail.ts scheduleDelivery); set by requireOrg. Resolves to
+	 * whether email delivery is enabled; never throws. */
+	deliverMail?: () => Promise<boolean>;
 }
 
 const memberRefs = (memberRows: readonly MemRow[]) =>
@@ -145,6 +150,7 @@ export async function requireOrg(event: CtxEvent, slug: string, permission?: Per
 		throw error(403, 'Active organization membership required.');
 	}
 	const ctx = buildCtx(login.config, login.session, login.user, login.db, bindings(event.platform), org, memberRows, roleRows);
+	ctx.deliverMail = () => scheduleDelivery(event, ctx.db, ctx.org.id);
 	if (permission !== undefined && !ctx.can(permission)) {
 		throw error(403, `Access denied: your role does not include “${permissionLabel(permission)}”.`);
 	}
@@ -720,7 +726,10 @@ function decisionOrg(ctx: TxnCtx) {
 }
 
 export function activeMembers(ctx: TxnCtx): Array<{ id: number; name: string; handle: string }> {
-	return ctx.memberRows.filter(memActive).map((m) => ({ id: m.id, name: m.name, handle: m.handle }));
+	// Invited members are assignable; label them so it is clear they have not joined.
+	return ctx.memberRows
+		.filter(memActive)
+		.map((m) => ({ id: m.id, name: m.invited ? `${m.name} (invited)` : m.name, handle: m.handle }));
 }
 
 /** Shell chrome for the journey pages, built over this request's context. */
@@ -839,6 +848,7 @@ export async function saveDetails(ctx: TxnCtx, txnId: number, form: FormData): P
 	if (!won) throw error(409, 'This transaction changed while you were editing it. Reload and review the latest details.');
 	if (!sameSet(recipientsOf(nextShape, nextSplits), recipientsOf(t, oldSplits))) {
 		await enqueueAssignment(ctx.db, ctx.org, ctx.memberRows, ctx.roleRows, { ...nextShape, status: 'pending' });
+		await ctx.deliverMail?.();
 	}
 	return destination(ctx, txnId, 'Details saved; approval requires current documentation');
 }
@@ -928,6 +938,7 @@ async function review(ctx: TxnCtx, txnId: number, form: FormData, changes: boole
 	if (!won) throw error(409, 'The transaction changed during review. Reload before deciding.');
 	if (changes) {
 		await enqueueAssignment(ctx.db, ctx.org, ctx.memberRows, ctx.roleRows, { ...t, status });
+		await ctx.deliverMail?.();
 	}
 	return destination(ctx, txnId, changes ? 'Changes requested' : 'Transaction approved');
 }
@@ -955,6 +966,7 @@ export async function addComment(ctx: TxnCtx, txnId: number, form: FormData): Pr
 	]);
 	// Comments do not modify the transaction revision or approval.
 	await enqueueMentions(ctx.db, ctx.org, ctx.memberRows, ctx.roleRows, ctx.user.id, t, body);
+	await ctx.deliverMail?.();
 	return destination(ctx, txnId, 'Comment added');
 }
 

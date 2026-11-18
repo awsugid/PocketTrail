@@ -12,6 +12,14 @@ organizations in PocketTrail.
 A user's participation in a particular organization, with roles assigned within
 that organization. One user can hold memberships in multiple organizations.
 
+**Invited member**:
+A person invited to an organization who has not accepted yet. They hold a
+membership with a role but no access; they can be mapped, made responsible, and
+reminded by email. Accepting with a matching verified Google sign-in turns the
+same membership into a full one, keeping every assignment. An invitation's
+expiry does not remove an invited member.
+_Avoid_: Pending user or guest, which suggest an account or partial access.
+
 **Role**:
 A configurable bundle of application permissions assigned to an organization's
 members.
@@ -37,9 +45,10 @@ the statement's source/destination. An actor is not necessarily a login user.
 _Avoid_: User, when the person has not been established as an application member.
 
 **Responsible member**:
-The organization member assigned to supply a transaction's explanation and
-supporting evidence. A mapping can assign this member automatically without
-requiring the bank counterparty to have an application account.
+The organization member (including an invited member) assigned to supply a
+transaction's explanation and supporting evidence. A mapping can assign this
+member automatically without requiring the bank counterparty to have an
+application account.
 _Avoid_: Actor, when referring specifically to the person accountable for details.
 
 **Transaction notification suppression**:
@@ -49,13 +58,21 @@ or constitute approval.
 _Avoid_: Reminder-only suppression, completion, or approval.
 
 **Pocket owner**:
-An active organization member responsible for a pocket's unmapped expenses and
-income explanations when no active income-responsibility role members exist.
+An active organization member responsible for a pocket's unmapped expenses,
+its internal pocket movements, and income explanations when no active
+income-responsibility role members exist. An invited member cannot own a pocket.
 _Avoid_: Bank account owner or organization owner; neither defines this responsibility.
 
 **Actor mapping**:
 A pocket-specific association between a statement source/destination label and
 an expense's responsible member. Multiple labels can identify the same member.
+Saving a mapping also moves that pocket's matching expenses that still need
+details and were never reassigned by hand.
+
+**Internal pocket movement**:
+Money moved between the organization's own pockets ("Pocket Money Out",
+"Movement between Pockets"). Its responsible member is always the pocket owner;
+actor mappings never apply to it.
 _Avoid_: Bank account identity, which a label mapping does not establish.
 
 **Income-responsibility role**:

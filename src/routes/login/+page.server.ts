@@ -32,7 +32,7 @@ async function fixtureIdentities(db: App.Platform['env']['DB']): Promise<UserRow
 	return qAll<UserRow>(
 		db,
 		`SELECT id, email, name, google_sub, picture, is_platform_admin, created_at
-		 FROM users WHERE google_sub IS NULL ORDER BY id`
+		 FROM users WHERE google_sub IS NULL AND id NOT LIKE 'invite:%' ORDER BY id`
 	);
 }
 
@@ -94,7 +94,7 @@ export const actions: Actions = {
 		const userId = typeof form.get('user_id') === 'string' ? String(form.get('user_id')) : '';
 		const user = await qOne<UserRow>(
 			env.DB,
-			'SELECT id, email, name, google_sub, picture, is_platform_admin, created_at FROM users WHERE id = ?1 AND google_sub IS NULL',
+			"SELECT id, email, name, google_sub, picture, is_platform_admin, created_at FROM users WHERE id = ?1 AND google_sub IS NULL AND id NOT LIKE 'invite:%'",
 			[userId]
 		);
 		if (!user) throw error(403, 'Unknown fixture identity.');
@@ -137,13 +137,21 @@ export const actions: Actions = {
 			throw error(403, 'Google sign-in failed: invalid ID token.');
 		}
 		const claims = verified.claims;
-		const uid = `g:${claims.sub}`;
 		const db = bindings(event.platform).DB;
-		const owner = await qOne<{ id: string }>(
+		// A placeholder user created for an invitee is claimed by the verified
+		// Google identity carrying its email; afterwards the subject finds it.
+		const claimed = await qOne<{ id: string }>(
 			db,
-			'SELECT id FROM users WHERE LOWER(email)=LOWER(?1)',
+			"SELECT id FROM users WHERE google_sub = ?1 AND id LIKE 'invite:%'",
+			[claims.sub]
+		);
+		const owner = await qOne<{ id: string; google_sub: string | null }>(
+			db,
+			'SELECT id, google_sub FROM users WHERE LOWER(email)=LOWER(?1)',
 			[claims.email]
 		);
+		const claimable = owner !== null && owner.google_sub === null && owner.id.startsWith('invite:');
+		const uid = claimed?.id ?? (claimable ? owner.id : `g:${claims.sub}`);
 		if (owner && owner.id !== uid) {
 			throw error(409, 'This email is associated with another account record. Contact a platform administrator.');
 		}
@@ -154,7 +162,8 @@ export const actions: Actions = {
 				.prepare(
 					`INSERT INTO users (id, email, name, google_sub, is_platform_admin, created_at, picture)
 					 VALUES (?1, ?2, ?3, ?4, 0, ?5, ?6)
-					 ON CONFLICT(id) DO UPDATE SET email = excluded.email, name = excluded.name, picture = excluded.picture`
+					 ON CONFLICT(id) DO UPDATE SET email = excluded.email, name = excluded.name, picture = excluded.picture,
+					   google_sub = COALESCE(users.google_sub, excluded.google_sub)`
 				)
 				.bind(uid, claims.email, claims.name, claims.sub, now, claims.picture),
 			db

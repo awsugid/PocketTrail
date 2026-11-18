@@ -5,6 +5,7 @@ import type { RequestEvent } from '@sveltejs/kit';
 import { requireMember, verifiedForm } from './auth';
 import type { Permission } from './permissions';
 import type { SettingsCtx } from './settings';
+import { scheduleDelivery } from './notification_mail';
 
 export async function settingsForm(
 	event: RequestEvent,
@@ -20,7 +21,8 @@ export async function settingsForm(
 			org: member.org,
 			memberRows: member.memberRows,
 			secret: member.config.secret,
-			section
+			section,
+			deliverMail: () => scheduleDelivery(event, member.db, member.org.id)
 		},
 		form
 	};

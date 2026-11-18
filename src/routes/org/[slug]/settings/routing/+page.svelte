@@ -92,7 +92,7 @@
 							</div>
 							<div class="field">
 								<label for="mapping-member">Responsible member</label>
-								<Select id="mapping-member" name="member_id" items={activeMembers.map((member) => ({ value: String(member.id), label: member.name }))} required />
+								<Select id="mapping-member" name="member_id" items={activeMembers.map((member) => ({ value: String(member.id), label: member.invited ? `${member.name} (invited)` : member.name }))} required />
 							</div>
 						</div>
 						<div class="form-actions">

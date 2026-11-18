@@ -98,8 +98,12 @@ Only after the owning organization authorizes a specific deployment:
    After deployment, an operator can Resend an existing invitation to a
    consenting recipient and check its mail status. No live SMTP delivery was
    performed during local validation.
-   Transaction notification delivery remains outbox-only; this transport sends
-   invitations only and does not enable a reminder scheduler.
+   Notification emails (assignment, mention, and the manual weekly digest)
+   use the same SMTP variables and the same `EMAIL_DELIVERY_ENABLED=true`
+   gate. Each queued `notification_outbox` row records `sent_at`, `attempts`
+   (at most 3) and `last_error`; unsent rows are retried on the organization's
+   next delivery. With delivery disabled, rows stay queued and unsent. Rows
+   older than 7 days are never emailed. There is no reminder scheduler.
 
 Rollback: redeploy the previous commit's build. D1 migrations are append-only
 history; this repository does not ship a down-migration.

@@ -8,7 +8,7 @@ import { error, redirect } from '@sveltejs/kit';
 import { r2Bytes, type D1PreparedStatement, type R2Bucket } from '$lib/d1';
 import { counterpartyDisplay, parseStatement, toPayloadJson, type StatementRowPayload } from './parser';
 import { fmtMoney, fmtMoment, validDate, validTime, MAX_SAFE_MINOR } from '$lib/fmt';
-import { activeMem, mapCounterparty, mappingsOf, pocketsOf, type MappingRow, type MemRow, type TxnRow } from './rows';
+import { activeMem, isInternalMovement, mapCounterparty, mappingsOf, pocketsOf, type MappingRow, type MemRow, type TxnRow } from './rows';
 import { exec, nowMs, qAll, qOne } from './db';
 import { committed } from './audit';
 import { randomHex } from './tokens';
@@ -152,11 +152,14 @@ async function rowChunks(ctx: TxnCtx, pocketId: number, payload: ImportPayload):
 	let current: string[] = [];
 	let size = 2;
 	for (const row of payload.rows) {
+		// Internal pocket movements always belong to the pocket owner; actor
+		// mappings apply to every other expense.
+		const mapped = isInternalMovement(row.transaction_type)
+			? null
+			: (mapCounterparty(mappings, pocketId, row.counterparty)?.membership_id ?? null);
 		const responsible =
 			row.amount_minor < 0
-				? (activeMem(ctx.memberRows, mapCounterparty(mappings, pocketId, row.counterparty)?.membership_id ?? null)?.id ??
-					activeMem(ctx.memberRows, owner)?.id ??
-					null)
+				? (activeMem(ctx.memberRows, mapped)?.id ?? activeMem(ctx.memberRows, owner)?.id ?? null)
 				: null;
 		const encoded = JSON.stringify({ ...row, responsible, repeated: repeated.has(row.bank_id) });
 		if (byteLen(encoded) > 1_000_000) {
@@ -324,10 +327,13 @@ export async function importBatchPage(ctx: TxnCtx, id: number) {
 
 	const rows = items.map((it, index) => {
 		const row = payload ? payload.rows[index] : undefined;
+		const internal = row !== undefined && isInternalMovement(row.transaction_type);
 		const member =
 			it.amount_minor !== null && it.amount_minor < 0
-				? (activeMem(ctx.memberRows, mapCounterparty(mappings, batch.pocket_id, it.counterparty)?.membership_id ?? null) ??
-					activeMem(ctx.memberRows, owner))
+				? (activeMem(
+						ctx.memberRows,
+						internal ? null : (mapCounterparty(mappings, batch.pocket_id, it.counterparty)?.membership_id ?? null)
+					) ?? activeMem(ctx.memberRows, owner))
 				: null;
 		return {
 			bankId: it.bank_id ?? '',
@@ -423,6 +429,8 @@ export async function confirmImport(ctx: TxnCtx, id: number): Promise<never> {
 		for (const row of newRows) {
 			await enqueueAssignment(ctx.db, ctx.org, ctx.memberRows, ctx.roleRows, row);
 		}
+		// One email per recipient for the whole batch (notification_mail.ts).
+		if (newRows.length > 0) await ctx.deliverMail?.();
 	}
 	throw redirect(303, destination);
 }

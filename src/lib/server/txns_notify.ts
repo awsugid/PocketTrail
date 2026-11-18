@@ -4,8 +4,12 @@
 // may move/merge this file; the SQL and gating rules here must stay identical
 // to the Rust application.
 //
-// Bodies never carry financial details or attachments (product policy): they
-// name the organization, the fact of a task/mention, and the in-app link only.
+// Stored outbox bodies never carry financial details or attachments: they name
+// the organization, the fact of a task/mention, and the in-app link only. The
+// email built from assignment rows (notification_mail.ts) MAY add each
+// transaction's date, counterparty and signed IDR amount plus an absolute
+// link (product decision); mention and digest emails stay link-only. Rows
+// queued here are emailed when the caller runs scheduleDelivery.
 
 import { extractMentions } from '$lib/mentions';
 import { documentationOwed, incomeComplete, incomeRecipients } from '$lib/domain';

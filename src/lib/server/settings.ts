@@ -22,6 +22,11 @@ import { nowMs, qAll, qOne, exec } from './db';
 import { parseRolePermissions, permissionsFor, PERMISSIONS, PERMISSION_LABELS } from './permissions';
 import {
 	activeMem,
+	isInternalMovement,
+	isPlaceholderUser,
+	joinedMem,
+	labelMatches,
+	mapCounterparty,
 	mappingsOf,
 	memActive,
 	orgBySlug,
@@ -29,9 +34,12 @@ import {
 	rolesOfOrg,
 	type MemRow,
 	type OrgRow,
-	type RoleRow
+	type RoleRow,
+	type TxnRow
 } from './rows';
+import { enqueueAssignment } from './txns_notify';
 import { csrfForSecret } from './session';
+import { withdrawInvitedStatements } from './invited';
 import { randomHex } from './tokens';
 
 export interface SettingsCtx {
@@ -44,6 +52,10 @@ export interface SettingsCtx {
 	secret: string | null;
 	/** Settings sub-route to return to after a mutation ("pockets", "people",…). */
 	section?: string;
+	/** Schedule outbox email delivery for this org (notification_mail.ts
+	 * scheduleDelivery). Resolves to whether email delivery is enabled; never
+	 * throws. Absent when no request event is available (treated as disabled). */
+	deliverMail?: () => Promise<boolean>;
 }
 
 function str(form: FormData, name: string): string {
@@ -173,7 +185,7 @@ export async function settingsPageData(ctx: TenantContext, url: URL) {
 		limited: boolean;
 	} | null = null;
 	let previewToken = '';
-	let outbox: Array<{ kind: string; toName: string; subject: string; createdAtLabel: string }> = [];
+	let outbox: Array<{ kind: string; toName: string; subject: string; createdAtLabel: string; deliveryLabel: string }> = [];
 	if (can.notifications) {
 		const previewOrg: OrgRow = { ...org, notification_cutoff_date: previewCutoff };
 		const targets = await digestTargets(db, previewOrg, ctx.memberRows, ctx.roleRows);
@@ -183,7 +195,8 @@ export async function settingsPageData(ctx: TenantContext, url: URL) {
 			kind: n.kind,
 			toName: n.to_name,
 			subject: n.subject,
-			createdAtLabel: fmtMoment(n.created_at)
+			createdAtLabel: fmtMoment(n.created_at),
+			deliveryLabel: deliveryLabel(n)
 		}));
 	}
 
@@ -196,7 +209,8 @@ export async function settingsPageData(ctx: TenantContext, url: URL) {
 			email: m.email,
 			handle: m.handle,
 			roleId: m.role_id,
-			active: memActive(m)
+			active: memActive(m),
+			invited: m.invited !== 0
 		})),
 		permissions: PERMISSIONS.map((id) => ({ id, label: PERMISSION_LABELS[id] })),
 		mappings: mappings.map((m) => ({
@@ -208,7 +222,7 @@ export async function settingsPageData(ctx: TenantContext, url: URL) {
 		})),
 		incomeExplanationRoleId: org.income_explanation_role_id,
 		/** New pockets default to the organization creator while they are active. */
-		defaultOwnerId: activeMem(ctx.memberRows, org.creator_membership_id)?.id ?? null,
+		defaultOwnerId: joinedMem(ctx.memberRows, org.creator_membership_id)?.id ?? null,
 		pockets: pockets.map((p) => {
 			const owner = activeMem(ctx.memberRows, p.owner_membership_id);
 			return {
@@ -318,7 +332,7 @@ export async function addMember(ctx: SettingsCtx, form: FormData): Promise<never
 		'SELECT id, email, name, google_sub, picture, is_platform_admin, created_at FROM users WHERE id=?1 OR LOWER(email)=LOWER(?1)',
 		[identity]
 	);
-	if (!user) {
+	if (!user || isPlaceholderUser(user)) {
 		throw error(400, 'The user must sign in with Google once before membership can be granted.');
 	}
 	if (ctx.memberRows.some((m) => m.user_id === user.id)) {
@@ -365,7 +379,20 @@ async function setMembershipActive(ctx: SettingsCtx, id: number, active: boolean
 	if (!active && id === (me(ctx)?.id ?? 0)) {
 		throw error(400, 'Ask another membership manager to remove your membership.');
 	}
+	const target = ctx.memberRows.find((m) => m.id === id);
+	// Removing an invited member also withdraws the invitation, so it cannot
+	// be accepted later. Restoring keeps them invited (no access granted).
+	const withdraw =
+		!active && target !== undefined && target.invited !== 0
+			? [
+					ctx.db
+						.prepare('UPDATE invitations SET revoked_at=?1 WHERE org_id=?2 AND email=?3 COLLATE NOCASE AND accepted_at IS NULL AND revoked_at IS NULL')
+						.bind(nowMs(), ctx.org.id, target.email),
+					...withdrawInvitedStatements(ctx.db, ctx.org.id, target.email, nowMs())
+				]
+			: [];
 	await ctx.db.batch([
+		...withdraw,
 		ctx.db
 			.prepare('UPDATE memberships SET removed_at=?1 WHERE id=?2 AND org_id=?3')
 			.bind(active ? null : nowMs(), id, ctx.org.id),
@@ -434,7 +461,79 @@ export async function addMapping(ctx: SettingsCtx, form: FormData): Promise<neve
 		// mapped membership is the stable, non-sensitive identity.
 		committed(ctx.db, ctx.org.id, ctx.user.id, 'mapping.created', `mapping:member-${member.id}`)
 	]);
-	return redirect(303, backPath(ctx.org.slug, 'Mapping saved; existing transaction assignments were not changed', ctx.section));
+	const moved = await applyMappingToOpen(ctx, pocketId, pattern, member.id);
+	const note =
+		moved === 0
+			? 'Mapping saved; no open transactions needed to move'
+			: `Mapping saved; ${moved} transaction${moved === 1 ? '' : 's'} needing details moved to ${member.name}`;
+	return redirect(303, backPath(ctx.org.slug, note, ctx.section));
+}
+
+/** Move this pocket's expenses matching `pattern` to the mapped member when
+ * they still need details (pending, documentation incomplete), are not
+ * internal pocket movements or suppressed, and still carry their import-time
+ * assignment (never reassigned by hand: at most one responsible-history row).
+ * Each move is recorded in responsible history and queues an assignment
+ * notice. Returns the number of transactions moved. */
+export async function applyMappingToOpen(
+	ctx: SettingsCtx,
+	pocketId: number,
+	pattern: string,
+	membershipId: number
+): Promise<number> {
+	const candidates = await qAll<TxnRow>(
+		ctx.db,
+		`SELECT t.* FROM transactions t
+		 WHERE t.org_id=?1 AND t.pocket_id=?2 AND t.amount_minor<0 AND t.suppressed=0 AND t.status='pending'
+		   AND (t.responsible_membership_id IS NULL OR t.responsible_membership_id<>?3)
+		   AND (SELECT COUNT(*) FROM responsible_history h WHERE h.transaction_id=t.id)<=1
+		   AND NOT (trim(t.explanation)<>'' AND (trim(t.evidence_unavailable_reason)<>''
+		        OR EXISTS(SELECT 1 FROM documents d WHERE d.transaction_id=t.id AND d.kind='evidence' AND d.superseded=0)))`,
+		[ctx.org.id, pocketId, membershipId]
+	);
+	// Same matcher as import time; the pocket's other mappings keep priority
+	// for counterparties that one of them matches by full label.
+	const mappings = (await mappingsOf(ctx.db, ctx.org.id)).filter((m) => m.pocket_id === pocketId);
+	const ids = candidates
+		.filter((t) => !isInternalMovement(t.transaction_type) && labelMatches(pattern, t.counterparty))
+		.filter((t) => (mapCounterparty(mappings, pocketId, t.counterparty)?.membership_id ?? membershipId) === membershipId)
+		.map((t) => t.id);
+	if (ids.length === 0) return 0;
+	const now = nowMs();
+	const list = JSON.stringify(ids);
+	// Re-check the guards inside the write so a concurrent edit or reassignment
+	// between the read and this batch is never overridden.
+	const results = await ctx.db.batch([
+		ctx.db
+			.prepare(
+				`UPDATE transactions SET responsible_membership_id=?1, updated_at=?2, revision=revision+1
+				 WHERE org_id=?3 AND id IN (SELECT value FROM json_each(?4)) AND status='pending' AND suppressed=0
+				   AND (responsible_membership_id IS NULL OR responsible_membership_id<>?1)
+				   AND (SELECT COUNT(*) FROM responsible_history h WHERE h.transaction_id=transactions.id)<=1
+				   AND EXISTS(SELECT 1 FROM memberships m WHERE m.id=?1 AND m.org_id=?3 AND m.removed_at IS NULL)`
+			)
+			.bind(membershipId, now, ctx.org.id, list),
+		ctx.db
+			.prepare(
+				'INSERT OR IGNORE INTO responsible_history(transaction_id,membership_id,since) SELECT id,?1,?2 FROM transactions WHERE org_id=?3 AND id IN (SELECT value FROM json_each(?4)) AND responsible_membership_id=?1 AND updated_at=?2'
+			)
+			.bind(membershipId, now, ctx.org.id, list),
+		committedIfChanged(ctx.db, ctx.org.id, ctx.user.id, 'mapping.applied', `mapping:member-${membershipId}`)
+	]);
+	// meta.changes also counts trigger writes (revision/outbox), so count the
+	// moved rows themselves.
+	if ((results[0]?.meta?.changes ?? 0) === 0) return 0;
+	const roles = await rolesOfOrg(ctx.db, ctx.org.id);
+	const fresh = await qAll<TxnRow>(
+		ctx.db,
+		'SELECT * FROM transactions WHERE org_id=?1 AND id IN (SELECT value FROM json_each(?2)) AND responsible_membership_id=?3 AND updated_at=?4',
+		[ctx.org.id, list, membershipId, now]
+	);
+	for (const t of fresh) {
+		await enqueueAssignment(ctx.db, ctx.org, ctx.memberRows, roles, t);
+	}
+	await ctx.deliverMail?.();
+	return fresh.length;
 }
 
 export async function deleteMapping(ctx: SettingsCtx, id: number): Promise<never> {
@@ -460,9 +559,9 @@ export async function addPocket(ctx: SettingsCtx, form: FormData): Promise<never
 		throw error(400, 'A pocket already uses that name.');
 	}
 	const owner = optInt(form, 'owner_membership_id') ?? ctx.org.creator_membership_id;
-	const ownerMem = activeMem(ctx.memberRows, owner);
+	const ownerMem = joinedMem(ctx.memberRows, owner);
 	if (ownerMem === null) {
-		throw error(400, 'Choose an active pocket owner.');
+		throw error(400, 'Choose an active pocket owner who has joined the organization.');
 	}
 	await ctx.db.batch([
 		ctx.db
@@ -476,9 +575,9 @@ export async function addPocket(ctx: SettingsCtx, form: FormData): Promise<never
 }
 
 export async function setPocketOwner(ctx: SettingsCtx, form: FormData, id: number): Promise<never> {
-	const owner = activeMem(ctx.memberRows, optInt(form, 'owner_membership_id'));
+	const owner = joinedMem(ctx.memberRows, optInt(form, 'owner_membership_id'));
 	if (owner === null) {
-		throw error(400, 'Choose an active pocket owner.');
+		throw error(400, 'Choose an active pocket owner who has joined the organization.');
 	}
 	if (!(await pocketsOf(ctx.db, ctx.org.id)).some((p) => p.id === id)) {
 		throw error(404, 'Pocket not found.');
@@ -554,15 +653,27 @@ export async function saveNotifications(ctx: SettingsCtx, form: FormData): Promi
 			'UPDATE notification_outbox SET cancelled_at=?1 WHERE org_id=?2 AND cancelled_at IS NULL',
 			[nowMs(), ctx.org.id]
 		);
+		return redirect(
+			303,
+			backPath(ctx.org.slug, 'Notification settings saved; notifications are off and queued notices were cancelled', ctx.section)
+		);
 	}
+	// Retries any unsent notices now that the settings allow delivery.
+	const emailing = (await ctx.deliverMail?.()) ?? false;
 	return redirect(
 		303,
-		backPath(ctx.org.slug, 'Notification settings saved; delivery remains local-outbox only', ctx.section)
+		backPath(
+			ctx.org.slug,
+			emailing
+				? 'Notification settings saved; notices are emailed to recipients'
+				: 'Notification settings saved; email delivery is disabled, so notices stay in the outbox',
+			ctx.section
+		)
 	);
 }
 
-/** Weekly digest capture (local outbox only): one gated insert per eligible
- * recipient whose cadence allows it. */
+/** Weekly digest: one gated outbox insert per eligible recipient whose
+ * cadence allows it, then email delivery (when EMAIL_DELIVERY_ENABLED). */
 export async function sendDigest(ctx: SettingsCtx): Promise<never> {
 	if (ctx.org.notifications_enabled === 0) {
 		throw error(400, 'Organization notifications are disabled.');
@@ -589,9 +700,16 @@ export async function sendDigest(ctx: SettingsCtx): Promise<never> {
 			ctx.org.notification_revision
 		);
 	}
+	const emailing = (await ctx.deliverMail?.()) ?? false;
 	return redirect(
 		303,
-		backPath(ctx.org.slug, 'Eligible weekly digests captured locally; no email was sent', ctx.section)
+		backPath(
+			ctx.org.slug,
+			emailing
+				? 'Eligible weekly digests queued and being emailed'
+				: 'Eligible weekly digests queued; email delivery is disabled, so no email was sent',
+			ctx.section
+		)
 	);
 }
 
@@ -649,15 +767,24 @@ export async function insertRow(
 	);
 }
 
+/** Email delivery state of one outbox row, for the outbox table. */
+function deliveryLabel(n: { sent_at: number | null; attempts: number; last_error: string | null }): string {
+	if (n.sent_at !== null) return `Emailed ${fmtMoment(n.sent_at)}`;
+	if (n.last_error !== null && !n.last_error.startsWith('sending:')) {
+		return n.attempts >= 3 ? `Failed: ${n.last_error}` : `Retrying: ${n.last_error}`;
+	}
+	return n.attempts > 0 ? 'Sending' : 'Queued';
+}
+
 /** Outbox rows still deliverable-if-there-were-delivery: recipient membership
  * active, org notifications ON, and — for rows tied to a transaction — that
  * transaction not suppressed NOW. Digest rows (transaction_id NULL) pass the
  * transaction filter. */
 export async function outboxView(db: D1Database, org: OrgRow) {
 	if (org.notifications_enabled === 0) return [];
-	return qAll<{ id: number; kind: string; subject: string; created_at: number; to_name: string }>(
+	return qAll<{ id: number; kind: string; subject: string; created_at: number; to_name: string; sent_at: number | null; attempts: number; last_error: string | null }>(
 		db,
-		"SELECT n.id, n.kind, n.subject, n.created_at, u.name AS to_name FROM notification_outbox n JOIN memberships m ON m.id=n.to_membership_id AND m.org_id=n.org_id AND m.removed_at IS NULL JOIN roles r ON r.id=m.role_id AND r.org_id=m.org_id JOIN users u ON u.id=m.user_id LEFT JOIN transactions t ON t.id=n.transaction_id WHERE n.org_id=?1 AND n.cancelled_at IS NULL AND (EXISTS(SELECT 1 FROM json_each(r.permissions) WHERE value='ViewTransactions') OR (n.kind='digest' AND EXISTS(SELECT 1 FROM transactions dt JOIN pockets dp ON dp.id=dt.pocket_id AND dp.org_id=dt.org_id JOIN organizations o ON o.id=dt.org_id WHERE dt.org_id=n.org_id AND dt.amount_minor>0 AND trim(dt.explanation)='' AND dt.suppressed=0 AND (o.notification_cutoff_date IS NULL OR dt.txn_date>=o.notification_cutoff_date) AND instr(n.body, '/org/' || o.slug || '/transactions/' || dt.id || char(10))>0 AND (m.role_id=?2 OR (NOT EXISTS(SELECT 1 FROM memberships im WHERE im.org_id=n.org_id AND im.role_id=?2 AND im.removed_at IS NULL) AND dp.owner_membership_id=m.id)))) OR (t.amount_minor>0 AND (m.role_id=?2 OR (NOT EXISTS(SELECT 1 FROM memberships im WHERE im.org_id=n.org_id AND im.role_id=?2 AND im.removed_at IS NULL) AND m.id=(SELECT p.owner_membership_id FROM pockets p WHERE p.id=t.pocket_id AND p.org_id=n.org_id))))) AND (t.id IS NULL OR (t.suppressed=0 AND (n.kind='mention' OR EXISTS(SELECT 1 FROM organizations o WHERE o.id=n.org_id AND (o.notification_cutoff_date IS NULL OR t.txn_date>=o.notification_cutoff_date))) AND (t.amount_minor<=0 OR n.kind='mention' OR trim(t.explanation)=''))) AND (t.amount_minor IS NULL OR t.amount_minor<=0 OR n.kind='mention' OR (m.role_id=?2 OR (NOT EXISTS(SELECT 1 FROM memberships im WHERE im.org_id=n.org_id AND im.role_id=?2 AND im.removed_at IS NULL) AND m.id=(SELECT p.owner_membership_id FROM pockets p WHERE p.id=t.pocket_id AND p.org_id=n.org_id)))) AND (n.kind<>'digest' OR NOT EXISTS(SELECT 1 FROM transactions dt JOIN organizations o ON o.id=dt.org_id JOIN pockets dp ON dp.id=dt.pocket_id AND dp.org_id=dt.org_id WHERE dt.org_id=n.org_id AND instr(n.body, '/org/' || o.slug || '/transactions/' || dt.id || char(10))>0 AND (dt.suppressed<>0 OR (o.notification_cutoff_date IS NOT NULL AND dt.txn_date<o.notification_cutoff_date) OR (dt.amount_minor>0 AND (trim(dt.explanation)<>'' OR NOT (m.role_id=coalesce(?2,-1) OR (NOT EXISTS(SELECT 1 FROM memberships im WHERE im.org_id=n.org_id AND im.role_id=?2 AND im.removed_at IS NULL) AND coalesce(dp.owner_membership_id,-1)=m.id))))))) ORDER BY n.id DESC LIMIT 100",
+		"SELECT n.id, n.kind, n.subject, n.created_at, u.name AS to_name, n.sent_at, n.attempts, n.last_error FROM notification_outbox n JOIN memberships m ON m.id=n.to_membership_id AND m.org_id=n.org_id AND m.removed_at IS NULL JOIN roles r ON r.id=m.role_id AND r.org_id=m.org_id JOIN users u ON u.id=m.user_id LEFT JOIN transactions t ON t.id=n.transaction_id WHERE n.org_id=?1 AND n.cancelled_at IS NULL AND (EXISTS(SELECT 1 FROM json_each(r.permissions) WHERE value='ViewTransactions') OR (n.kind='digest' AND EXISTS(SELECT 1 FROM transactions dt JOIN pockets dp ON dp.id=dt.pocket_id AND dp.org_id=dt.org_id JOIN organizations o ON o.id=dt.org_id WHERE dt.org_id=n.org_id AND dt.amount_minor>0 AND trim(dt.explanation)='' AND dt.suppressed=0 AND (o.notification_cutoff_date IS NULL OR dt.txn_date>=o.notification_cutoff_date) AND instr(n.body, '/org/' || o.slug || '/transactions/' || dt.id || char(10))>0 AND (m.role_id=?2 OR (NOT EXISTS(SELECT 1 FROM memberships im WHERE im.org_id=n.org_id AND im.role_id=?2 AND im.removed_at IS NULL) AND dp.owner_membership_id=m.id)))) OR (t.amount_minor>0 AND (m.role_id=?2 OR (NOT EXISTS(SELECT 1 FROM memberships im WHERE im.org_id=n.org_id AND im.role_id=?2 AND im.removed_at IS NULL) AND m.id=(SELECT p.owner_membership_id FROM pockets p WHERE p.id=t.pocket_id AND p.org_id=n.org_id))))) AND (t.id IS NULL OR (t.suppressed=0 AND (n.kind='mention' OR EXISTS(SELECT 1 FROM organizations o WHERE o.id=n.org_id AND (o.notification_cutoff_date IS NULL OR t.txn_date>=o.notification_cutoff_date))) AND (t.amount_minor<=0 OR n.kind='mention' OR trim(t.explanation)=''))) AND (t.amount_minor IS NULL OR t.amount_minor<=0 OR n.kind='mention' OR (m.role_id=?2 OR (NOT EXISTS(SELECT 1 FROM memberships im WHERE im.org_id=n.org_id AND im.role_id=?2 AND im.removed_at IS NULL) AND m.id=(SELECT p.owner_membership_id FROM pockets p WHERE p.id=t.pocket_id AND p.org_id=n.org_id)))) AND (n.kind<>'digest' OR NOT EXISTS(SELECT 1 FROM transactions dt JOIN organizations o ON o.id=dt.org_id JOIN pockets dp ON dp.id=dt.pocket_id AND dp.org_id=dt.org_id WHERE dt.org_id=n.org_id AND instr(n.body, '/org/' || o.slug || '/transactions/' || dt.id || char(10))>0 AND (dt.suppressed<>0 OR (o.notification_cutoff_date IS NOT NULL AND dt.txn_date<o.notification_cutoff_date) OR (dt.amount_minor>0 AND (trim(dt.explanation)<>'' OR NOT (m.role_id=coalesce(?2,-1) OR (NOT EXISTS(SELECT 1 FROM memberships im WHERE im.org_id=n.org_id AND im.role_id=?2 AND im.removed_at IS NULL) AND coalesce(dp.owner_membership_id,-1)=m.id))))))) ORDER BY n.id DESC LIMIT 100",
 		[org.id, org.income_explanation_role_id]
 	);
 }

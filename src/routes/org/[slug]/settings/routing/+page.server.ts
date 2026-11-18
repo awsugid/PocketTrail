@@ -4,8 +4,8 @@ import { requireMember, shellContext } from '$lib/server/auth';
 import { addMapping, deleteMapping, saveIncomeRole, settingsPageData } from '$lib/server/settings';
 import { intField, settingsForm } from '$lib/server/settings_actions';
 
-// Routing: statement-label mappings and the income explanation role. Mapping
-// changes never rewrite existing assignments.
+// Routing: statement-label mappings and the income explanation role. Saving a
+// mapping moves matching expenses that still need details (applyMappingToOpen).
 export const load: PageServerLoad = async (event) => {
 	const ctx = await requireMember(event, event.params.slug, 'ViewTransactions');
 	return {

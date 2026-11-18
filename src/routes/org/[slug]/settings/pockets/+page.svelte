@@ -13,7 +13,8 @@
 	let { data }: { data: PageData } = $props();
 
 	const s = $derived(data.settings);
-	const activeMembers = $derived(s.members.filter((member) => member.active));
+	// Pocket owners must have joined; invited members cannot own a pocket.
+	const activeMembers = $derived(s.members.filter((member) => member.active && !member.invited));
 </script>
 
 <svelte:head>

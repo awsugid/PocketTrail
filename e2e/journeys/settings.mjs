@@ -210,7 +210,7 @@ export async function checks(ctx) {
 		});
 		check('an invitation can be revoked', revokedInvite.status === 303, String(revokedInvite.status));
 		const afterRevoke = await (await alice.get('/org/demo-jakarta/settings/people')).text();
-		check('a revoked invitation leaves the pending list', !afterRevoke.includes('invitee@example.test'));
+		check('a revoked invitation leaves the pending list', !(afterRevoke.split('invitations-heading')[1] ?? '').includes('invitee@example.test'));
 	}
 	const linkPage = await alice.get('/invitations/accept?token=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
 	check('an unknown invitation token is not found', linkPage.status === 404, String(linkPage.status));
@@ -237,8 +237,8 @@ export async function checks(ctx) {
 	const digest = await alice.postForm('/org/demo-jakarta/notifications/digest', { csrf_token: csrf });
 	check('a digest capture is accepted', digest.status === 303, String(digest.status));
 	const afterDigest = await (await alice.get('/org/demo-jakarta/settings/notifications')).text();
-	check('the local outbox is shown', /Local outbox/.test(afterDigest));
-	check('no delivery transport is claimed', /no email|Delivery stays/i.test(afterDigest));
+	check('the outbox is shown', /Outbox/.test(afterDigest));
+	check('disabled email delivery is reported, not claimed', /Email delivery is disabled/i.test(afterDigest));
 	const bobNotify = await bob.postForm('/org/demo-jakarta/settings/notifications?/saveNotifications', {
 		csrf_token: bobCsrf,
 		enabled: 'on',

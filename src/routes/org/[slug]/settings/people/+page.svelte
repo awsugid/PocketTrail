@@ -32,7 +32,7 @@
 			<section class="panel" aria-labelledby="members-heading">
 				<div class="panel__head">
 					<Icon name="people" size={16} /><h2 id="members-heading">Members</h2>
-					<span class="count">{s.members.filter((member) => member.active).length} active</span>
+					<span class="count">{s.members.filter((member) => member.active && !member.invited).length} active{#if s.members.some((member) => member.active && member.invited)} · {s.members.filter((member) => member.active && member.invited).length} invited{/if}</span>
 				</div>
 				<ul class="rows">
 					{#each s.members as member (member.id)}
@@ -41,7 +41,7 @@
 								<strong>{member.name}</strong>
 								<span class="rows__sub">{member.email} · @{member.handle}</span>
 							</div>
-							{#if !member.active}<span class="badge badge--muted">Revoked</span>{/if}
+							{#if !member.active}<span class="badge badge--muted">Revoked</span>{:else if member.invited}<span class="badge badge--muted">Invited</span>{/if}
 							<div class="rows__actions">
 								<form method="POST" action="?/setRole" class="form form--inline" use:submit>
 									<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
@@ -55,7 +55,9 @@
 										method="POST"
 										action="?/removeMember"
 										use:submit={{
-											confirm: `Revoke ${member.name}? Access and notifications end now.`,
+											confirm: member.invited
+												? `Withdraw the invitation for ${member.name}? Their mappings are removed and their open transactions return to the pocket owner.`
+												: `Revoke ${member.name}? Access and notifications end now.`,
 											confirmLabel: 'Revoke'
 										}}
 									>
@@ -128,7 +130,7 @@
 										method="POST"
 										action="/org/{slug}/settings/invitations/{invitation.id}/revoke"
 										use:guard={{
-											confirm: `Revoke invite? The link stops working.`,
+											confirm: `Revoke invite? The link stops working, their mappings are removed, and their open transactions return to the pocket owner.`,
 											confirmLabel: 'Revoke'
 										}}
 									>

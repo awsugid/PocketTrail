@@ -28,7 +28,7 @@
 	<PageHead title="Notifications" icon="bell">
 		{#snippet meta()}
 			<span class="badge badge--{s.notifications.enabled ? 'approved' : 'muted'}">{s.notifications.enabled ? 'On' : 'Off'}</span>
-			<span>Local outbox only · no email is sent</span>
+			<span>{data.emailDeliveryEnabled ? 'Notices are emailed to recipients' : 'Email delivery is disabled · notices stay in the outbox'}</span>
 		{/snippet}
 	</PageHead>
 	<SettingsNav current="notifications" can={s.can} slug={slug} />
@@ -80,7 +80,7 @@
 					<form method="POST" action="/org/{slug}/notifications/digest" class="form form--inline" use:guard>
 						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 						<button class="btn" type="submit" disabled={!s.notifications.enabled} aria-describedby="digest-why">
-							<Icon name="mail" size={16} />Capture weekly digests
+							<Icon name="mail" size={16} />Send weekly digests
 						</button>
 						{#if !s.notifications.enabled}<span class="hint" id="digest-why">Turn notifications on first.</span>{/if}
 					</form>
@@ -106,6 +106,7 @@
 									<th scope="col">To</th>
 									<th scope="col">Subject</th>
 									<th scope="col">Queued</th>
+									<th scope="col">Email</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -115,6 +116,7 @@
 										<td data-label="To">{row.toName}</td>
 										<td data-label="Subject">{row.subject}</td>
 										<td class="cell--nowrap" data-label="Queued">{row.createdAtLabel}</td>
+										<td data-label="Email">{data.emailDeliveryEnabled || row.deliveryLabel !== 'Queued' ? row.deliveryLabel : 'Not sent (email disabled)'}</td>
 									</tr>
 								{/each}
 							</tbody>

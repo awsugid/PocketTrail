@@ -69,6 +69,8 @@ export interface MemberRow {
 	handle: string;
 	created_at: number;
 	removed_at: number | null;
+	/** 1 while invited and not yet accepted: assignable, but no access. */
+	invited: number;
 	name: string;
 	email: string;
 }
@@ -167,7 +169,7 @@ async function membersOfOrg(db: D1Database, orgId: number): Promise<MemberRow[]>
 	return qAll<MemberRow>(
 		db,
 		`SELECT m.id, m.org_id, m.user_id, m.role_id, m.handle, m.created_at, m.removed_at,
-		        u.name, u.email
+		        m.invited, u.name, u.email
 		 FROM memberships m JOIN users u ON u.id = m.user_id
 		 WHERE m.org_id = ?1 ORDER BY m.id`,
 		[orgId]
@@ -188,7 +190,7 @@ export async function orgsOfUser(
 		db,
 		`SELECT o.slug, o.name FROM organizations o
 		 JOIN memberships m ON m.org_id = o.id
-		 WHERE m.user_id = ?1 AND m.removed_at IS NULL ORDER BY o.name`,
+		 WHERE m.user_id = ?1 AND m.removed_at IS NULL AND m.invited = 0 ORDER BY o.name`,
 		[userId]
 	);
 }
@@ -220,7 +222,8 @@ export async function shellContext(ctx: TenantContext) {
 			name: m.name,
 			email: m.email,
 			handle: m.handle,
-			active: m.removed_at === null
+			active: m.removed_at === null,
+			invited: m.invited !== 0
 		})),
 		csrfToken: ctx.session.csrf
 	};
@@ -238,11 +241,17 @@ export async function requireMember(
 	if (!org) throw error(404, 'Unknown organization.');
 	const memberRows = await membersOfOrg(login.db, org.id);
 	const roleRows = await rolesOfOrg(login.db, org.id);
+	// Invited members are assignable but hold no access until they accept.
 	const members: MemberRef[] = memberRows.map((row) => ({
 		userId: row.user_id,
 		roleId: row.role_id,
-		active: row.removed_at === null
+		active: row.removed_at === null && row.invited === 0
 	}));
+	const own = memberRows.find((row) => row.user_id === login.user.id);
+	if (own && own.removed_at === null && own.invited !== 0) {
+		// Accepting happens from Organizations, which lists open invitations.
+		throw redirect(303, '/orgs');
+	}
 	const roles: RoleRef[] = roleRows.map((row) => ({ id: row.id, permissions: row.permissions }));
 	if (!memberIsActive(members, login.user.id)) {
 		throw error(403, 'Active organization membership required.');

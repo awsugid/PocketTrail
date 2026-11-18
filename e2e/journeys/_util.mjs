@@ -41,7 +41,7 @@ export function statement(rows) {
 		.map((row) =>
 			[
 				statementRow(row.date, row.source, row.details, row.notes ?? '', row.amount, row.balance),
-				statementTime(row.time ?? '09:00', row.source, row.id ?? '')
+				statementTime(row.time ?? '09:00', row.source2 ?? row.source, row.id ?? '')
 			].join('\n')
 		)
 		.join('\n');

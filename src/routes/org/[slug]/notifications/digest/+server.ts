@@ -2,8 +2,10 @@ import type { RequestHandler } from './$types';
 
 import { requireMember, verifiedForm } from '$lib/server/auth';
 import { sendDigest, type SettingsCtx } from '$lib/server/settings';
+import { scheduleDelivery } from '$lib/server/notification_mail';
 
-// POST /org/:slug/notifications/digest — the weekly digest capture, kept at
+// POST /org/:slug/notifications/digest — the weekly digest (queued, then
+// emailed when EMAIL_DELIVERY_ENABLED), kept at
 // its own path so the audit trail records the same target as the Rust app.
 export const POST: RequestHandler = async (event) => {
 	const ctx = await requireMember(event, event.params.slug, 'ManageNotifications');
@@ -13,7 +15,8 @@ export const POST: RequestHandler = async (event) => {
 		user: ctx.user,
 		org: ctx.org,
 		memberRows: ctx.memberRows,
-		secret: ctx.config.secret
+		secret: ctx.config.secret,
+		deliverMail: () => scheduleDelivery(event, ctx.db, ctx.org.id)
 	};
 	return sendDigest(settingsCtx);
 };

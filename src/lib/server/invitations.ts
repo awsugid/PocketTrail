@@ -14,6 +14,7 @@ import { rolesOfOrg } from './rows';
 import { validEmail } from './profile';
 import { encodeToken, hashToken, randomHex } from './tokens';
 import { deliverMail, msgQuery, outcomeMessage, type MailEnv } from './invitation_mail';
+import { inviteMembershipStatements, withdrawInvitedStatements } from './invited';
 
 export interface PendingInvitation {
 	id: string;
@@ -30,8 +31,8 @@ export async function pendingInvitations(
 ): Promise<PendingInvitation[]> {
 	return qAll<PendingInvitation>(
 		db,
-		'SELECT i.id,i.email,o.name AS org_name,r.name AS role_name,i.expires_at FROM invitations i JOIN organizations o ON o.id=i.org_id JOIN roles r ON r.id=i.role_id AND r.org_id=i.org_id WHERE i.email=?1 COLLATE NOCASE AND i.accepted_at IS NULL AND i.revoked_at IS NULL AND i.expires_at>?2',
-		[email, nowMs()]
+		'SELECT i.id,i.email,o.name AS org_name,r.name AS role_name,i.expires_at FROM invitations i JOIN organizations o ON o.id=i.org_id JOIN roles r ON r.id=i.role_id AND r.org_id=i.org_id WHERE i.email=?1 COLLATE NOCASE AND i.accepted_at IS NULL AND i.revoked_at IS NULL',
+		[email]
 	);
 }
 
@@ -60,7 +61,7 @@ export async function createInvitation(
 	if (!roles.some((r) => r.id === roleId)) {
 		throw error(400, 'Choose an organization role.');
 	}
-	if (ctx.memberRows.some((m) => m.removed_at === null && m.email.toLowerCase() === email.toLowerCase())) {
+	if (ctx.memberRows.some((m) => m.removed_at === null && !m.invited && m.email.toLowerCase() === email.toLowerCase())) {
 		throw error(400, 'This person is already an active member.');
 	}
 	const roleName = roles.find((r) => r.id === roleId)?.name ?? '';
@@ -84,6 +85,9 @@ export async function createInvitation(
 				"INSERT INTO invitation_mail(invitation_id,token_hash,status,created_at) VALUES(?1,?2,'pending',?3)"
 			)
 			.bind(id, hashToken(token), now),
+		// The invitee becomes an invited member right away: mappable,
+		// assignable, and emailed, with no access until they accept.
+		...inviteMembershipStatements(ctx.db, ctx.org.id, email, roleId, now),
 		committedEvent(ctx.db, ctx.org.id, ctx.user.id, 'invitation.created', normalizeTarget(ctx.path))
 	]);
 	const outcome = await deliverMail(env, ctx.db, {
@@ -106,12 +110,12 @@ async function openInvitation(
 	db: D1Database,
 	orgId: number,
 	id: string,
-	now: number
+	_now: number
 ): Promise<OpenInvitation | null> {
 	return qOne<OpenInvitation>(
 		db,
-		'SELECT i.email,r.name AS role_name,i.expires_at FROM invitations i JOIN roles r ON r.id=i.role_id AND r.org_id=i.org_id WHERE i.id=?1 AND i.org_id=?2 AND i.accepted_at IS NULL AND i.revoked_at IS NULL AND i.expires_at>?3',
-		[id, orgId, now]
+		'SELECT i.email,r.name AS role_name,i.expires_at FROM invitations i JOIN roles r ON r.id=i.role_id AND r.org_id=i.org_id WHERE i.id=?1 AND i.org_id=?2 AND i.accepted_at IS NULL AND i.revoked_at IS NULL',
+		[id, orgId]
 	);
 }
 
@@ -131,19 +135,25 @@ export async function resendInvitation(
 	const results = await ctx.db.batch([
 		ctx.db
 			.prepare(
-				"UPDATE invitation_mail SET status='superseded' WHERE invitation_id=?1 AND status!='superseded' AND EXISTS(SELECT 1 FROM invitations i WHERE i.id=?1 AND i.org_id=?2 AND i.accepted_at IS NULL AND i.revoked_at IS NULL AND i.expires_at>?3)"
+				"UPDATE invitation_mail SET status='superseded' WHERE invitation_id=?1 AND status!='superseded' AND EXISTS(SELECT 1 FROM invitations i WHERE i.id=?1 AND i.org_id=?2 AND i.accepted_at IS NULL AND i.revoked_at IS NULL)"
 			)
-			.bind(id, ctx.org.id, now),
+			.bind(id, ctx.org.id),
 		ctx.db
 			.prepare(
-				"INSERT INTO invitation_mail(invitation_id,token_hash,status,created_at) SELECT ?1,?2,'pending',?3 WHERE EXISTS(SELECT 1 FROM invitations i WHERE i.id=?1 AND i.org_id=?4 AND i.accepted_at IS NULL AND i.revoked_at IS NULL AND i.expires_at>?3)"
+				"INSERT INTO invitation_mail(invitation_id,token_hash,status,created_at) SELECT ?1,?2,'pending',?3 WHERE EXISTS(SELECT 1 FROM invitations i WHERE i.id=?1 AND i.org_id=?4 AND i.accepted_at IS NULL AND i.revoked_at IS NULL)"
 			)
 			.bind(id, hashToken(token), now, ctx.org.id),
 		ctx.db
 			.prepare(
 				"INSERT INTO audit_events(actor_id,org_id,action,target,outcome,created_at) SELECT ?1,i.org_id,'invitation.resent',?2,'committed',?5 FROM invitations i WHERE i.id=?3 AND (SELECT changes())=1"
 			)
-			.bind(ctx.user.id, normalizeTarget(ctx.path), id, ctx.org.id, now)
+			.bind(ctx.user.id, normalizeTarget(ctx.path), id, ctx.org.id, now),
+		// Resending renews an expired link: expiry never ends an invitation.
+		ctx.db
+			.prepare(
+				'UPDATE invitations SET expires_at=MAX(expires_at,?1) WHERE id=?2 AND org_id=?3 AND accepted_at IS NULL AND revoked_at IS NULL'
+			)
+			.bind(now + 7 * 86400000, id, ctx.org.id)
 	]);
 	const inserted = changesOf(results[1]) === 1;
 	if (!inserted) throw error(404, 'Invitation is no longer open.');
@@ -154,12 +164,20 @@ export async function resendInvitation(
 // ------------------------------------------------------------------ revoke
 
 export async function revokeInvitation(ctx: TenantContextLike, id: string): Promise<never> {
+	const inv = await qOne<{ email: string }>(
+		ctx.db,
+		'SELECT email FROM invitations WHERE id=?1 AND org_id=?2 AND accepted_at IS NULL AND revoked_at IS NULL',
+		[id, ctx.org.id]
+	);
+	const now = nowMs();
 	await ctx.db.batch([
+		// Withdraw the invited member first (only invited=1 rows are touched).
+		...(inv ? withdrawInvitedStatements(ctx.db, ctx.org.id, inv.email, now) : []),
 		ctx.db
 			.prepare(
 				'UPDATE invitations SET revoked_at=?1 WHERE id=?2 AND org_id=?3 AND accepted_at IS NULL AND revoked_at IS NULL'
 			)
-			.bind(nowMs(), id, ctx.org.id),
+			.bind(now, id, ctx.org.id),
 		ctx.db
 			.prepare(
 				"INSERT INTO audit_events(actor_id,org_id,action,target,outcome,created_at) SELECT ?1,i.org_id,'invitation.revoked',?2,'committed',?5 FROM invitations i WHERE i.id=?3 AND i.org_id=?4 AND (SELECT changes())=1"
@@ -192,12 +210,12 @@ export function acceptStatements(
 		return [
 			db
 				.prepare(
-					"INSERT INTO memberships(org_id,user_id,role_id,handle,created_at) SELECT i.org_id,?1,i.role_id,?1,?2 FROM invitations i JOIN roles r ON r.id=i.role_id AND r.org_id=i.org_id JOIN invitation_mail im ON im.invitation_id=i.id AND im.token_hash=?5 AND im.status='sent' WHERE i.id=?3 AND i.email=?4 COLLATE NOCASE AND i.accepted_at IS NULL AND i.revoked_at IS NULL AND i.expires_at>?2 ON CONFLICT(org_id,user_id) DO UPDATE SET role_id=excluded.role_id,removed_at=NULL WHERE memberships.removed_at IS NOT NULL"
+					"INSERT INTO memberships(org_id,user_id,role_id,handle,created_at) SELECT i.org_id,?1,i.role_id,?1,?2 FROM invitations i JOIN roles r ON r.id=i.role_id AND r.org_id=i.org_id JOIN invitation_mail im ON im.invitation_id=i.id AND im.token_hash=?5 AND im.status='sent' WHERE i.id=?3 AND i.email=?4 COLLATE NOCASE AND i.accepted_at IS NULL AND i.revoked_at IS NULL AND i.expires_at>?2 ON CONFLICT(org_id,user_id) DO UPDATE SET role_id=excluded.role_id,removed_at=NULL,invited=0 WHERE memberships.removed_at IS NOT NULL OR memberships.invited=1"
 				)
 				.bind(userId, now, invitationId, email, gate),
 			db
 				.prepare(
-					"UPDATE invitations SET accepted_at=?1,accepted_by=?2 WHERE id=?3 AND email=?4 COLLATE NOCASE AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at>?1 AND EXISTS(SELECT 1 FROM memberships m WHERE m.org_id=invitations.org_id AND m.user_id=?2 AND m.removed_at IS NULL) AND EXISTS(SELECT 1 FROM invitation_mail x WHERE x.invitation_id=invitations.id AND x.token_hash=?5 AND x.status='sent')"
+					"UPDATE invitations SET accepted_at=?1,accepted_by=?2 WHERE id=?3 AND email=?4 COLLATE NOCASE AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at>?1 AND EXISTS(SELECT 1 FROM memberships m WHERE m.org_id=invitations.org_id AND m.user_id=?2 AND m.removed_at IS NULL AND m.invited=0) AND EXISTS(SELECT 1 FROM invitation_mail x WHERE x.invitation_id=invitations.id AND x.token_hash=?5 AND x.status='sent')"
 				)
 				.bind(now, userId, invitationId, email, gate)
 		];
@@ -205,12 +223,12 @@ export function acceptStatements(
 	return [
 		db
 			.prepare(
-				'INSERT INTO memberships(org_id,user_id,role_id,handle,created_at) SELECT i.org_id,?1,i.role_id,?1,?2 FROM invitations i JOIN roles r ON r.id=i.role_id AND r.org_id=i.org_id WHERE i.id=?3 AND i.email=?4 COLLATE NOCASE AND i.accepted_at IS NULL AND i.revoked_at IS NULL AND i.expires_at>?2 ON CONFLICT(org_id,user_id) DO UPDATE SET role_id=excluded.role_id,removed_at=NULL WHERE memberships.removed_at IS NOT NULL'
+				'INSERT INTO memberships(org_id,user_id,role_id,handle,created_at) SELECT i.org_id,?1,i.role_id,?1,?2 FROM invitations i JOIN roles r ON r.id=i.role_id AND r.org_id=i.org_id WHERE i.id=?3 AND i.email=?4 COLLATE NOCASE AND i.accepted_at IS NULL AND i.revoked_at IS NULL ON CONFLICT(org_id,user_id) DO UPDATE SET role_id=excluded.role_id,removed_at=NULL,invited=0 WHERE memberships.removed_at IS NOT NULL OR memberships.invited=1'
 			)
 			.bind(userId, now, invitationId, email),
 		db
 			.prepare(
-				'UPDATE invitations SET accepted_at=?1,accepted_by=?2 WHERE id=?3 AND email=?4 COLLATE NOCASE AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at>?1 AND EXISTS(SELECT 1 FROM memberships m WHERE m.org_id=invitations.org_id AND m.user_id=?2 AND m.removed_at IS NULL)'
+				'UPDATE invitations SET accepted_at=?1,accepted_by=?2 WHERE id=?3 AND email=?4 COLLATE NOCASE AND accepted_at IS NULL AND revoked_at IS NULL AND EXISTS(SELECT 1 FROM memberships m WHERE m.org_id=invitations.org_id AND m.user_id=?2 AND m.removed_at IS NULL AND m.invited=0)'
 			)
 			.bind(now, userId, invitationId, email)
 	];
@@ -257,8 +275,8 @@ export async function acceptFromOrganizations(
 	// is a 404, never a silent redirect.
 	const open = await qOne<{ ok: number }>(
 		login.db,
-		'SELECT 1 AS ok FROM invitations WHERE id=?1 AND email=?2 COLLATE NOCASE AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at>?3',
-		[id, login.user.email, now]
+		'SELECT 1 AS ok FROM invitations WHERE id=?1 AND email=?2 COLLATE NOCASE AND accepted_at IS NULL AND revoked_at IS NULL',
+		[id, login.user.email]
 	);
 	if (!open) throw error(404, 'This invitation is no longer available.');
 	const statements = acceptStatements(login.db, login.user.id, id, login.user.email, now, null);
@@ -360,7 +378,7 @@ export interface TenantContextLike {
 	db: D1Database;
 	user: UserRowLike;
 	org: { id: number; slug: string };
-	memberRows: Array<{ id: number; user_id: string; email: string; removed_at: number | null }>;
+	memberRows: Array<{ id: number; user_id: string; email: string; removed_at: number | null; invited?: number }>;
 	path: string;
 }
 
@@ -389,7 +407,7 @@ export function inviteCtxFrom(
 		db: import('$lib/d1').D1Database;
 		user: { id: string; email: string };
 		org: { id: number; slug: string };
-		memberRows: ReadonlyArray<{ id: number; user_id: string; email: string; removed_at: number | null }>;
+		memberRows: ReadonlyArray<{ id: number; user_id: string; email: string; removed_at: number | null; invited?: number }>;
 	},
 	path: string
 ): TenantContextLike {
@@ -401,7 +419,8 @@ export function inviteCtxFrom(
 			id: m.id,
 			user_id: m.user_id,
 			email: m.email,
-			removed_at: m.removed_at
+			removed_at: m.removed_at,
+			invited: m.invited
 		})),
 		path
 	};

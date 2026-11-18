@@ -3,6 +3,7 @@
 
 import type { D1Database } from '$lib/d1';
 import { qAll, qOne } from './db';
+import { counterpartyDisplay } from './ledger';
 import { extractMentions, resolveMentions } from '$lib/mentions';
 import { fmtTs } from '$lib/fmt';
 import { documentationOwed, incomeComplete, runtimeStatus, validateDocumentation, type DomTxn, type DocStatus, type Documentation, type Purpose } from '$lib/domain';
@@ -37,11 +38,41 @@ export interface MemRow {
 	handle: string;
 	created_at: number;
 	removed_at: number | null;
+	/** 1 while the person has been invited but has not accepted yet. */
+	invited: number;
 	name: string;
 	email: string;
 }
 
+/** Assignable: an active or invited member (mappings, responsibility, email). */
 export const memActive = (m: MemRow) => m.removed_at === null;
+
+/** Joined: an active member who has accepted, i.e. holds access. Pocket
+ * ownership and anything the member must act on in the app requires this. */
+export const memJoined = (m: MemRow) => m.removed_at === null && m.invited === 0;
+
+/** Jago transaction types that move money between the organization's own
+ * pockets. Their responsible member is always the pocket owner. */
+const INTERNAL_MOVEMENT_TYPES = ['pocket money out', 'pocket money in', 'movement between pockets'];
+
+export function isInternalMovement(transactionType: string): boolean {
+	return INTERNAL_MOVEMENT_TYPES.includes(transactionType.trim().toLowerCase());
+}
+
+/** Users created for an invitee who has never signed in carry this id prefix
+ * and no Google subject; the invitee's verified Google sign-in claims them. */
+export const PLACEHOLDER_USER_PREFIX = 'invite:';
+
+export function isPlaceholderUser(user: { id: string; google_sub: string | null }): boolean {
+	return user.google_sub === null && user.id.startsWith(PLACEHOLDER_USER_PREFIX);
+}
+
+/** Resolve a membership id to a JOINED membership row of this org. */
+export function joinedMem(mems: readonly MemRow[], id: number | null | undefined): MemRow | null {
+	if (id === null || id === undefined) return null;
+	const m = mems.find((candidate) => candidate.id === id);
+	return m && memJoined(m) ? m : null;
+}
 
 /** Resolve a responsible membership id to an ACTIVE membership row of this
  * org; null when unassigned/removed/foreign. */
@@ -214,16 +245,32 @@ export async function historyOf(db: D1Database, txnId: number): Promise<number[]
 
 /** Best-effort actor mapping: exact, trimmed, case-insensitive label match
  * within one pocket. */
+/** Whether a mapping label identifies this statement counterparty: the full
+ * label (e.g. "AZMI FAIZ HABIBI / Jago 102707966843") or the name the ledger
+ * displays for it ("AZMI FAIZ HABIBI"), case- and edge-space-insensitive. An
+ * exact full-label mapping wins over a display-name one. */
+export function labelMatches(pattern: string, counterparty: string): boolean {
+	const want = pattern.trim().toLowerCase();
+	if (want === '') return false;
+	if (counterparty.trim().toLowerCase() === want) return true;
+	return counterpartyDisplay(counterparty).name.trim().toLowerCase() === want;
+}
+
 export function mapCounterparty(mappings: readonly MappingRow[], pocketId: number, counterparty: string): MappingRow | null {
-	const want = counterparty.trim().toLowerCase();
-	return mappings.find((m) => m.pocket_id === pocketId && m.pattern.trim().toLowerCase() === want) ?? null;
+	const full = counterparty.trim().toLowerCase();
+	const inPocket = mappings.filter((m) => m.pocket_id === pocketId);
+	return (
+		inPocket.find((m) => m.pattern.trim().toLowerCase() === full) ??
+		inPocket.find((m) => labelMatches(m.pattern, counterparty)) ??
+		null
+	);
 }
 
 /** A tiny DecisionOrg view over freshly read rows: the single authorization
  * vocabulary every decision uses. */
 export function decisionOrgFor(mems: readonly MemRow[], roles: readonly RoleRow[], userId: string) {
 	const me = mems.find((m) => m.user_id === userId) ?? null;
-	const active = me !== null && memActive(me);
+	const active = me !== null && memJoined(me);
 	const granted = new Set<Permission>();
 	if (me && active) {
 		for (const role of roles) {
