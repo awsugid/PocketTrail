@@ -31,7 +31,7 @@ export async function pendingInvitations(
 ): Promise<PendingInvitation[]> {
 	return qAll<PendingInvitation>(
 		db,
-		'SELECT i.id,i.email,o.name AS org_name,r.name AS role_name,i.expires_at FROM invitations i JOIN organizations o ON o.id=i.org_id JOIN roles r ON r.id=i.role_id AND r.org_id=i.org_id WHERE i.email=?1 COLLATE NOCASE AND i.accepted_at IS NULL AND i.revoked_at IS NULL',
+		'SELECT i.id,i.email,o.name AS orgName,r.name AS roleName,i.expires_at AS expiresAt FROM invitations i JOIN organizations o ON o.id=i.org_id JOIN roles r ON r.id=i.role_id AND r.org_id=i.org_id WHERE i.email=?1 COLLATE NOCASE AND i.accepted_at IS NULL AND i.revoked_at IS NULL',
 		[email]
 	);
 }
