@@ -49,6 +49,7 @@
 	const nav: Array<{ key: string; label: string; path: string; icon: IconName }> = [
 		{ key: 'actions', label: 'Actions', path: 'actions', icon: 'actions' },
 		{ key: 'transactions', label: 'Ledger', path: 'transactions', icon: 'ledger' },
+		{ key: 'purposes', label: 'Purposes', path: 'purposes', icon: 'tag' },
 		{ key: 'imports', label: 'Imports', path: 'imports', icon: 'imports' },
 		{ key: 'inventory', label: 'Inventory', path: 'inventory', icon: 'inventory' },
 		{ key: 'settings', label: 'Settings', path: 'settings', icon: 'settings' }

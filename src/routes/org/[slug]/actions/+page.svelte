@@ -18,10 +18,12 @@
 			title: 'To explain',
 			icon: 'comment',
 			rows: data.explain.map((task) => ({
-				href: `/org/${slug}/transactions/${task.id}`,
-				title: task.counterparty,
-				sub: `${fmtDate(task.date)} · ${task.pocketName}`,
-				badge: task.income ? 'Income notes' : 'Needs details',
+				href: task.purposeId ? `/org/${slug}/purposes/${task.purposeId}` : `/org/${slug}/transactions/${task.id}`,
+				title: task.purposeId ? (task.purposeName ?? task.counterparty) : task.counterparty,
+				sub: task.purposeId
+					? `${fmtDate(task.date)} · ${task.pocketName} · ${task.counterparty}`
+					: `${fmtDate(task.date)} · ${task.pocketName}`,
+				badge: task.income ? 'Income notes' : (task.badge ?? 'Needs details'),
 				tone: 'needs'
 			}))
 		},
@@ -30,9 +32,9 @@
 			title: 'To review',
 			icon: 'check',
 			rows: data.review.map((task) => ({
-				href: `/org/${slug}/transactions/${task.id}`,
-				title: task.counterparty,
-				sub: `${fmtDate(task.date)} · ${task.pocketName}`,
+				href: `/org/${slug}/purposes/${task.id}`,
+				title: task.purposeName,
+				sub: `${fmtDate(task.date)} · ${task.pocketName} · ${task.counterparty}`,
 				badge: 'Awaiting review',
 				tone: 'review'
 			}))

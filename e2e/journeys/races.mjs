@@ -34,15 +34,14 @@ export async function checks(ctx) {
 	const revision = html.match(/name="revision"\s+value="(\d+)"/)?.[1] ?? '';
 
 	const save = (client, csrf, text) =>
-		client.postForm(`${detailPath}?/details`, {
+		client.postForm(`${detailPath}?/allocations`, {
 			csrf_token: csrf,
 			revision,
-			explanation: text,
 			responsible_member_id: '1',
-			evidence_unavailable_reason: 'DEMO: race',
-			'split_label[]': 'DEMO: hosting',
-			'split_amount[]': '120000',
-			'split_member[]': '1'
+			'alloc_purpose[]': 'DEMO: hosting',
+			'alloc_amount[]': '120000',
+			'alloc_member[]': '',
+			justification: `DEMO: race writer ${text}`
 		});
 	const [first, second] = await Promise.all([
 		save(aliceA, csrfA, 'DEMO: race writer A'),
@@ -60,8 +59,8 @@ export async function checks(ctx) {
 	check('the surviving write is one whole version', winnerA !== winnerB, `A=${winnerA} B=${winnerB}`);
 	check(
 		'the losing write left no duplicate child rows',
-		/Purposes match the bank amount/.test(settled.replace(/\s+/g, ' ')),
-		'purpose total does not reconcile'
+		/Fully allocated/.test(settled.replace(/\s+/g, ' ')),
+		'allocation total does not reconcile'
 	);
 
 	// ---------------------------------------------- import confirmation race

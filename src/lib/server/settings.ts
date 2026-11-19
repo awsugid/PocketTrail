@@ -9,6 +9,7 @@ import type { D1Database } from '$lib/d1';
 import { ALL_PERMISSIONS, documentationOwed, incomeComplete, incomeRecipients } from '$lib/domain';
 import { parseRupiah, validDate, fmtMoment, fmtTsOrDash as fmtTs } from '$lib/fmt';
 import { digestBody, digestDue } from '$lib/notify_rules';
+import { owedPurposeState } from './purposes';
 import { committed, committedIfChanged, listOrg } from './audit';
 import {
 	actionLabel,
@@ -808,15 +809,39 @@ export async function digestTargets(
 		org.notification_cutoff_date !== null && org.notification_cutoff_date !== ''
 			? org.notification_cutoff_date
 			: null;
+	// Purpose-derived documentation state for allocated expenses.
+	const purposeState = await owedPurposeState(db, org.id);
+	const allocatedTxnIds = new Set(purposeState.allocatedTxnIds);
+	const owedTxnIds = new Set([
+		...purposeState.owedPurposes.map((owed) => owed.txnId),
+		...purposeState.remainders.map((remainder) => remainder.txnId)
+	]);
+	const purposeChase = new Map<number, number[]>(); // txn → effective members to chase
+	for (const owed of purposeState.owedPurposes) {
+		const list = purposeChase.get(owed.txnId) ?? [];
+		for (const mid of owed.effective) if (!list.includes(mid)) list.push(mid);
+		purposeChase.set(owed.txnId, list);
+	}
+	for (const remainder of purposeState.remainders) {
+		if (remainder.responsibleId === null) continue;
+		const list = purposeChase.get(remainder.txnId) ?? [];
+		if (!list.includes(remainder.responsibleId)) list.push(remainder.responsibleId);
+		purposeChase.set(remainder.txnId, list);
+	}
 	const owed = rows.filter((r) => {
+		if (cutoff !== null && r.txn_date < cutoff) return false;
+		if (r.amount_minor > 0) {
+			return incomeComplete(r.explanation) === false;
+		}
+		// Allocated expenses chase purpose-derived state only (Notes/evidence
+		// gates and purpose responsibility), never the legacy predicates.
+		if (allocatedTxnIds.has(r.id)) {
+			return owedTxnIds.has(r.id);
+		}
 		const complete =
 			r.explanation.trim() !== '' &&
 			(r.evidence_count > 0 || r.evidence_unavailable_reason.trim() !== '');
-		const chase =
-			r.amount_minor > 0
-				? !incomeComplete(r.explanation)
-				: documentationOwed(r.status, complete);
-		return chase && (cutoff === null || r.txn_date >= cutoff);
+		return documentationOwed(r.status, complete);
 	});
 
 	// Split-level responsibles chase their own purposes (txn-level inheriting
@@ -863,6 +888,10 @@ export async function digestTargets(
 		let resps: number[];
 		if (r.amount_minor > 0) {
 			resps = incomeRecipients(org.income_explanation_role_id, r.owner_membership_id, members);
+		} else if (allocatedTxnIds.has(r.id)) {
+			// Purpose responsibility routes the chase: allocation overrides, else
+			// purpose members, else the transaction's inherited member.
+			resps = purposeChase.get(r.id) ?? [];
 		} else {
 			resps = splitResps.get(r.id) ?? [];
 			splitResps.delete(r.id);

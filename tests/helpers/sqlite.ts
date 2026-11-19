@@ -2,15 +2,9 @@ import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import { readFileSync, readdirSync } from 'node:fs';
 import type { D1Database, D1PreparedStatement, D1Result } from '$lib/d1';
 
-/** Run real server statements against SQLite with D1's numbered bindings and
- * transactional batch semantics, without any Cloudflare or network dependency. */
-export function testDatabase() {
-	const sqlite = new DatabaseSync(':memory:');
-	sqlite.exec('PRAGMA foreign_keys=ON');
-	const migrations = new URL('../../migrations/', import.meta.url);
-	for (const file of readdirSync(migrations).filter((name) => name.endsWith('.sql')).sort()) {
-		sqlite.exec(readFileSync(new URL(file, migrations), 'utf8'));
-	}
+/** Adapt a raw node:sqlite database to the D1-shaped surface the server
+ * modules expect (numbered bindings, transactional batch). */
+export function wrapSqlite(sqlite: InstanceType<typeof DatabaseSync>) {
 	function prepare(query: string, values: unknown[] = []): D1PreparedStatement {
 		const args: SQLInputValue[] = [];
 		const sql = query.replace(/\?(\d+)/g, (_, index: string) => {
@@ -22,6 +16,14 @@ export function testDatabase() {
 			async first<T>() { return (sqlite.prepare(sql).get(...args) ?? null) as T | null; },
 			async all<T>() { return { results: sqlite.prepare(sql).all(...args) as T[] }; },
 			async run<T>() {
+				// D1 batch results carry rows for reader statements (the revision-CAS
+				// probe relies on this). node:sqlite has no cheap reader probe, and a
+				// statement must execute exactly once, so reads and writes split on
+				// the statement verb.
+				if (/^\s*(SELECT|WITH)\b/i.test(sql)) {
+					const results = sqlite.prepare(sql).all(...args) as T[];
+					return { results, meta: { changes: results.length } };
+				}
 				const result = sqlite.prepare(sql).run(...args);
 				return { results: [] as T[], meta: { changes: Number(result.changes) } };
 			}
@@ -42,5 +44,17 @@ export function testDatabase() {
 			}
 		}
 	};
-	return { db, sqlite };
+	return db;
+}
+
+/** Run real server statements against SQLite with D1's numbered bindings and
+ * transactional batch semantics, without any Cloudflare or network dependency. */
+export function testDatabase() {
+	const sqlite = new DatabaseSync(':memory:');
+	sqlite.exec('PRAGMA foreign_keys=ON');
+	const migrations = new URL('../../migrations/', import.meta.url);
+	for (const file of readdirSync(migrations).filter((name) => name.endsWith('.sql')).sort()) {
+		sqlite.exec(readFileSync(new URL(file, migrations), 'utf8'));
+	}
+	return { db: wrapSqlite(sqlite), sqlite };
 }

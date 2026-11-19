@@ -48,6 +48,30 @@ import {
 import { enqueueAssignment, enqueueMentions } from './txns_notify';
 import { scheduleDelivery } from './notification_mail';
 import {
+	allocationsOfTxn,
+	createPurposeRow,
+	enqueuePurposeNotices,
+	purposeById,
+	purposeNoticeRecipients,
+	purposeResponsibles,
+	purposesOfKind,
+	sniffDocType
+} from './purposes';
+import {
+	allocationExact,
+	allocationRemainder,
+	aggregatePurposeStatuses,
+	effectiveResponsibles,
+	purposeKindOf,
+	purposeReady,
+	purposeStatusLabel,
+	purposeStatusTone,
+	validateAllocations,
+	type AllocationInput,
+	type PurposeKind
+} from '$lib/purposes';
+import { markdownToPlain } from '$lib/markdown';
+import {
 	approveTransaction,
 	ALL_PERMISSIONS,
 	documentationOwed,
@@ -225,6 +249,7 @@ async function mayDocument(ctx: TxnCtx, t: TxnRow): Promise<boolean> {
 interface FullTxn {
 	t: TxnRow;
 	splits: SplitRow[];
+	allocations: Awaited<ReturnType<typeof allocationsOfTxn>>;
 	comments: Awaited<ReturnType<typeof commentsOf>>;
 	evidence: Awaited<ReturnType<typeof evidenceOf>>;
 }
@@ -235,6 +260,7 @@ async function loadFull(db: import('$lib/d1').D1Database, orgId: number, txnId: 
 	return {
 		t,
 		splits: await splitsOf(db, txnId),
+		allocations: await allocationsOfTxn(db, txnId),
 		comments: await commentsOf(db, txnId),
 		evidence: await evidenceOf(db, txnId)
 	};
@@ -367,45 +393,6 @@ export function validateResponsiblesActive(
 	return null;
 }
 
-interface SnapshotShape {
-	explanation: string;
-	responsible_member_id: number | null;
-	evidence_unavailable_reason: string;
-	purposes: Array<{ label: string; amount_minor: number; responsible_member_id: number | null }>;
-}
-
-function snapshot(
-	t: TxnRow,
-	splits: ReadonlyArray<Pick<SplitRow, 'label' | 'amount_minor' | 'responsible_membership_id'>>
-): SnapshotShape {
-	return {
-		explanation: t.explanation,
-		responsible_member_id: t.responsible_membership_id,
-		evidence_unavailable_reason: t.evidence_unavailable_reason,
-		purposes: splits.map((s) => ({
-			label: s.label,
-			amount_minor: s.amount_minor,
-			responsible_member_id: s.responsible_membership_id
-		}))
-	};
-}
-
-const snapshotEqual = (a: SnapshotShape, b: SnapshotShape): boolean => JSON.stringify(a) === JSON.stringify(b);
-
-const recipientsOf = (
-	record: Pick<TxnRow, 'responsible_membership_id'>,
-	parts: ReadonlyArray<Pick<SplitRow, 'responsible_membership_id'>>
-): Set<number> => {
-	const ids = new Set<number>();
-	if (record.responsible_membership_id !== null) ids.add(record.responsible_membership_id);
-	for (const part of parts) {
-		if (part.responsible_membership_id !== null) ids.add(part.responsible_membership_id);
-	}
-	return ids;
-};
-
-const sameSet = (a: Set<number>, b: Set<number>): boolean => a.size === b.size && [...a].every((id) => b.has(id));
-
 // -------------------------------------------------------------- history facts
 
 /** One rendered history row: (label, value). Values may contain newlines
@@ -463,6 +450,9 @@ export function historyFacts(details: string, memberName: (id: number) => string
 			rows.push([label, beforeValue !== undefined ? `${beforeValue}\n→ ${afterValue}` : afterValue]);
 		}
 		if (rows.length === 0) rows.push(['Changes', 'No substantive change']);
+		if (typeof map.justification === 'string' && map.justification !== '') {
+			rows.push(['Justification', map.justification]);
+		}
 		return rows;
 	}
 	const rows: FactRow[] = [];
@@ -526,6 +516,33 @@ export interface TxnDetail {
 		responsibleMemberId: number | null;
 	}>;
 	totals: { amountMinor: number; splitTotalMinor: number; balanced: boolean } | null;
+	/** Purpose allocations (the new documentation path) with per-purpose review state. */
+	allocations: Array<{
+		id: number;
+		purposeId: number;
+		purposeName: string;
+		kindLabel: string;
+		amountMinor: number;
+		amount: string;
+		rupiah: string;
+		overrideName: string | null;
+		overrideMemberId: number | null;
+		effectiveNames: string[];
+		effectiveInactive: boolean;
+		statusLabel: string;
+		statusTone: 'needs' | 'review' | 'approved' | 'changes';
+		ready: boolean;
+		canApprove: boolean;
+		approveIneligibleReason: string | null;
+		notesPreview: string;
+		url: string;
+	}>;
+	allocationTotals: { amountMinor: number; allocatedMinor: number; remainderMinor: number; remainder: string; exact: boolean } | null;
+	/** Derived review state once purposes own approval (null while unallocated). */
+	purposeReview: { label: string; tone: 'needs' | 'review' | 'approved' | 'changes' } | null;
+	/** Purpose catalogue of the matching kind, for the allocation picker. */
+	purposes: Array<{ id: number; name: string }>;
+	kindLabel: string;
 	members: Array<{ id: number; name: string; handle: string }>;
 	evidence: Array<{ id: number; filename: string; size: number; sizeDisplay: string; note: string; url: string }>;
 	comments: Array<{ authorName: string; body: string; createdAt: string }>;
@@ -534,6 +551,7 @@ export interface TxnDetail {
 	audit: AuditEntryView[];
 	can: {
 		edit: boolean;
+		allocate: boolean;
 		incomeNotes: boolean;
 		approve: boolean;
 		requestChanges: boolean;
@@ -550,7 +568,7 @@ export interface TxnDetail {
 export async function txnDetail(ctx: TxnCtx, txnId: number): Promise<TxnDetail> {
 	const loaded = await loadFull(ctx.db, ctx.org.id, txnId);
 	if (!loaded) throw error(404, 'Transaction not found.');
-	const { t, splits, comments, evidence } = loaded;
+	const { t, splits, allocations, comments, evidence } = loaded;
 	const mine = me(ctx);
 	const incomeAccess = t.amount_minor > 0 && (await incomeRecipientsOf(ctx, t)).includes(mine.id);
 	if (!ctx.can('ViewTransactions') && !incomeAccess) {
@@ -579,22 +597,114 @@ export async function txnDetail(ctx: TxnCtx, txnId: number): Promise<TxnDetail> 
 			  };
 
 	const responsiblesOk = validateResponsiblesActive(t, splits, ctx.memberRows) === null;
+
+	// ---------------------------------------------------------- purposes
+	const kind: PurposeKind = purposeKindOf(t.amount_minor);
+	const purposeCatalogue = await purposesOfKind(ctx.db, ctx.org.id, kind);
+	const hasAllocations = allocations.length > 0;
+	const responsibleIdsOf = new Map<number, number[]>();
+	const historyIdsOf = new Map<number, number[]>();
+	const evidenceCounts = new Map<number, number>();
+	for (const allocation of allocations) {
+		if (!responsibleIdsOf.has(allocation.purpose_id)) {
+			responsibleIdsOf.set(allocation.purpose_id, await purposeResponsibles(ctx.db, allocation.purpose_id));
+			historyIdsOf.set(allocation.purpose_id, []);
+		}
+	}
+	if (allocations.length > 0) {
+		const rows = await qAll<{ purpose_id: number; membership_id: number }>(
+			ctx.db,
+			`SELECT pr.purpose_id, pr.membership_id FROM purpose_responsible_history pr WHERE pr.purpose_id IN (${allocations.map(() => '?').join(',')})`,
+			allocations.map((a) => a.purpose_id)
+		);
+		for (const row of rows) historyIdsOf.set(row.purpose_id, [...(historyIdsOf.get(row.purpose_id) ?? []), row.membership_id]);
+		const docs = await qAll<{ purpose_id: number; n: number }>(
+			ctx.db,
+			`SELECT purpose_id, COUNT(*) AS n FROM documents WHERE purpose_id IN (${allocations.map(() => '?').join(',')}) AND kind='evidence' AND superseded=0 GROUP BY purpose_id`,
+			allocations.map((a) => a.purpose_id)
+		);
+		for (const row of docs) evidenceCounts.set(row.purpose_id, row.n);
+	}
+	const nameOf = (id: number | null | undefined) => memName(ctx, id) ?? 'Unassigned';
+	const allocationViews = allocations.map((a) => {
+		const pResponsible = responsibleIdsOf.get(a.purpose_id) ?? [];
+		const effective = effectiveResponsibles(a.responsible_membership_id, pResponsible, t.responsible_membership_id);
+		const ready = purposeReady(a.purpose_kind, a.purpose_notes, evidenceCounts.get(a.purpose_id) ?? 0);
+		// Effective responsibility (plus historical responsibles of the purpose
+		// and this transaction) bars approving one's own purpose.
+		const barred =
+			effective.includes(mine.id) ||
+			t.responsible_membership_id === mine.id ||
+			exclusions.includes(mine.id) ||
+			(historyIdsOf.get(a.purpose_id) ?? []).includes(mine.id) ||
+			pResponsible.includes(mine.id);
+		const approveEligible = a.purpose_status === 'submitted' && ctx.can('ApproveTransactions') && !barred;
+		return {
+			id: a.id,
+			purposeId: a.purpose_id,
+			purposeName: a.purpose_name,
+			kindLabel: a.purpose_kind === 'income' ? 'Income' : 'Expense',
+			amountMinor: a.amount_minor,
+			amount: fmtMoney(a.amount_minor),
+			rupiah: rupiahInput(a.amount_minor),
+			overrideName: memName(ctx, a.responsible_membership_id),
+			overrideMemberId: a.responsible_membership_id,
+			effectiveNames: effective.map(nameOf),
+			effectiveInactive: effective.length === 0 || effective.every((id) => activeMem(ctx.memberRows, id) === null),
+			statusLabel: purposeStatusLabel(a.purpose_status, ready),
+			statusTone: purposeStatusTone(a.purpose_status, ready),
+			ready,
+			canApprove: approveEligible,
+			approveIneligibleReason:
+				a.purpose_status === 'submitted' && ctx.can('ApproveTransactions') && !approveEligible
+					? 'A member responsible for this purpose, now or before, cannot approve it.'
+					: null,
+			notesPreview: a.purpose_notes.trim() === '' ? '' : markdownToPlain(a.purpose_notes, 120),
+			url: `/org/${ctx.org.slug}/purposes/${a.purpose_id}`
+		};
+	});
+	const allocatedMinor = allocations.reduce((sum, a) => sum + a.amount_minor, 0);
+	const remainderMinor = allocationRemainder(bankAbs, allocations.map((a) => a.amount_minor));
+	const allocationTotals = {
+		amountMinor: bankAbs,
+		allocatedMinor,
+		remainderMinor,
+		remainder: fmtMoney(remainderMinor),
+		exact: allocationExact(bankAbs, allocations.map((a) => a.amount_minor))
+	};
+	const purposeReview =
+		kind === 'expense' && hasAllocations
+			? (() => {
+					const aggregate = aggregatePurposeStatuses(allocations.map((a) => a.purpose_status));
+					return { label: aggregate.label, tone: aggregate.tone };
+				})()
+			: null;
+
 	// needs_details: documentation still owed (Draft/ChangesRequested domain
 	// states), derived from completeness; submit/approve enforce the full rule.
 	const docsComplete = validateDocumentation(dom) === null && responsiblesOk && activeMem(ctx.memberRows, t.responsible_membership_id) !== null;
-	const needsDetails = t.amount_minor > 0 ? !incomeComplete(t.explanation) : documentationOwed(t.status, docsComplete);
+	const needsDetails = t.amount_minor > 0 ? !incomeComplete(t.explanation) : purposeReview !== null ? purposeReview.tone !== 'approved' : documentationOwed(t.status, docsComplete);
 
 	// What the "Still needed" notice should actually list.
 	const missing: string[] = [];
-	if (t.explanation.trim() === '') missing.push('an explanation');
-	if (activeMem(ctx.memberRows, t.responsible_membership_id) === null) missing.push('an active responsible member');
-	if (splits.length === 0) {
-		missing.push('at least one purpose');
-	} else if (splitTotal !== BigInt(bankAbs)) {
-		missing.push('purposes that add up to the bank amount');
-	}
-	if (evidence.length === 0 && t.evidence_unavailable_reason.trim() === '') {
-		missing.push('supporting documents or a document-unavailable reason');
+	if (purposeReview !== null) {
+		// Purposes own the documentation; report allocation-level gaps.
+		if (remainderMinor > 0) missing.push(`purpose allocations for the remaining ${fmtMoney(remainderMinor)}`);
+		for (const view of allocationViews) {
+			if (!view.ready) missing.push(`notes or evidence for “${view.purposeName}”`);
+			if (view.effectiveInactive) missing.push(`an active responsible member for “${view.purposeName}”`);
+		}
+	} else {
+		if (t.explanation.trim() === '') missing.push('an explanation');
+		if (activeMem(ctx.memberRows, t.responsible_membership_id) === null) missing.push('an active responsible member');
+		if (splits.length === 0) {
+			missing.push('at least one purpose');
+		} else if (splitTotal !== BigInt(bankAbs)) {
+			missing.push('purposes that add up to the bank amount');
+		}
+		if (evidence.length === 0 && t.evidence_unavailable_reason.trim() === '') {
+			missing.push('supporting documents or a document-unavailable reason');
+		}
 	}
 
 	interface AuditViewRow {
@@ -670,7 +780,7 @@ export async function txnDetail(ctx: TxnCtx, txnId: number): Promise<TxnDetail> 
 		responsibleMemberId: t.responsible_membership_id,
 		responsibleInactive: t.responsible_membership_id !== null && activeMem(ctx.memberRows, t.responsible_membership_id) === null,
 		status: t.status,
-		statusLabel: domainStatusLabel(t.status),
+		statusLabel: purposeReview !== null ? purposeReview.label : domainStatusLabel(t.status),
 		needsDetails,
 		suppressed: t.suppressed !== 0,
 		suppressedReason: t.suppressed_reason,
@@ -684,6 +794,11 @@ export async function txnDetail(ctx: TxnCtx, txnId: number): Promise<TxnDetail> 
 			responsibleMemberId: s.responsible_membership_id
 		})),
 		totals,
+		allocations: allocationViews,
+		allocationTotals: purposeReview !== null || hasAllocations ? allocationTotals : null,
+		purposeReview,
+		purposes: purposeCatalogue,
+		kindLabel: kind === 'income' ? 'Income' : 'Expense',
 		members: activeMembers(ctx),
 		evidence: evidence.map((d) => ({
 			id: d.id,
@@ -699,13 +814,18 @@ export async function txnDetail(ctx: TxnCtx, txnId: number): Promise<TxnDetail> 
 		audit,
 		can: {
 			edit: t.amount_minor <= 0 && ctx.can('DocumentTransactions'),
+			allocate: ctx.can('DocumentTransactions'),
 			incomeNotes: t.amount_minor > 0 && canDocument,
-			approve: t.amount_minor <= 0 && ctx.can('ApproveTransactions'),
-			requestChanges: t.amount_minor <= 0 && ctx.can('ApproveTransactions'),
+			approve: t.amount_minor <= 0 && purposeReview === null && ctx.can('ApproveTransactions'),
+			requestChanges: t.amount_minor <= 0 && purposeReview === null && ctx.can('ApproveTransactions'),
 			comment: ctx.can('CommentTransactions'),
 			suppress: ctx.can('SuppressNotifications'),
 			upload: canDocument,
-			submit: ctx.can('DocumentTransactions') && docsComplete && t.status === 'changes_requested'
+			submit:
+				ctx.can('DocumentTransactions') &&
+				(purposeReview !== null
+					? allocationTotals.exact && allocationViews.every((view) => view.ready && !view.effectiveInactive)
+					: docsComplete && t.status === 'changes_requested')
 		}
 	};
 }
@@ -782,75 +902,316 @@ export async function saveDetails(ctx: TxnCtx, txnId: number, form: FormData): P
 		return destination(ctx, txnId, 'Income notes saved; no approval required');
 	}
 
-	const reason = formStr(form, 'evidence_unavailable_reason').trim();
-	if (explanation === '' || byteLen(explanation) > 16000 || byteLen(reason) > 2000) {
-		throw error(400, 'Supply an explanation of up to 16,000 characters and a document note of up to 2,000 characters.');
+	// Expense documentation now lives on purposes (Notes, evidence,
+	// responsibility, approval). The transaction records allocations only.
+	if (t.amount_minor <= 0) {
+		throw error(400, 'Expense documentation is recorded through purpose allocations.');
 	}
-	const responsible = formInt(form, 'responsible_member_id');
-	if (activeMem(ctx.memberRows, responsible) === null) {
-		throw error(400, 'Choose an active responsible member of this organization.');
+	throw error(400, 'Unexpected details request.');
+}
+
+// ------------------------------------------------------ purpose allocations
+
+export interface AllocationDraftRow {
+	purposeId: number;
+	amountMinor: number;
+	override: number | null;
+}
+
+/** Removes purposes this request created but never allocated (any failure
+ * path); a purpose with allocations is never touched. */
+async function cleanupCreatedPurposes(db: import('$lib/d1').D1Database, ids: readonly number[]): Promise<void> {
+	for (const id of ids) {
+		await exec(db, 'DELETE FROM purposes WHERE id = ?1 AND NOT EXISTS (SELECT 1 FROM allocations WHERE purpose_id = ?1)', [id]);
 	}
+}
+
+/** POST ?/allocations. Draft partial allocations are allowed (the remainder
+ * stays visible); overallocation is rejected. Effective responsibility is
+ * the allocation override, else the purpose's own members, else the
+ * transaction's; a reassignment requires a justification, and explicit
+ * overrides survive a whole-transaction responsible change untouched. */
+export async function saveAllocations(ctx: TxnCtx, txnId: number, form: FormData): Promise<never> {
+	const required: Permission = 'DocumentTransactions';
+	if (!ctx.can(required)) {
+		throw error(403, `Access denied: your role does not include “${permissionLabel(required)}”.`);
+	}
+	const loaded = await loadFull(ctx.db, ctx.org.id, txnId);
+	if (!loaded) throw error(404, 'Transaction not found.');
+	const { t, allocations: oldAllocations } = loaded;
+	requireRevision(form, t);
+	const kind = purposeKindOf(t.amount_minor);
 	const magnitude = Math.abs(t.amount_minor);
 	if (!(magnitude > 0)) throw error(400, 'The bank amount cannot be allocated.');
-	const parsed = parseSplits(formStrings(form, 'split_label[]'), formStrings(form, 'split_amount[]'), formStrings(form, 'split_member[]'), magnitude);
-	if (parsed.error !== null) throw error(400, parsed.error);
-	const now = nowMs();
-	const nextSplits: SplitRow[] = parsed.splits.map((s, i) => ({
-		id: -(i + 1),
-		transaction_id: txnId,
-		label: s.label,
-		amount_minor: s.amount_minor,
-		responsible_membership_id: s.responsible,
-		created_at: now
-	}));
-	const nextShape = { ...t, explanation, evidence_unavailable_reason: reason, responsible_membership_id: responsible };
-	const invalid = validateResponsiblesActive(nextShape, nextSplits, ctx.memberRows);
-	if (invalid !== null) throw error(400, invalid);
-	if (snapshotEqual(snapshot(t, oldSplits), snapshot(nextShape, nextSplits))) {
-		return destination(ctx, txnId, 'Details unchanged');
+	const responsible = formInt(form, 'responsible_member_id');
+	if (responsible !== null && activeMem(ctx.memberRows, responsible) === null) {
+		throw error(400, 'The inherited responsible member must be an active member of this organization.');
 	}
+
+	// ------------------------------------------------------------ parse rows
+	const refs = formStrings(form, 'alloc_purpose[]');
+	const amounts = formStrings(form, 'alloc_amount[]');
+	const members = formStrings(form, 'alloc_member[]');
+	if (refs.length !== amounts.length || refs.length !== members.length) {
+		throw error(400, 'purpose rows are malformed');
+	}
+	if (refs.length > 100) throw error(400, 'At most 100 purposes can be allocated on one transaction.');
+	const catalogue = await purposesOfKind(ctx.db, ctx.org.id, kind);
+	const catalogueLower = new Set(catalogue.map((p) => p.name.toLowerCase()));
+	const newRowNames: string[] = [];
+	interface DraftRow {
+		purposeId: number | null;
+		newName: string | null;
+		amountMinor: number;
+		override: number | null;
+	}
+	const drafts: DraftRow[] = [];
+	for (let i = 0; i < refs.length; i += 1) {
+		const ref = (refs[i] ?? '').trim();
+		const amountRaw = (amounts[i] ?? '').trim();
+		if (ref === '' && amountRaw === '') continue; // untouched default row
+		if (ref === '') throw error(400, `purpose row ${i + 1} has an empty purpose`);
+		const parsedAmount = parseRupiah(amountRaw);
+		if (parsedAmount === null || parsedAmount <= 0) {
+			throw error(400, `purpose row ${i + 1} amount must be a positive IDR magnitude`);
+		}
+		const member = (members[i] ?? '').trim();
+		let override: number | null = null;
+		if (member !== '') {
+			if (!/^-?[0-9]{1,18}$/.test(member)) throw error(400, 'purpose row has an invalid member');
+			override = Number(member);
+			if (activeMem(ctx.memberRows, override) === null) {
+				throw error(400, 'A purpose row override must be an active member of this organization.');
+			}
+		}
+		if (/^[0-9]{1,15}$/.test(ref)) {
+			const purpose = await purposeById(ctx.db, ctx.org.id, Number(ref));
+			if (purpose === null || purpose.kind !== kind) {
+				throw error(400, `purpose row ${i + 1} references a purpose of the wrong direction`);
+			}
+			drafts.push({ purposeId: purpose.id, newName: null, amountMinor: parsedAmount, override });
+		} else {
+			// A picked suggestion posts as the purpose name; a typed new name
+			// creates the purpose. An existing name of this kind resolves to it.
+			const name = (ref.startsWith('new:') ? ref.slice(4) : ref).trim();
+			if (name === '' || byteLen(name) > 300) throw error(400, `purpose row ${i + 1} has an invalid new purpose name`);
+			const existing = catalogue.find((p) => p.name.toLowerCase() === name.toLowerCase());
+			if (existing) {
+				drafts.push({ purposeId: existing.id, newName: null, amountMinor: parsedAmount, override });
+			} else {
+				if (newRowNames.some((candidate) => candidate.toLowerCase() === name.toLowerCase())) {
+					throw error(400, `purpose row ${i + 1} repeats the new purpose “${name}”`);
+				}
+				newRowNames.push(name);
+				drafts.push({ purposeId: null, newName: name, amountMinor: parsedAmount, override });
+			}
+		}
+	}
+	const invalidDrafts = validateAllocations(
+		magnitude,
+		drafts.map((row) => ({ purposeId: row.purposeId ?? -1, amountMinor: row.amountMinor, responsibleMembershipId: row.override }))
+	);
+	if (invalidDrafts !== null) throw error(400, invalidDrafts);
+
+	// ------------------------------------------------- diff + responsibility
+	// The diff runs BEFORE any write, keyed by purpose id or new-name, so a
+	// rejected save (missing justification, malformed rows) creates nothing.
+	interface KeyedRow {
+		key: string;
+		purposeId: number | null;
+		newName: string | null;
+		amountMinor: number;
+		override: number | null;
+	}
+	const keyedDrafts: KeyedRow[] = drafts.map((row) => ({
+		key: row.purposeId !== null ? `p${row.purposeId}` : `n:${row.newName!.toLowerCase()}`,
+		purposeId: row.purposeId,
+		newName: row.newName,
+		amountMinor: row.amountMinor,
+		override: row.override
+	}));
+	const oldByPurpose = new Map(oldAllocations.map((a) => [a.purpose_id, a]));
+	const oldByKey = new Map<string, (typeof oldAllocations)[number]>(oldAllocations.map((a) => [`p${a.purpose_id}`, a]));
+	const nextByKey = new Map<string, KeyedRow>(keyedDrafts.map((r) => [r.key, r]));
+	const involvedIds = [...oldByPurpose.keys()];
+	const purposeResponsibleMap = new Map<number, number[]>();
+	for (const id of involvedIds) purposeResponsibleMap.set(id, await purposeResponsibles(ctx.db, id));
+	const effectiveOf = (override: number | null, purposeId: number | null, txnResponsible: number | null) =>
+		effectiveResponsibles(override, purposeId === null ? [] : (purposeResponsibleMap.get(purposeId) ?? []), txnResponsible);
+	let structureChanged = responsible !== t.responsible_membership_id;
+	let responsibilityChanged = structureChanged;
+	const changedPurposeIds = new Set<number>();
+	const responsibilityDeltaKeys = new Map<string, number[]>(); // key → added members
+	for (const key of new Set([...oldByKey.keys(), ...nextByKey.keys()])) {
+		const before = oldByKey.get(key);
+		const after = nextByKey.get(key);
+		const rowChanged =
+			before === undefined ||
+			after === undefined ||
+			before.amount_minor !== after.amountMinor ||
+			before.responsible_membership_id !== after.override;
+		if (rowChanged) {
+			if (after?.purposeId !== null && after?.purposeId !== undefined) changedPurposeIds.add(after.purposeId);
+			if (before !== undefined) changedPurposeIds.add(before.purpose_id);
+			structureChanged = true;
+		}
+		const beforeIds = before ? effectiveOf(before.responsible_membership_id, before.purpose_id, t.responsible_membership_id) : [];
+		const afterIds = after ? effectiveOf(after.override, after.purposeId, responsible) : [];
+		const added = afterIds.filter((mid) => !beforeIds.includes(mid));
+		if (added.length > 0 || beforeIds.some((mid) => !afterIds.includes(mid))) {
+			responsibilityChanged = true;
+			if (added.length > 0) responsibilityDeltaKeys.set(key, added);
+		}
+	}
+	const justification = formStr(form, 'justification').trim();
+	if (byteLen(justification) > 4000) throw error(400, 'Justification must be at most 4,000 characters.');
+	if (responsibilityChanged && justification === '') {
+		throw error(400, 'A justification is required whenever responsibility changes.');
+	}
+	if (!structureChanged) return destination(ctx, txnId, 'Allocations unchanged');
+
+	// ------------------------------------------------------- create purposes
+	// Guarded against concurrent creators: a lost name race rejects the save.
+	const createdPurposeIds: number[] = [];
+	const keyToId = new Map<string, number>();
+	for (const row of keyedDrafts) {
+		if (row.purposeId !== null) {
+			keyToId.set(row.key, row.purposeId);
+			continue;
+		}
+		const created = await createPurposeRow(ctx.db, ctx.org.id, row.newName!, kind, me(ctx).id);
+		if (created === null) {
+			await cleanupCreatedPurposes(ctx.db, createdPurposeIds);
+			throw error(400, `A purpose named “${row.newName}” already exists — choose it from the list.`);
+		}
+		createdPurposeIds.push(created);
+		keyToId.set(row.key, created);
+	}
+	const nextRows: AllocationDraftRow[] = keyedDrafts.map((row) => ({
+		purposeId: keyToId.get(row.key) as number,
+		amountMinor: row.amountMinor,
+		override: row.override
+	}));
+	const finalInvalid = validateAllocations(
+		magnitude,
+		nextRows.map((row) => ({ purposeId: row.purposeId, amountMinor: row.amountMinor, responsibleMembershipId: row.override }))
+	);
+	if (finalInvalid !== null) {
+		await cleanupCreatedPurposes(ctx.db, createdPurposeIds);
+		throw error(400, finalInvalid);
+	}
+
+	// ------------------------------------------------------------- commit
+	const now = nowMs();
 	const token = randomHex(24);
-	const statements = [
+	const nameLookup = new Map<number, string>();
+	for (const p of await purposesOfKind(ctx.db, ctx.org.id, kind)) nameLookup.set(p.id, p.name);
+	const purposeNameOf = (purposeId: number): string => nameLookup.get(purposeId) ?? `purpose ${purposeId}`;
+	interface AllocSnapRow {
+		purpose_name: string;
+		amount_minor: number;
+		responsible_membership_id: number | null;
+	}
+	const allocSnapshot = (txnResponsible: number | null, rows: readonly AllocSnapRow[]) => ({
+		explanation: t.explanation,
+		responsible_member_id: txnResponsible,
+		evidence_unavailable_reason: t.evidence_unavailable_reason,
+		purposes: rows.map((row) => ({
+			label: row.purpose_name,
+			amount_minor: row.amount_minor,
+			responsible_membership_id: row.responsible_membership_id
+		}))
+	});
+	const afterSnapRows: AllocSnapRow[] = nextRows.map((row) => ({
+		purpose_name: purposeNameOf(row.purposeId),
+		amount_minor: row.amountMinor,
+		responsible_membership_id: row.override
+	}));
+
+	const statements: D1PreparedStatement[] = [
 		ctx.db
 			.prepare(
-				"UPDATE transactions SET explanation=?1,evidence_unavailable_reason=?2,responsible_membership_id=?3,status='pending',approved_by_membership_id=NULL,approved_at=NULL,approval_note='',updated_at=?4,revision=revision+1,mutation_token=?5 WHERE id=?6 AND org_id=?7 AND revision=?8"
+				'UPDATE transactions SET responsible_membership_id=?1,updated_at=?2,revision=revision+1,mutation_token=?3 WHERE id=?4 AND org_id=?5 AND revision=?6'
 			)
-			.bind(explanation, reason, responsible, now, token, txnId, ctx.org.id, t.revision),
+			.bind(responsible, now, token, txnId, ctx.org.id, t.revision),
 		ctx.db
-			.prepare('DELETE FROM transaction_splits WHERE transaction_id=?1 AND EXISTS(SELECT 1 FROM transactions WHERE id=?1 AND mutation_token=?2)')
+			.prepare('DELETE FROM allocations WHERE transaction_id=?1 AND EXISTS(SELECT 1 FROM transactions WHERE id=?1 AND mutation_token=?2)')
 			.bind(txnId, token)
 	];
-	for (const split of nextSplits) {
+	for (const row of nextRows) {
 		statements.push(
 			ctx.db
-				.prepare(
-					'INSERT INTO transaction_splits(transaction_id,label,amount_minor,responsible_membership_id,created_at) SELECT ?1,?2,?3,?4,?5 WHERE EXISTS(SELECT 1 FROM transactions WHERE id=?1 AND mutation_token=?6)'
-				)
-				.bind(txnId, split.label, split.amount_minor, split.responsible_membership_id, now, token)
+					.prepare(
+							'INSERT INTO allocations(org_id,purpose_id,transaction_id,amount_minor,responsible_membership_id,created_at) SELECT ?1,?2,?3,?4,?5,?6 WHERE EXISTS(SELECT 1 FROM transactions WHERE id=?3 AND mutation_token=?7)'
+					)
+					.bind(ctx.org.id, row.purposeId, txnId, row.amountMinor, row.override, now, token)
 		);
 	}
 	// Reassignment must not launder self-approval: record the union of old and
-	// new responsible ids (transaction-level and split-level) as history.
-	const allResponsibles = new Set<number>([
-		...recipientsOf(t, oldSplits),
-		...recipientsOf(nextShape, nextSplits)
-	]);
-	for (const memberId of allResponsibles) {
+	// new responsible ids (inherited and override) as transaction history.
+	const historyIds = new Set<number>([...(responsible !== null ? [responsible] : []), ...(t.responsible_membership_id !== null ? [t.responsible_membership_id] : [])]);
+	for (const allocation of oldAllocations) if (allocation.responsible_membership_id !== null) historyIds.add(allocation.responsible_membership_id);
+	for (const row of nextRows) if (row.override !== null) historyIds.add(row.override);
+	for (const memberId of historyIds) {
 		statements.push(
 			ctx.db
 				.prepare('INSERT OR IGNORE INTO responsible_history(transaction_id,membership_id,since) SELECT ?1,?2,?3 WHERE EXISTS(SELECT 1 FROM transactions WHERE id=?1 AND mutation_token=?4)')
-				.bind(txnId, memberId, now, token)
+					.bind(txnId, memberId, now, token)
 		);
 	}
-	statements.push(auditStatement(ctx, t, 'details_updated', 'pending', { before: snapshot(t, oldSplits), after: snapshot(nextShape, nextSplits) }, token));
-	statements.push(auditEventStatement(ctx, txnId, 'transaction.details_updated', token));
-	const won = await commitMutation(ctx, txnId, token, statements);
-	if (!won) throw error(409, 'This transaction changed while you were editing it. Reload and review the latest details.');
-	if (!sameSet(recipientsOf(nextShape, nextSplits), recipientsOf(t, oldSplits))) {
-		await enqueueAssignment(ctx.db, ctx.org, ctx.memberRows, ctx.roleRows, { ...nextShape, status: 'pending' });
+	// Substantive allocation changes reopen the affected expense purposes.
+	const reopenList = [...changedPurposeIds]
+		.map((id) => ({ id, previous: oldByPurpose.get(id)?.purpose_status ?? 'pending' }))
+		.filter((entry) => ['approved', 'submitted', 'changes_requested'].includes(entry.previous));
+	for (const entry of reopenList) {
+		statements.push(
+			ctx.db
+				.prepare(
+						"UPDATE purposes SET status='pending',approved_by_membership_id=NULL,approved_at=NULL,approval_note='',updated_at=?1,revision=revision+1 WHERE id=?2 AND kind='expense' AND status IN ('approved','submitted','changes_requested') AND EXISTS(SELECT 1 FROM transactions WHERE id=?3 AND mutation_token=?4)"
+					)
+					.bind(now, entry.id, txnId, token),
+			ctx.db
+				.prepare(
+						"INSERT INTO purpose_audit (org_id,purpose_id,actor_membership_id,action,previous_status,new_status,details,created_at) SELECT ?1,?2,?3,'reopened',?4,'pending',?5,?6 WHERE EXISTS(SELECT 1 FROM transactions WHERE id=?7 AND mutation_token=?8)"
+					)
+					.bind(ctx.org.id, entry.id, me(ctx).id, entry.previous, JSON.stringify({ via: 'allocation change' }), now, txnId, token)
+		);
+	}
+	statements.push(
+		auditStatement(
+				ctx,
+				t,
+				'allocations_updated',
+				t.status,
+				{
+					before: allocSnapshot(t.responsible_membership_id, oldAllocations),
+					after: allocSnapshot(responsible, afterSnapRows),
+					justification
+				},
+				token
+			),
+		auditEventStatement(ctx, txnId, 'transaction.allocations_updated', token)
+	);
+	const won = await commitMutation(ctx, txnId, token, statements).catch(async (cause) => {
+		await cleanupCreatedPurposes(ctx.db, createdPurposeIds);
+		throw cause;
+	});
+	if (!won) {
+		await cleanupCreatedPurposes(ctx.db, createdPurposeIds);
+		throw error(409, 'This transaction changed while you were editing it. Reload and review the latest allocations.');
+	}
+
+	// ------------------------------------------------------- notifications
+	if (responsibilityChanged) {
+		for (const [key, added] of responsibilityDeltaKeys) {
+			const purposeId = keyToId.get(key);
+			if (purposeId === undefined) continue;
+			const recipients = purposeNoticeRecipients(ctx.memberRows, ctx.roleRows, ctx.user.id, added, justification);
+			if (recipients.length > 0) await enqueuePurposeNotices(ctx.db, ctx.org, purposeId, recipients, 'assignment');
+		}
 		await ctx.deliverMail?.();
 	}
-	return destination(ctx, txnId, 'Details saved; approval requires current documentation');
+	return destination(ctx, txnId, 'Allocations saved');
 }
 
 // ----------------------------------------------------------------- submit
@@ -862,9 +1223,66 @@ export async function submitDocumentation(ctx: TxnCtx, txnId: number, form: Form
 	}
 	const loaded = await loadFull(ctx.db, ctx.org.id, txnId);
 	if (!loaded) throw error(404, 'Transaction not found.');
-	const { t, splits, comments, evidence } = loaded;
+	const { t, splits, allocations, comments, evidence } = loaded;
 	if (t.amount_minor > 0) throw error(400, 'Income notes require no submission or approval.');
 	requireRevision(form, t);
+	const bankAbs = Math.abs(t.amount_minor);
+
+	if (allocations.length > 0) {
+		// Purposes own documentation: the allocation must be exact and every
+		// expense purpose must carry evidence or Notes and an active responsible
+		// member before its review can start.
+		if (!allocationExact(bankAbs, allocations.map((a) => a.amount_minor))) {
+			throw error(400, `Purpose allocations must add up to ${fmtMoney(bankAbs)} before review.`);
+		}
+		const evidenceCounts = new Map<number, number>();
+		const docs = await qAll<{ purpose_id: number; n: number }>(
+			ctx.db,
+			`SELECT purpose_id, COUNT(*) AS n FROM documents WHERE purpose_id IN (${allocations.map(() => '?').join(',')}) AND kind='evidence' AND superseded=0 GROUP BY purpose_id`,
+			allocations.map((a) => a.purpose_id)
+		);
+		for (const row of docs) evidenceCounts.set(row.purpose_id, row.n);
+		for (const allocation of allocations) {
+			if (allocation.purpose_kind === 'income') continue;
+			if (!purposeReady(allocation.purpose_kind, allocation.purpose_notes, evidenceCounts.get(allocation.purpose_id) ?? 0)) {
+				throw error(400, `The purpose “${allocation.purpose_name}” needs evidence or Notes before review.`);
+			}
+			const pResponsible = await purposeResponsibles(ctx.db, allocation.purpose_id);
+			const effective = effectiveResponsibles(allocation.responsible_membership_id, pResponsible, t.responsible_membership_id);
+			if (effective.length === 0 || effective.every((id) => activeMem(ctx.memberRows, id) === null)) {
+				throw error(400, `The purpose “${allocation.purpose_name}” needs an active responsible member before review.`);
+			}
+		}
+		const now = nowMs();
+		const token = randomHex(24);
+		const statements: D1PreparedStatement[] = [
+			ctx.db
+				.prepare('UPDATE transactions SET revision=revision+1,updated_at=?1,mutation_token=?2 WHERE id=?3 AND org_id=?4 AND revision=?5')
+				.bind(now, token, txnId, ctx.org.id, t.revision),
+			auditStatement(ctx, t, 'documentation_submitted', t.status, {}, token),
+			auditEventStatement(ctx, txnId, 'transaction.submitted', token)
+		];
+		for (const allocation of allocations) {
+			if (allocation.purpose_kind !== 'expense' || allocation.purpose_status === 'approved') continue;
+			statements.push(
+				ctx.db
+					.prepare(
+							"UPDATE purposes SET status='submitted',updated_at=?1,revision=revision+1 WHERE id=?2 AND status IN ('pending','changes_requested') AND EXISTS(SELECT 1 FROM transactions WHERE id=?3 AND mutation_token=?4)"
+						)
+					.bind(now, allocation.purpose_id, txnId, token),
+				ctx.db
+					.prepare(
+							"INSERT INTO purpose_audit (org_id,purpose_id,actor_membership_id,action,previous_status,new_status,details,created_at) SELECT ?1,?2,?3,'submitted',?4,'submitted','{}',?5 WHERE EXISTS(SELECT 1 FROM transactions WHERE id=?6 AND mutation_token=?7)"
+						)
+					.bind(ctx.org.id, allocation.purpose_id, me(ctx).id, allocation.purpose_status, now, txnId, token)
+			);
+		}
+		const won = await commitMutation(ctx, txnId, token, statements);
+		if (!won) throw error(409, 'The transaction changed during submission. Reload and try again.');
+		return destination(ctx, txnId, 'Documentation submitted for purpose review');
+	}
+
+	// Legacy unallocated expense path (pre-purpose records).
 	const invalidResponsibles = validateResponsiblesActive(t, splits, ctx.memberRows);
 	if (invalidResponsibles !== null) throw error(400, invalidResponsibles);
 	const history = await historyOf(ctx.db, txnId);
@@ -908,8 +1326,11 @@ async function review(ctx: TxnCtx, txnId: number, form: FormData, changes: boole
 	}
 	const loaded = await loadFull(ctx.db, ctx.org.id, txnId);
 	if (!loaded) throw error(404, 'Transaction not found.');
-	const { t, splits, comments, evidence } = loaded;
+	const { t, splits, allocations, comments, evidence } = loaded;
 	if (t.amount_minor > 0) throw error(400, 'Income notes require no approval or change request.');
+	if (allocations.length > 0) {
+		throw error(400, 'Each purpose is approved individually — open a purpose from the allocation list.');
+	}
 	requireRevision(form, t);
 	if (!changes) {
 		const invalidResponsibles = validateResponsiblesActive(t, splits, ctx.memberRows);
@@ -1021,12 +1442,6 @@ async function setSuppression(ctx: TxnCtx, txnId: number, form: FormData, suppre
 
 // ---------------------------------------------------------------- evidence
 
-const PDF_SIG = [0x25, 0x50, 0x44, 0x46, 0x2d]; // %PDF-
-const PNG_SIG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-const JPEG_SIG = [0xff, 0xd8, 0xff];
-
-const startsWith = (bytes: Uint8Array, sig: readonly number[]): boolean => sig.every((b, i) => bytes[i] === b);
-
 /** POST ?/document. Magic-byte content detection; the R2 object is written
  * first, and on a losing CAS it is retained for recovery rather than deleted. */
 export async function uploadDocument(ctx: TxnCtx, txnId: number, form: FormData): Promise<never> {
@@ -1041,13 +1456,7 @@ export async function uploadDocument(ctx: TxnCtx, txnId: number, form: FormData)
 		throw error(400, 'Supporting documents must be between 1 byte and 10 MB.');
 	}
 	const bytes = new Uint8Array(await file.arrayBuffer());
-	const contentType = startsWith(bytes, PDF_SIG)
-		? 'application/pdf'
-		: startsWith(bytes, PNG_SIG)
-			? 'image/png'
-			: startsWith(bytes, JPEG_SIG)
-				? 'image/jpeg'
-				: null;
+	const contentType = sniffDocType(bytes);
 	if (contentType === null) throw error(400, 'Upload a PDF, PNG, or JPEG document.');
 	const note = formStr(form, 'note');
 	if (byteLen(note) > 2000) {
@@ -1085,7 +1494,8 @@ export async function uploadDocument(ctx: TxnCtx, txnId: number, form: FormData)
 
 /** GET /org/:slug/documents/:id. Same-org lookup first; without
  * ViewTransactions only income recipients of the tied income transaction may
- * download. Missing bucket content reports 404 while the metadata row stays. */
+ * download (purpose evidence requires ViewTransactions). Missing bucket
+ * content reports 404 while the metadata row stays. */
 export async function downloadDocument(ctx: TxnCtx, documentId: number): Promise<Response> {
 	const document = await docById(ctx.db, ctx.org.id, documentId);
 	if (!document) throw error(404, 'Document not found.');

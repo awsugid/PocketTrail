@@ -1,13 +1,16 @@
-import type { D1Database } from '$lib/d1';
 import { requireMember, shellContext } from '$lib/server/auth';
 import { qAll, qOne } from '$lib/server/db';
 import { incomeRecipients } from '$lib/domain';
+import { owedPurposeState, submittedPurposeTasks } from '$lib/server/purposes';
 import type { PageServerLoad } from './$types';
 
 // The in-app action list: the member's own documentation tasks, the reviews
-// they are eligible to decide, and in-flight imports. Empty groups must not
-// imply an empty ledger, and members without import permission are never
-// pointed at importing.
+// they are eligible to decide, and in-flight imports. Expense work on
+// allocated transactions is derived from purposes (Notes/evidence gates and
+// purpose responsibility); the legacy explanation predicates apply only to
+// income and unallocated pre-purpose records. Empty groups must not imply an
+// empty ledger, and members without import permission are never pointed at
+// importing.
 
 interface TaskRow {
 	id: number;
@@ -42,6 +45,9 @@ export const load: PageServerLoad = async (event) => {
 	const me = ctx.memberRows.find((m) => m.user_id === ctx.user.id) ?? null;
 	const myMembership = me && me.removed_at === null ? me : null;
 
+	const purposeState = await owedPurposeState(ctx.db, ctx.org.id);
+	const allocated = new Set(purposeState.allocatedTxnIds);
+
 	// Income routing follows current membership, never stored assignments.
 	const incomeMine = new Set<number>();
 	if (myMembership) {
@@ -60,39 +66,80 @@ export const load: PageServerLoad = async (event) => {
 		}
 	}
 
-	const explain: TaskRow[] = [];
-	const review: TaskRow[] = [];
-	const canApprove = ctx.can('ApproveTransactions');
-	const exclusions = await responsibleExclusions(ctx.db, ctx.org.id);
+	interface Task {
+		id: number;
+		date: string;
+		counterparty: string;
+		pocketName: string;
+		income: boolean;
+		purposeId?: number;
+		purposeName?: string;
+		badge?: string;
+	}
+	const explain: Task[] = [];
+	const seen = new Set<string>();
+	const addExplain = (task: Task) => {
+		const key = task.purposeId !== undefined ? `p${task.purposeId}` : `t${task.id}`;
+		if (seen.has(key)) return;
+		seen.add(key);
+		explain.push(task);
+	};
+
 	for (const row of rows) {
-		if (!isOwed(row)) continue;
 		if (row.amount_minor > 0) {
-			if (incomeMine.has(row.id)) explain.push(row);
-			continue;
-		}
-		if (myMembership && row.responsible_membership_id === myMembership.id) {
-			explain.push(row);
-			continue;
-		}
-	}
-	// Split-level responsibility also routes explanations.
-	if (myMembership) {
-		const splitMine = await splitResponsibleIds(ctx.db, ctx.org.id, myMembership.id);
-		for (const row of rows) {
-			if (row.amount_minor <= 0 && isOwed(row) && splitMine.has(row.id) && !explain.some((task) => task.id === row.id)) {
-				explain.push(row);
+			if (incomeMine.has(row.id)) {
+				addExplain({ id: row.id, date: row.txn_date, counterparty: row.counterparty, pocketName: row.pocket_name, income: true });
 			}
+			continue;
+		}
+		// Purposes own documentation on allocated expenses; the legacy
+		// predicates only route unallocated pre-purpose records.
+		if (allocated.has(row.id)) continue;
+		if (myMembership && isOwed(row) && row.responsible_membership_id === myMembership.id) {
+			addExplain({ id: row.id, date: row.txn_date, counterparty: row.counterparty, pocketName: row.pocket_name, income: false });
 		}
 	}
-	if (canApprove && myMembership) {
-		for (const row of rows) {
-			if (row.amount_minor > 0 || !isOwed(row)) continue;
-			if (row.status !== 'submitted') continue;
-			// Domain gate: reviewers currently or historically responsible for
-			// any part cannot decide it.
-			if (row.responsible_membership_id === myMembership.id) continue;
-			if (exclusions.get(row.id)?.includes(myMembership.id)) continue;
-			if (!explain.some((task) => task.id === row.id)) review.push(row);
+	if (myMembership) {
+		for (const owed of purposeState.owedPurposes) {
+			if (!owed.effective.includes(myMembership.id)) continue;
+			addExplain({
+				id: owed.txnId,
+				date: owed.txnDate,
+				counterparty: owed.counterparty,
+				pocketName: owed.pocketName,
+				income: false,
+				purposeId: owed.purposeId,
+				purposeName: owed.purposeName,
+				badge: owed.status === 'changes_requested' ? 'Changes requested' : 'Needs details'
+			});
+		}
+		for (const remainder of purposeState.remainders) {
+			if (remainder.responsibleId !== myMembership.id) continue;
+			addExplain({
+				id: remainder.txnId,
+				date: remainder.txnDate,
+				counterparty: remainder.counterparty,
+				pocketName: remainder.pocketName,
+				income: false,
+				badge: 'Unallocated'
+			});
+		}
+	}
+
+	// Reviews are per purpose: submitted documentation, decided by a member
+	// never responsible for it, now or before.
+	const review: Array<{ id: number; txnId: number; date: string; purposeName: string; counterparty: string; pocketName: string }> = [];
+	if (ctx.can('ApproveTransactions') && myMembership) {
+		for (const task of await submittedPurposeTasks(ctx.db, ctx.org.id)) {
+			if (task.excluded.includes(myMembership.id)) continue;
+			review.push({
+				id: task.purposeId,
+				txnId: task.txnId,
+				date: task.txnDate,
+				purposeName: task.purposeName,
+				counterparty: task.counterparty,
+				pocketName: task.pocketName
+			});
 		}
 	}
 
@@ -105,56 +152,20 @@ export const load: PageServerLoad = async (event) => {
 		);
 	}
 
-	const task = (row: TaskRow) => ({
-		id: row.id,
-		date: row.txn_date,
-		counterparty: row.counterparty,
-		pocketName: row.pocket_name,
-		income: row.amount_minor > 0,
-		status: row.status
-	});
-
 	return {
 		shell: await shellContext(ctx),
-		explain: explain.map(task),
-		review: review.map(task),
+		explain,
+		review,
 		imports: imports.map((batch) => ({ id: batch.id, filename: batch.filename, status: batch.status })),
 		canImport: ctx.can('ImportStatements')
 	};
 };
 
-async function pocketOwnerOf(db: D1Database, orgId: number, txnId: number): Promise<number | null> {
+async function pocketOwnerOf(db: Parameters<typeof qOne>[0], orgId: number, txnId: number): Promise<number | null> {
 	const row = await qOne<{ owner_membership_id: number | null }>(
 		db,
 		'SELECT p.owner_membership_id FROM transactions t JOIN pockets p ON p.id = t.pocket_id AND p.org_id = t.org_id WHERE t.id = ?1 AND t.org_id = ?2',
 		[txnId, orgId]
 	);
 	return row?.owner_membership_id ?? null;
-}
-
-async function responsibleExclusions(db: D1Database, orgId: number): Promise<Map<number, number[]>> {
-	const rows = await qAll<{ transaction_id: number; membership_id: number }>(
-		db,
-		`SELECT rh.transaction_id, rh.membership_id FROM responsible_history rh
-		 JOIN transactions t ON t.id = rh.transaction_id AND t.org_id = ?1`,
-		[orgId]
-	);
-	const map = new Map<number, number[]>();
-	for (const row of rows) {
-		const list = map.get(row.transaction_id) ?? [];
-		list.push(row.membership_id);
-		map.set(row.transaction_id, list);
-	}
-	return map;
-}
-
-async function splitResponsibleIds(db: D1Database, orgId: number, membershipId: number): Promise<Set<number>> {
-	const rows = await qAll<{ transaction_id: number }>(
-		db,
-		`SELECT s.transaction_id FROM transaction_splits s
-		 JOIN transactions t ON t.id = s.transaction_id AND t.org_id = ?1
-		 WHERE s.responsible_membership_id = ?2`,
-		[orgId, membershipId]
-	);
-	return new Set(rows.map((row) => row.transaction_id));
 }

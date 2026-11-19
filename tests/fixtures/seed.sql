@@ -75,3 +75,16 @@ VALUES
   (1, 2, 1, 5, 0, 5, 'DEMO: initial print run', 1, 0),
   (1, 3, 1, 2, 0, 2, 'DEMO: initial stock', 1, 0),
   (1, 3, 2, 1, 0, 1, 'DEMO: stock held by organizer', 1, 0);
+
+-- Purposes for the seeded splits. The 0014 migration converts splits that
+-- exist at migration time; local databases seed AFTER migrating, so the same
+-- conversion is stated here explicitly (one purpose per split, no label merge,
+-- responsible from the split override or the transaction member).
+INSERT INTO purposes (id, org_id, name, kind, notes, status, created_by_membership_id, source_split_id, created_at, updated_at)
+VALUES
+  (1, 1, 'DEMO: workshop supplies', 'expense', '', 'pending', 2, 1, 0, 0),
+  (2, 1, 'DEMO: attendee coffee', 'expense', '', 'pending', 1, 2, 0, 0);
+INSERT INTO purpose_responsibles (purpose_id, membership_id, since) VALUES (1, 2, 0), (2, 1, 0);
+INSERT INTO purpose_responsible_history (purpose_id, membership_id, since) VALUES (1, 2, 0), (2, 1, 0);
+INSERT INTO allocations (org_id, purpose_id, transaction_id, amount_minor, responsible_membership_id, created_at)
+VALUES (1, 1, 1, 90000000, NULL, 0), (1, 2, 1, 60000000, NULL, 0);

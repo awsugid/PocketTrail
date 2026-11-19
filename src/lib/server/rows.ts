@@ -136,6 +136,8 @@ export interface DocRow {
 	id: number;
 	org_id: number;
 	transaction_id: number | null;
+	/** Purpose-level evidence (set for purpose documents, else null). */
+	purpose_id: number | null;
 	import_batch_id: number | null;
 	kind: string;
 	r2_key: string;

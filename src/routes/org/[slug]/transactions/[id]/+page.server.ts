@@ -1,4 +1,4 @@
-import { actionForm, approve, addComment, requireOrg, numericPathId, requestChanges, saveDetails, submitDocumentation, suppress, txnDetail, txnShell, unsuppress, uploadDocument } from '$lib/server/txns';
+import { actionForm, approve, addComment, requireOrg, numericPathId, requestChanges, saveAllocations, saveDetails, submitDocumentation, suppress, txnDetail, txnShell, unsuppress, uploadDocument } from '$lib/server/txns';
 import type { Actions, PageServerLoad } from './$types';
 
 // Per-entry authorization: the row is looked up by (id, org_id) together, so a
@@ -21,10 +21,15 @@ export const actions: Actions = {
 		const form = await actionForm(event, ctx.session);
 		return saveDetails(ctx, numericPathId(event.params.id), form);
 	},
-	submit: async (event) => {
+submit: async (event) => {
 		const ctx = await requireOrg(event, event.params.slug);
 		const form = await actionForm(event, ctx.session);
 		return submitDocumentation(ctx, numericPathId(event.params.id), form);
+	},
+	allocations: async (event) => {
+		const ctx = await requireOrg(event, event.params.slug);
+		const form = await actionForm(event, ctx.session);
+		return saveAllocations(ctx, numericPathId(event.params.id), form);
 	},
 	approve: async (event) => {
 		const ctx = await requireOrg(event, event.params.slug);

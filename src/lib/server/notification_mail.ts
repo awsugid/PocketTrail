@@ -217,6 +217,32 @@ export function mentionMessage(org: OrgRef, recipient: Recipient, txnId: number,
 	};
 }
 
+/** One purpose notice: the fact and the link only (discussion message or
+ * assignment). No amounts, notes, or message text leave the app. */
+export function purposeMessage(org: OrgRef, recipient: Recipient, purposeId: number, baseUrl: string, assigned: boolean): SmtpMessage {
+	const url = `${baseUrl}/org/${encodeURIComponent(org.slug)}/purposes/${purposeId}`;
+	const subject = assigned ? `Purpose assigned to you — ${org.name}` : `New discussion message — ${org.name}`;
+	const fact = assigned ? 'You are now responsible for a purpose' : 'A purpose discussion has a new message';
+	let text = `${fact} in ${org.name}. Sign in to open it:\n${url}\n`;
+	if (recipient.invited) text += `\n${inviteText(org, recipient, baseUrl)}\n`;
+	text += '\nThe details stay in PocketTrail; this email does not include them.\n';
+	return {
+		to: recipient.email,
+		subject,
+		body: text,
+		html: layoutHtml({
+			title: subject,
+			preheader: `${fact} in ${org.name}.`,
+			heading: assigned ? 'A purpose needs you' : 'New discussion message',
+			introHtml: `${escapeHtml(fact)} in <strong style="color:#18181b;">${escapeHtml(org.name)}</strong>.`,
+			contentHtml: `<p style="margin:0;font-size:12px;line-height:20px;text-align:center;"><a href="${escapeHtml(url)}" style="${linkStyle}">${escapeHtml(url)}</a></p>`,
+			button: { url, label: assigned ? 'Open the purpose' : 'Read the discussion' },
+			inviteHtml: recipient.invited ? inviteHtml(org, recipient, baseUrl) : '',
+			footer: 'The details stay in PocketTrail; this email does not include them.'
+		})
+	};
+}
+
 /** Transaction ids linked from a stored digest body (`/org/<slug>/transactions/<id>`). */
 export function digestTxnIds(body: string, slug: string): number[] {
 	const ids: number[] = [];
@@ -266,6 +292,8 @@ export interface OutboxMailRow {
 	kind: string;
 	to_membership_id: number;
 	transaction_id: number | null;
+	/** Purpose-bound rows (kind 'mention'): the link opens the purpose page. */
+	purpose_id: number | null;
 	body: string;
 	attempts: number;
 	email: string;
@@ -280,12 +308,12 @@ export interface OutboxMailRow {
 
 export interface EmailJob {
 	rows: OutboxMailRow[];
-	kind: 'assignment' | 'mention' | 'digest';
+	kind: 'assignment' | 'mention' | 'digest' | 'purpose';
 }
 
 /** Group deliverable rows into emails: assignment rows -> one email per
- * recipient (input order of first row); mention/digest -> one per row. Capped
- * at `maxEmails`. Unknown kinds are skipped. */
+ * recipient (input order of first row); mention/digest/purpose -> one per row.
+ * Capped at `maxEmails`. Unknown kinds are skipped. */
 export function planEmails(rows: readonly OutboxMailRow[], maxEmails = MAX_EMAILS_PER_CALL): EmailJob[] {
 	const jobs: EmailJob[] = [];
 	const byRecipient = new Map<number, EmailJob>();
@@ -300,7 +328,7 @@ export function planEmails(rows: readonly OutboxMailRow[], maxEmails = MAX_EMAIL
 			const job: EmailJob = { kind: 'assignment', rows: [row] };
 			byRecipient.set(row.to_membership_id, job);
 			jobs.push(job);
-		} else if (row.kind === 'mention' || row.kind === 'digest') {
+		} else if (row.kind === 'mention' || row.kind === 'digest' || row.kind === 'purpose') {
 			if (jobs.length >= maxEmails) continue;
 			jobs.push({ kind: row.kind, rows: [row] });
 		}
@@ -320,19 +348,29 @@ export function messageFor(job: EmailJob, baseUrl: string): SmtpMessage {
 			amountMinor: row.amount_minor ?? 0
 		})), baseUrl);
 	}
-	if (job.kind === 'mention') return mentionMessage(org, recipient, first.transaction_id ?? 0, baseUrl);
+	if (job.kind === 'mention') {
+		if (first.purpose_id !== null && first.purpose_id !== undefined) {
+			return purposeMessage(org, recipient, first.purpose_id, baseUrl, false);
+		}
+		return mentionMessage(org, recipient, first.transaction_id ?? 0, baseUrl);
+	}
+	if (job.kind === 'purpose') {
+		return purposeMessage(org, recipient, first.purpose_id ?? 0, baseUrl, true);
+	}
 	return digestMessage(org, recipient, digestTxnIds(first.body, first.org_slug), baseUrl);
 }
 
-const DELIVERABLE_SQL = `SELECT n.id,n.kind,n.to_membership_id,n.transaction_id,n.body,n.attempts,u.email,u.name,m.invited,o.name AS org_name,o.slug AS org_slug,t.txn_date,t.counterparty,t.amount_minor
+const DELIVERABLE_SQL = `SELECT n.id,n.kind,n.to_membership_id,n.transaction_id,n.purpose_id,n.body,n.attempts,u.email,u.name,m.invited,o.name AS org_name,o.slug AS org_slug,t.txn_date,t.counterparty,t.amount_minor
 FROM notification_outbox n
 JOIN organizations o ON o.id=n.org_id
-JOIN memberships m ON m.id=n.to_membership_id AND m.org_id=n.org_id
+JOIN memberships m ON m.id=n.to_membership_id AND m.org_id=o.id
 JOIN users u ON u.id=m.user_id
-LEFT JOIN transactions t ON t.id=n.transaction_id AND t.org_id=n.org_id
+LEFT JOIN transactions t ON t.id=n.transaction_id AND t.org_id=o.id
+LEFT JOIN purposes pu ON pu.id=n.purpose_id AND pu.org_id=o.id
 WHERE n.org_id=?1 AND o.notifications_enabled=1 AND n.cancelled_at IS NULL AND n.sent_at IS NULL
   AND n.attempts<?2 AND n.created_at>=?3 AND m.removed_at IS NULL
   AND (n.last_error IS NULL OR substr(n.last_error,1,${LEASE_PREFIX.length})<>'${LEASE_PREFIX}' OR CAST(substr(n.last_error,${LEASE_PREFIX.length + 1}) AS INTEGER)<?4)
+  AND (n.purpose_id IS NULL OR (pu.id IS NOT NULL AND pu.suppressed=0))
   AND (n.transaction_id IS NULL OR (t.id IS NOT NULL AND t.suppressed=0 AND (n.kind='mention' OR o.notification_cutoff_date IS NULL OR t.txn_date>=o.notification_cutoff_date)))
 ORDER BY n.id LIMIT ${SCAN_LIMIT}`;
 

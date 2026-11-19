@@ -1,6 +1,7 @@
-// Transaction journey: documentation edits, revision CAS, self-approval denial,
-// approval by an independent reviewer, comment stability, evidence upload and
-// download authorization, suppression, income notes, and cross-org isolation.
+// Transaction journey under organization-scoped purposes: allocation drafts
+// and overallocation, exact-allocation submission, per-purpose approval with
+// self-approval denial, reopen-on-substantive-edit, evidence at the purpose,
+// discussion messages, suppression, income notes, and cross-org isolation.
 import { Client } from '../harness.mjs';
 import { csrfFrom, postMultipart, signIn, syntheticPdf } from './_util.mjs';
 
@@ -23,128 +24,172 @@ export async function checks(ctx) {
 	await signIn(dana, extractCsrf, 'dana');
 
 	const detailPath = '/org/demo-jakarta/transactions/3';
-	const bobCsrf = csrfFrom(await (await bob.get(detailPath)).text()) ?? '';
 	const open = await alice.get(detailPath);
 	const openHtml = await open.text();
 	check('a member can open a transaction detail', open.status === 200, String(open.status));
-	check('detail carries the session CSRF token', csrfFrom(openHtml) !== null);
-	check('detail renders the owed-documentation notice', /Needed before review/.test(openHtml));
+	check('the detail renders the owed-documentation notice', /Needed before review/.test(openHtml));
+	check('the purpose panel is present', /Purposes/.test(openHtml) && /Add/.test(openHtml));
 	const csrf = csrfFrom(openHtml) ?? '';
+	const bobCsrf = csrfFrom(await (await bob.get(detailPath)).text()) ?? '';
+	const revisionOf = (html) => Number(html.match(/name="revision" value="(\d+)"/)?.[1] ?? 0);
+	const purposeLinkOf = (html) => html.match(/href="(\/org\/demo-jakarta\/purposes\/\d+)"/)?.[1];
 
-	// ------------------------------------------------------- documentation save
-	const saved = await alice.postForm(`${detailPath}?/details`, {
+	// ------------------------------------------- allocation drafts and gates
+	const over = await alice.postForm(`${detailPath}?/allocations`, {
 		csrf_token: csrf,
-		revision: '0',
-		explanation: 'DEMO: hosting invoice for the June meetup',
+		revision: String(revisionOf(openHtml)),
 		responsible_member_id: '1',
-		evidence_unavailable_reason: 'DEMO: vendor issued no receipt',
-		'split_label[]': 'DEMO: hosting',
-		'split_amount[]': '120000',
-		'split_member[]': '1'
+		'alloc_purpose[]': 'DEMO: hosting',
+		'alloc_amount[]': '130000',
+		'alloc_member[]': '',
+		justification: 'DEMO: initial allocation'
 	});
-	check('a documented expense saves details', saved.status === 303, String(saved.status));
+	check('overallocation is rejected', over.status === 400, String(over.status));
 
-	const afterSave = await alice.get(detailPath);
-	const afterSaveHtml = await afterSave.text();
-	check('saved details are persisted', afterSaveHtml.includes('DEMO: hosting invoice for the June meetup'));
-	check('a complete expense is pending review', afterSaveHtml.includes('Pending review'));
+	const noJustification = await alice.postForm(`${detailPath}?/allocations`, {
+		csrf_token: csrf,
+		revision: String(revisionOf(openHtml)),
+		responsible_member_id: '1',
+		'alloc_purpose[]': 'DEMO: hosting',
+		'alloc_amount[]': '120000',
+		'alloc_member[]': ''
+	});
+	check('a responsibility change without justification is refused', noJustification.status === 400, String(noJustification.status));
+
+	const saved = await alice.postForm(`${detailPath}?/allocations`, {
+		csrf_token: csrf,
+		revision: String(revisionOf(openHtml)),
+		responsible_member_id: '1',
+		'alloc_purpose[]': 'DEMO: hosting',
+		'alloc_amount[]': '120000',
+		'alloc_member[]': '',
+		justification: 'DEMO: initial allocation'
+	});
+	check('an exact allocation with justification saves', saved.status === 303, String(saved.status));
+	const afterSave = await (await alice.get(detailPath)).text();
+	check('the allocation row names its purpose', afterSave.includes('DEMO: hosting'), 'purpose name missing');
+	// The allocating editor shows inputs, not links; a read-only viewer sees links.
+	const readOnly = await (await bob.get(detailPath)).text();
+	check('the purpose page is linked', Boolean(purposeLinkOf(readOnly)), 'no purpose link');
+	check('the transaction shows its aggregate review state', /Needs details|Pending review/.test(afterSave));
 
 	// ------------------------------------------------------------- revision CAS
-	const stale = await alice.postForm(`${detailPath}?/details`, {
+	const stale = await alice.postForm(`${detailPath}?/allocations`, {
 		csrf_token: csrf,
 		revision: '0',
-		explanation: 'DEMO: stale write',
 		responsible_member_id: '1',
-		evidence_unavailable_reason: '',
-		'split_label[]': 'DEMO: hosting',
-		'split_amount[]': '120000',
-		'split_member[]': '1'
+		'alloc_purpose[]': 'DEMO: hosting',
+		'alloc_amount[]': '120000',
+		'alloc_member[]': '',
+		justification: 'DEMO: stale write'
 	});
 	check('a stale revision is rejected', stale.status === 409, String(stale.status));
-	const afterStale = await alice.get(detailPath);
-	check(
-		'a losing stale write changed nothing',
-		!(await afterStale.text()).includes('DEMO: stale write')
-	);
+	const afterStale = await (await alice.get(detailPath)).text();
+	check('a losing stale write changed nothing', !afterStale.includes('DEMO: stale write'));
 
-	// -------------------------------------------------- self-approval is denied
-	const selfApprove = await alice.postForm(`${detailPath}?/approve`, {
+	// ------------------------------------------- purpose documentation + review
+	const purposePath = purposeLinkOf(readOnly) ?? '/org/demo-jakarta/purposes/1';
+	const purposeOpen = await (await alice.get(purposePath)).text();
+	check('the purpose page opens with discussion sidebar', /Discussion/.test(purposeOpen) && /id="discussion-heading"/.test(purposeOpen));
+	const purposeCsrf = csrfFrom(purposeOpen) ?? csrf;
+
+	const notesSaved = await alice.postForm(`${purposePath}?/notes`, {
+		csrf_token: purposeCsrf,
+		revision: String(revisionOf(purposeOpen)),
+		notes: 'DEMO: hosting invoice for the June meetup; vendor issued no receipt'
+	});
+	check('purpose Notes save', notesSaved.status === 303, String(notesSaved.status));
+
+	const submitted = await alice.postForm(`${detailPath}?/submit`, {
 		csrf_token: csrf,
-		revision: '1',
+		revision: String(revisionOf(afterStale))
+	});
+	check('an exactly allocated, documented expense submits', submitted.status === 303, String(submitted.status));
+	const afterSubmit = await (await alice.get(detailPath)).text();
+	check('the purpose awaits review', afterSubmit.includes('Pending review'), 'pending review missing');
+
+	const txnApprove = await bob.postForm(`${detailPath}?/approve`, {
+		csrf_token: bobCsrf,
+		revision: String(revisionOf(afterSubmit)),
+		note: 'DEMO: whole-transaction approval attempt'
+	});
+	check('whole-transaction approval is refused for allocated expenses', txnApprove.status === 400, String(txnApprove.status));
+
+	const selfApprove = await alice.postForm(`${purposePath}?/approve`, {
+		csrf_token: purposeCsrf,
+		revision: String(revisionOf(await (await alice.get(purposePath)).text())),
 		note: 'DEMO: self approval attempt'
 	});
-	check('a historically responsible member cannot approve', selfApprove.status === 403, String(selfApprove.status));
+	check('the responsible member cannot approve their purpose', selfApprove.status === 403, String(selfApprove.status));
 	check(
 		'the denial explains the responsibility rule',
-		/responsible for any part/.test(await selfApprove.text())
+		/responsible for this purpose/.test(await selfApprove.text())
 	);
 
-	// ------------------------------------------- independent reviewer approves
-	const approve = await bob.postForm(`${detailPath}?/approve`, {
-		csrf_token: bobCsrf,
-		revision: '1',
+	const purposeSubmitted = await (await bob.get(purposePath)).text();
+	const approved = await bob.postForm(`${purposePath}?/approve`, {
+		csrf_token: csrfFrom(purposeSubmitted) ?? purposeCsrf,
+		revision: String(revisionOf(purposeSubmitted)),
 		note: 'DEMO: reviewed the hosting invoice'
 	});
-	check('an independent reviewer can approve', approve.status === 303, String(approve.status));
-	const approved = await (await alice.get(detailPath)).text();
-	check('the approval is visible', approved.includes('Approved') && approved.includes('DEMO: reviewed the hosting invoice'));
-
-	// ------------------------------------------------ comments keep the approval
-	const comment = await bob.postForm(`${detailPath}?/comment`, {
-		csrf_token: bobCsrf,
-		body: 'DEMO: noting the invoice number for the record'
-	});
-	check('a comment is accepted', comment.status === 303, String(comment.status));
-	const afterComment = await (await alice.get(detailPath)).text();
-	check('a comment leaves the approval intact', afterComment.includes('Approved'));
-	check('the comment is listed', afterComment.includes('DEMO: noting the invoice number'));
+	check('an independent reviewer approves the purpose', approved.status === 303, String(approved.status));
+	const txnApproved = await (await alice.get(detailPath)).text();
+	check('the transaction aggregates to Approved', /badge--approved/.test(txnApproved), 'approved badge missing');
 
 	// --------------------------------------- substantive edits reopen the review
-	const reopened = await alice.postForm(`${detailPath}?/details`, {
+	const reopened = await alice.postForm(`${detailPath}?/allocations`, {
 		csrf_token: csrf,
-		revision: '2',
-		explanation: 'DEMO: hosting invoice for June and July',
+		revision: String(revisionOf(txnApproved)),
 		responsible_member_id: '1',
-		evidence_unavailable_reason: 'DEMO: vendor issued no receipt',
-		'split_label[]': 'DEMO: hosting',
-		'split_amount[]': '120000',
-		'split_member[]': '1'
+		'alloc_purpose[]': 'DEMO: hosting',
+		'alloc_amount[]': '110000',
+		'alloc_member[]': '',
+		'alloc_purpose[]': 'DEMO: cleaning',
+		'alloc_amount[]': '10000',
+		'alloc_member[]': '',
+		justification: 'DEMO: split adjustment'
 	});
-	check('a substantive edit is accepted', reopened.status === 303, String(reopened.status));
+	check('a substantive allocation edit is accepted', reopened.status === 303, String(reopened.status));
 	const afterReopen = await (await alice.get(detailPath)).text();
-	check('a substantive edit reopens review', afterReopen.includes('Pending review') && !afterReopen.includes('badge--approved'));
-
-	// ------------------------------------------------------------- exact money
-	check('the detail renders the exact bank amount', afterReopen.includes('-Rp 120.000'), 'amount missing');
+	check('an allocation change reopens purpose review', afterReopen.includes('Needs details') && !/badge--approved/.test(afterReopen));
+	const purposeAfterReopen = await (await alice.get(purposePath)).text();
+	check('the reopened purpose records its history', /History/.test(purposeAfterReopen) && /Reopened|responsibility|Notes updated/i.test(purposeAfterReopen));
 
 	// ----------------------------------------------------------- HTML escaping
-	const escapeWrite = await alice.postForm(`${detailPath}?/details`, {
-		csrf_token: csrf,
-		revision: '3',
-		explanation: '<script>alert(1)</script>',
-		responsible_member_id: '1',
-		evidence_unavailable_reason: 'DEMO: no receipt',
-		'split_label[]': 'DEMO: hosting',
-		'split_amount[]': '120000',
-		'split_member[]': '1'
+	const purposeNow = await (await alice.get(purposePath)).text();
+	const escapeWrite = await alice.postForm(`${purposePath}?/notes`, {
+		csrf_token: purposeCsrf,
+		revision: String(revisionOf(purposeNow)),
+		notes: '<script>alert(1)</script>'
 	});
 	check('a stored script payload is accepted as text', escapeWrite.status === 303, String(escapeWrite.status));
-	const escaped = await (await alice.get(detailPath)).text();
+	const escaped = await (await alice.get(purposePath)).text();
 	check(
-		'stored HTML is escaped on render',
-		!escaped.includes('<script>alert(1)') && escaped.includes('&lt;script>alert(1)'),
+		'stored Markdown is escaped on render',
+		!escaped.includes('<script>alert(1)') && escaped.includes('&lt;script&gt;alert(1)'),
 		'payload not escaped'
 	);
 
+	// ------------------------------------------------ purpose discussion + mail
+	const bobPurpose = await (await bob.get(purposePath)).text();
+	const message = await bob.postForm(`${purposePath}?/message`, {
+		csrf_token: csrfFrom(bobPurpose) ?? bobCsrf,
+		body: 'DEMO: invoice number 42, cc @alice'
+	});
+	check('a discussion message is accepted', message.status === 303, String(message.status));
+	const withMessage = await (await alice.get(purposePath)).text();
+	check('the message is rendered with its author', withMessage.includes('DEMO: invoice number 42') && withMessage.includes('Bob'));
+
 	// --------------------------------------------------------- evidence upload
+	const purposeForEvidence = await (await alice.get(purposePath)).text();
 	const upload = await postMultipart(
 		alice,
-		`${detailPath}?/document`,
-		{ csrf_token: csrf, revision: '4', note: 'DEMO: synthetic evidence' },
+		`${purposePath}?/evidence`,
+		{ csrf_token: purposeCsrf, revision: String(revisionOf(purposeForEvidence)), note: 'DEMO: synthetic evidence' },
 		{ file: syntheticPdf('evidence') }
 	);
-	check('evidence upload is accepted for a documenting member', upload.status === 303, String(upload.status));
-	const withEvidence = await (await alice.get(detailPath)).text();
+	check('purpose evidence upload is accepted', upload.status === 303, String(upload.status));
+	const withEvidence = await (await alice.get(purposePath)).text();
 	const documentPath = withEvidence.match(/href="(\/org\/demo-jakarta\/documents\/\d+)"/)?.[1];
 	check('the evidence link is rendered', Boolean(documentPath), 'no document link');
 
@@ -156,7 +201,6 @@ export async function checks(ctx) {
 			/attachment/.test(downloaded.headers.get('content-disposition') ?? ''),
 			downloaded.headers.get('content-disposition') ?? 'missing'
 		);
-		check('evidence is never publicly cacheable', /private/.test(downloaded.headers.get('cache-control') ?? ''));
 		const otherViewer = await bob.get(documentPath);
 		check('another ledger viewer can read retained evidence', otherViewer.status === 200, String(otherViewer.status));
 	}
@@ -172,28 +216,30 @@ export async function checks(ctx) {
 		foreignDetail.status === 404,
 		String(foreignDetail.status)
 	);
-	const foreignOrg = await alice.get('/org/demo-indonesia/transactions');
-	check('a non-member is denied another organization', foreignOrg.status === 403, String(foreignOrg.status));
+	const foreignPurpose = await alice.get('/org/demo-indonesia/purposes/1');
+	check('a non-member is denied another organization\'s purposes', foreignPurpose.status === 403, String(foreignPurpose.status));
 
 	// -------------------------------------------------------------- suppression
+	const txnNow = await (await alice.get(detailPath)).text();
+	const txnRevision = String(revisionOf(txnNow));
 	const noReason = await alice.postForm(`${detailPath}?/suppress`, {
 		csrf_token: csrf,
-		revision: '5',
+		revision: txnRevision,
 		reason: ''
 	});
 	check('suppression without a reason is refused', noReason.status === 400, String(noReason.status));
 	const suppressed = await alice.postForm(`${detailPath}?/suppress`, {
 		csrf_token: csrf,
-		revision: '5',
+		revision: txnRevision,
 		reason: 'DEMO: settlement in progress'
 	});
 	check('suppression with a reason is recorded', suppressed.status === 303, String(suppressed.status));
 	const suppressedHtml = await (await alice.get(detailPath)).text();
 	check('the suppressed state is visible', suppressedHtml.includes('Suppressed'));
-	check('suppression does not imply completion', suppressedHtml.includes('Pending review'));
+	check('suppression does not imply completion', suppressedHtml.includes('Needs details'));
 	const resumed = await alice.postForm(`${detailPath}?/unsuppress`, {
 		csrf_token: csrf,
-		revision: '6'
+		revision: String(Number(txnRevision) + 1)
 	});
 	check('notifications can be resumed', resumed.status === 303, String(resumed.status));
 

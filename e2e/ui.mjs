@@ -204,17 +204,16 @@ await withWorker(async () => {
 		// ---------------------------------------------------------------- detail
 		await page.goto(`${ORIGIN}/org/demo-jakarta/transactions/1`);
 		check(
-			'detail page shows purposes and the owed-documentation notice',
-			(await page.locator('input[name="split_label[]"]').evaluateAll((inputs) => inputs.map((input) => input.value))).includes('DEMO: workshop supplies') &&
-				(await page.getByText('DEMO: workshop supplies').count()) === 0 &&
-				(await page.getByText(/Needed before review/).count()) === 1,
+			'detail page shows its allocated purposes',
+			(await page.locator('input[name="alloc_purpose[]"]').evaluateAll((inputs) => inputs.map((input) => input.value))).includes('DEMO: workshop supplies') &&
+				(await page.getByText(/Needs details/).count()) >= 1,
 			'detail content missing'
 		);
 		const labelAudit = await page.evaluate(() =>
 			[...document.querySelectorAll('label')].map((label) => `${label.getAttribute('for') ?? '?'}=${(label.textContent ?? '').trim()}`)
 		);
-		const countA = await page.getByRole('textbox', { name: /Explanation/ }).count();
-		const countB = await page.getByRole('combobox', { name: 'Responsible member', exact: true }).count();
+		const countA = await page.getByRole('textbox', { name: /Justification/ }).count();
+		const countB = await page.getByRole('combobox', { name: 'Inherited responsible member', exact: true }).count();
 		check(
 			'detail page labels its primary money inputs',
 			countA === 1 && countB === 1,

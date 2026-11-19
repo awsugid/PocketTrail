@@ -69,7 +69,9 @@ export async function createOrg(event: CtxEvent, login: LoginState, form: FormDa
 	await login.db.batch([
 		login.db
 			.prepare(
-				'INSERT INTO organizations (slug, name, is_synthetic, notifications_enabled, created_at) VALUES (?1, ?2, 0, 0, ?3)'
+				// New organizations notify by default; existing organizations keep
+				// their explicitly chosen setting.
+				'INSERT INTO organizations (slug, name, is_synthetic, notifications_enabled, created_at) VALUES (?1, ?2, 0, 1, ?3)'
 			)
 			.bind(slug, name, now),
 		login.db

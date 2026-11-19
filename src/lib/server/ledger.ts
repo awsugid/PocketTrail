@@ -53,6 +53,9 @@ interface LedgerRow extends Record<string, unknown> {
 	responsible_membership_id: number | null;
 	responsible_name: string | null;
 	evidence_count: number | null;
+	/** 'approved'|'changes_requested'|'needs'|'submitted' for allocated expense
+	 * transactions; '' keeps the legacy stored-status path. */
+	derived_status: string;
 }
 
 /** Documentation still owed by the responsible member. Ports
@@ -134,33 +137,83 @@ export interface LedgerEntry {
 	responsibleName: string | null;
 }
 
-const LIST_SQL = `SELECT t.id, p.name AS pocket_name, t.txn_date, t.txn_time, t.counterparty,
+const LIST_SQL_BASE = `SELECT * FROM (
+	SELECT t.id, p.name AS pocket_name, t.txn_date, t.txn_time, t.counterparty,
 		t.transaction_type, t.amount_minor, t.balance_minor, t.explanation,
 		t.evidence_unavailable_reason, t.status, t.suppressed, t.responsible_membership_id,
 		u.name AS responsible_name,
 		(SELECT COUNT(*) FROM documents d
-		 WHERE d.transaction_id = t.id AND d.kind = 'evidence' AND d.superseded = 0) AS evidence_count
+		 WHERE d.transaction_id = t.id AND d.kind = 'evidence' AND d.superseded = 0) AS evidence_count,
+		CASE WHEN t.amount_minor < 0 AND EXISTS (SELECT 1 FROM allocations al WHERE al.transaction_id = t.id) THEN
+			CASE
+				WHEN NOT EXISTS (SELECT 1 FROM allocations a JOIN purposes pu ON pu.id = a.purpose_id
+				                 WHERE a.transaction_id = t.id AND pu.status <> 'approved') THEN 'approved'
+				WHEN EXISTS (SELECT 1 FROM allocations a JOIN purposes pu ON pu.id = a.purpose_id
+				             WHERE a.transaction_id = t.id AND pu.status = 'changes_requested') THEN 'changes_requested'
+				WHEN ((
+					SELECT 1 FROM allocations a JOIN purposes pu ON pu.id = a.purpose_id
+					 WHERE a.transaction_id = t.id AND pu.status <> 'approved'
+					   AND trim(pu.notes) = ''
+					   AND NOT EXISTS (SELECT 1 FROM documents d3 WHERE d3.purpose_id = pu.id AND d3.kind = 'evidence' AND d3.superseded = 0)
+					 LIMIT 1
+				) IS NOT NULL
+				OR (SELECT COALESCE(SUM(a4.amount_minor), 0) FROM allocations a4 WHERE a4.transaction_id = t.id) <> abs(t.amount_minor)
+				) THEN 'needs'
+				ELSE 'submitted'
+			END
+		ELSE '' END AS derived_status
 	FROM transactions t
 	JOIN pockets p ON p.id = t.pocket_id AND p.org_id = t.org_id
 	LEFT JOIN memberships m ON m.id = t.responsible_membership_id
 	LEFT JOIN users u ON u.id = m.user_id
 	WHERE t.org_id = ?1
-	  AND (
-	    ?2 = ''
-	    OR (?2='pending' AND t.status IN ('pending','submitted')
-	        AND (trim(t.explanation) <> '' AND (trim(t.evidence_unavailable_reason) <> ''
-	             OR EXISTS (SELECT 1 FROM documents d2 WHERE d2.transaction_id = t.id AND d2.kind = 'evidence' AND d2.superseded = 0))))
-	    OR (?2='needs_details' AND t.status IN ('pending','submitted','changes_requested')
-	        AND NOT (trim(t.explanation) <> '' AND (trim(t.evidence_unavailable_reason) <> ''
-	             OR EXISTS (SELECT 1 FROM documents d2 WHERE d2.transaction_id = t.id AND d2.kind = 'evidence' AND d2.superseded = 0))))
-	    OR (?2 NOT IN ('pending','needs_details') AND t.status = ?2)
+	)
+	WHERE (
+		?2 = ''
+		OR (?2='pending' AND (
+			(derived_status = 'submitted')
+			OR (derived_status = '' AND status IN ('pending','submitted')
+				AND (trim(explanation) <> '' AND (trim(evidence_unavailable_reason) <> ''
+					 OR EXISTS (SELECT 1 FROM documents d2 WHERE d2.transaction_id = id AND d2.kind = 'evidence' AND d2.superseded = 0))))))
+		OR (?2='needs_details' AND (
+			(derived_status = 'needs')
+			OR (derived_status = '' AND status IN ('pending','submitted','changes_requested')
+				AND NOT (trim(explanation) <> '' AND (trim(evidence_unavailable_reason) <> ''
+					 OR EXISTS (SELECT 1 FROM documents d2 WHERE d2.transaction_id = id AND d2.kind = 'evidence' AND d2.superseded = 0))))))
+		OR (?2='approved' AND ((derived_status <> '' AND derived_status = 'approved') OR (derived_status = '' AND status = 'approved')))
+		OR (?2='changes_requested' AND ((derived_status <> '' AND derived_status = 'changes_requested') OR (derived_status = '' AND status = 'changes_requested')))
 	  )
-	ORDER BY t.txn_date DESC, t.id DESC
+	ORDER BY txn_date DESC, id DESC
 	LIMIT ?3 OFFSET ?4`;
+
+/** The exact ledger query, exposed for SQL-level regression tests. */
+export const LIST_SQL = LIST_SQL_BASE;
 
 function toEntry(row: LedgerRow): LedgerEntry {
 	const amountMinor = assertSafeMinor(row.amount_minor, 'ledger amount');
 	const evidenceCount = row.evidence_count ?? 0;
+	if (row.derived_status !== '') {
+		// Purposes own the documentation: the derived status is the aggregate.
+		const status = row.derived_status;
+		const owed = status === 'needs';
+		return {
+			id: row.id,
+			date: row.txn_date,
+			time: row.txn_time ?? '',
+			counterparty: counterpartyDisplay(row.counterparty),
+			transactionType: row.transaction_type,
+			pocketName: row.pocket_name,
+			amountMinor,
+			amount: fmtMoney(amountMinor),
+			balance: fmtMoney(assertSafeMinor(row.balance_minor ?? 0, 'ledger balance')),
+			status,
+			statusLabel: statusLabel(status === 'submitted' ? 'pending' : status, !owed),
+			statusTone: statusTone(status === 'submitted' ? 'pending' : status, !owed),
+			needsDetails: owed,
+			suppressed: (row.suppressed ?? 0) !== 0,
+			responsibleName: row.responsible_name
+		};
+	}
 	const owed = needsDetails(
 		amountMinor,
 		row.explanation,
