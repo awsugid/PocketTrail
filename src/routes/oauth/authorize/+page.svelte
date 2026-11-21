@@ -10,12 +10,12 @@
 <main class="consent flex flex-col gap-5">
  <h1>Connect {data.clientName}</h1>
   {#if data.clientHost}<p>Client host: <strong>{data.clientHost}</strong></p>{/if}
- <p>Signed in as <strong>{data.userName}</strong>. This AI client acts on your behalf, never as a direct human action.</p>
+ <p class="my-[14px]">Signed in as <strong>{data.userName}</strong>. This AI client acts on your behalf, never as a direct human action.</p>
  <section class="rounded-lg border p-5"><div class="flex flex-col gap-4">
- <dl><dt>Registered client ID</dt><dd>{data.clientId}</dd><dt>Callback origin</dt><dd>{data.callbackOrigin}</dd><dt>Exact callback URL</dt><dd>{data.callback}</dd></dl>
+ <dl class="my-[14px]"><dt>Registered client ID</dt><dd>{data.clientId}</dd><dt>Callback origin</dt><dd>{data.callbackOrigin}</dd><dt>Exact callback URL</dt><dd>{data.callback}</dd></dl>
  <p class="hint">Client names are self-reported. Verify client host and callback before granting access.</p>
  <h2>Requested access</h2>
- <ul>{#each data.scopes as scope}<li>{scope==='finance:read'?'Read transaction summaries and details':scope==='income:write'?'Update income notes':scope==='purposes:read'?'Read purposes and details':scope==='purposes:write'?'Allocate transactions and review purposes when your role permits':'Add or remove transaction tags'}</li>{/each}</ul>
+ <ul class="my-[14px] list-disc pl-10">{#each data.scopes as scope}<li>{scope==='finance:read'?'Read transaction summaries and details':scope==='income:write'?'Update income notes':scope==='purposes:read'?'Read purposes and details':scope==='purposes:write'?'Allocate transactions and review purposes when your role permits':'Add or remove transaction tags'}</li>{/each}</ul>
  <p class="hint">Your current role permissions limit every call. Purpose reviews require your approval permission; reviewing your own responsibilities stays forbidden. No membership or payment access. Access tokens last 15 minutes; refresh access lasts up to 30 days between uses, at most 90 days total. Revoke anytime in Settings.</p>
  <form method="POST" class="form">
  <input type="hidden" name="csrf_token" value={data.csrf}/>

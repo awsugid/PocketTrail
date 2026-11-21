@@ -1,6 +1,4 @@
-@layer theme, base, components, utilities;
-@import 'tailwindcss/theme.css' layer(theme);
-@import 'tailwindcss/utilities.css' layer(utilities);
+@import 'tailwindcss';
 @import 'tw-animate-css';
 
 @theme inline {
@@ -126,10 +124,13 @@
 	--topbar-h: 56px;
 }
 
-*,
-*::before,
-*::after {
-	box-sizing: border-box;
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+	body {
+		@apply bg-background text-foreground;
+	}
 }
 
 html {
@@ -1004,7 +1005,6 @@ fieldset {
 	font-size: 14px;
 }
 
-.select,
 .input {
 	width: 100%;
 	min-height: 36px;
@@ -1018,24 +1018,20 @@ fieldset {
 	transition: border-color 120ms;
 }
 
-.input:hover,
-.select:hover {
+.input:hover {
 	border-color: var(--text-secondary);
 }
 
-.select:focus-visible,
 .input:focus-visible {
 	border-color: var(--focus);
 	outline-offset: 0;
 }
 
-.input:user-invalid,
-.select:user-invalid {
+.input:user-invalid {
 	border-color: var(--danger);
 }
 
 .input:disabled,
-.select:disabled,
 .input[readonly] {
 	background: var(--surface-2);
 	color: var(--text-secondary);
@@ -1045,10 +1041,6 @@ fieldset {
 	color: var(--placeholder);
 }
 
-.textarea {
-	min-height: 96px;
-	resize: vertical;
-}
 
 .form--inline .field {
 	flex: 1 1 200px;
@@ -1071,10 +1063,6 @@ fieldset {
 	pointer-events: none;
 }
 
-.money-input .input {
-	padding-left: 36px;
-	font-variant-numeric: tabular-nums;
-}
 
 .form-error:focus-visible {
 	outline: 2px solid var(--danger);
@@ -1146,16 +1134,6 @@ form[aria-busy='true'] .btn[type='submit'] {
 	background: var(--primary-active);
 }
 
-.btn--quiet {
-	border-color: transparent;
-	background: transparent;
-	color: var(--text-secondary);
-}
-
-.btn--quiet:hover {
-	background: var(--surface-2);
-	color: var(--text);
-}
 
 .btn--danger {
 	color: var(--danger);
@@ -1176,15 +1154,6 @@ form[aria-busy='true'] .btn[type='submit'] {
 	min-height: 32px;
 	padding: 4px 10px;
 	font-size: 13px;
-}
-
-.btn--icon {
-	width: 36px;
-	padding: 0;
-}
-
-.btn--sm.btn--icon {
-	width: 32px;
 }
 
 
@@ -1285,9 +1254,8 @@ table.ledger.matrix tbody tr:last-child td {
 	vertical-align: middle;
 }
 
-.cell--check .check {
-	justify-content: center;
-	min-height: 24px;
+.cell--check [data-slot='checkbox'] {
+	margin-inline: auto;
 }
 
 table.ledger th:first-child,
@@ -1377,13 +1345,6 @@ table.ledger td a {
 	color: var(--text-secondary);
 }
 
-.check__native {
-	flex: none;
-	width: 18px;
-	height: 18px;
-	margin: 0;
-	accent-color: var(--primary);
-}
 
 .fold summary {
 	display: flex;
@@ -1747,34 +1708,11 @@ dl.facts dd {
 	table.ledger td a {
 		min-height: 44px;
 	}
-	.btn--icon,
-	.btn--sm.btn--icon {
-		width: 44px;
-	}
-	.input,
-	.select {
+	.input {
 		min-height: 44px;
-	}
-	.ui-item {
-		min-height: 44px;
-	}
-	.ui-cal__dow,
-	.ui-cal__cell {
-		width: 44px;
-		height: 44px;
-	}
-	.ui-cal__day {
-		width: 42px;
-		height: 42px;
 	}
 }
 
-@media (max-width: 400px) {
-	.ui-cal__dow,
-	.ui-cal__cell {
-		width: min(44px, calc((100vw - 64px) / 7));
-	}
-}
 
 /* ------------------------------------------- purposes, markdown, discussion */
 .purpose-grid {
@@ -1820,6 +1758,20 @@ dl.facts dd {
 .md ol {
 	margin: 0 0 10px;
 	padding-left: 22px;
+}
+
+.md ul,
+.notice ul {
+	list-style: disc;
+}
+
+.md ol {
+	list-style: decimal;
+}
+
+.panel__body > p:not([class]),
+.panel__body > p.muted {
+	margin-block: 14px;
 }
 
 .md blockquote {
