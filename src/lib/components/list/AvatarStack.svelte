@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Tooltip } from 'bits-ui';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	let { members }: { members: { id: number; name: string; picture: string | null }[] } = $props();
 	let failed = $state<string[]>([]);
 	const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map(part => Array.from(part)[0] ?? '').join('').toUpperCase();
@@ -19,7 +19,7 @@
 						</span>
 					{/snippet}
 				</Tooltip.Trigger>
-				<Tooltip.Portal><Tooltip.Content role="tooltip" class="member-tooltip" sideOffset={4}>{member.name}</Tooltip.Content></Tooltip.Portal>
+				<Tooltip.Content role="tooltip" sideOffset={4}>{member.name}</Tooltip.Content>
 			</Tooltip.Root>
 		{/each}
 		{#if members.length > 3}
@@ -30,7 +30,7 @@
 						<span {...props} class="member-avatar member-avatar--more" tabindex="0" role="img" aria-label={members.slice(3).map(member => member.name).join(', ')}>+{members.length - 3}</span>
 					{/snippet}
 				</Tooltip.Trigger>
-				<Tooltip.Portal><Tooltip.Content role="tooltip" class="member-tooltip" sideOffset={4}>{members.slice(3).map(member => member.name).join(', ')}</Tooltip.Content></Tooltip.Portal>
+				<Tooltip.Content role="tooltip" sideOffset={4}>{members.slice(3).map(member => member.name).join(', ')}</Tooltip.Content>
 			</Tooltip.Root>
 		{:else if members.length === 0}<span class="muted" aria-label="No responsible member">—</span>{/if}
 	</Tooltip.Provider>

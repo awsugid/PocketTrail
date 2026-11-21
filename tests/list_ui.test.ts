@@ -11,6 +11,14 @@ test('filter changes preserve repeated fields and reset pagination', () => {
 	expect(new URL(filterHref(url, 'tag', '3', true), url).searchParams.getAll('tag')).toEqual(['1', '2', '3']);
 });
 
+test('action status and ordinary statuses replace one another', () => {
+ const url = new URL('https://example.test/org/demo/transactions?status=needs_action&page=4&tag=1');
+ const approved = new URL(filterHref(url, 'status', 'approved'), url);
+ expect(approved.searchParams.getAll('status')).toEqual(['approved']);
+ expect(approved.searchParams.has('page')).toBe(false);
+ expect(new URL(filterHref(approved, 'status', 'needs_action'), url).searchParams.getAll('status')).toEqual(['needs_action']);
+});
+
 test('pagination includes boundaries and gaps without enumerating every page', () => {
 	expect(pageNumbers(1, 1)).toEqual([1]);
 	expect(pageNumbers(4, 7)).toEqual([1, 2, 3, 4, 5, 6, 7]);

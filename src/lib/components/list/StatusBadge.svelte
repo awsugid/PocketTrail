@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon, { type IconName } from '../Icon.svelte';
+	 import { Badge } from '$lib/components/ui/badge';
 	import { statuses, type Status } from './helpers';
 	let { status }: { status: Status } = $props();
 	const styles: Record<Status, { tone: string; icon: IconName }> = {
@@ -8,4 +9,4 @@
 	};
 </script>
 
-<span class="badge badge--{styles[status].tone}"><Icon name={styles[status].icon} size={12} />{statuses.find(option => option.value === status)?.label}</span>
+<Badge variant="outline" class="badge--{styles[status].tone}"><Icon name={styles[status].icon} size={12} />{statuses.find(option => option.value === status)?.label}</Badge>

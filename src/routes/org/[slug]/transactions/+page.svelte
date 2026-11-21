@@ -38,7 +38,7 @@
 		{/snippet}
 	</PageHead>
 	<SummaryCards items={cards} />
-	<FilterBar selection={data.selection} options={data.filterOptions} />
+	<FilterBar selection={data.selection} options={data.filterOptions} needsActionCount={data.summary.needsActionCount} />
 	{#if data.entries.length > 0}
 		<!-- svelte-ignore a11y_no_noninteractive_tabindex (Scrollable table needs keyboard access.) -->
 		<div class="panel"><div class="table-scroll" tabindex="0" role="region" aria-label="Ledger table">

@@ -173,7 +173,7 @@ await withWorker(async () => {
 		}
 		check('the skip link is the first tab stop', focusOrder[0].includes('Skip to content'), focusOrder[0]);
 		check(
-			'keyboard reaches the status filter links',
+			'keyboard reaches status filter toggles',
 			focusOrder.some((entry) => entry.includes('nav=Status filter')),
 			focusOrder.join(' | ')
 		);
@@ -184,7 +184,7 @@ await withWorker(async () => {
 		);
 		check(
 			'the current ledger filter is marked, not only coloured',
-			(await page.locator('nav[aria-label="Status filter"] a[aria-current="true"]').count()) === 1
+			(await page.locator('nav[aria-label="Status filter"] button[data-state="on"]').count()) === 1
 		);
 
 		// ------------------------------------------------------- revised list filters
@@ -193,13 +193,13 @@ await withWorker(async () => {
 		await page.getByRole('button', { name: 'Apply', exact: true }).click();
 		await page.waitForURL(url => url.searchParams.get('min') === '100');
 		check('popup applies IDR amounts through URL', new URL(page.url()).searchParams.get('min') === '100');
-		await page.getByRole('link', { name: 'Approved', exact: true }).click();
+		await page.locator('nav[aria-label="Status filter"] button').filter({ hasText: /^Approved$/ }).click();
 		await page.waitForURL(url => url.searchParams.get('status') === 'approved');
 		check('status pills preserve popup filters and reset page', new URL(page.url()).searchParams.get('min') === '100' && !new URL(page.url()).searchParams.has('page'));
 		await page.goto(`${ORIGIN}/org/demo-jakarta/purposes`);
 		check('purposes summary and creation form remain available', await page.getByRole('definition').count() === 6 && await page.getByRole('button', { name: 'Add purpose', exact: true }).isVisible());
 		await page.getByRole('button', { name: /^Filters/ }).click();
-		check('purpose popup has kind and total filters', await page.getByLabel('Kind', { exact: true }).isVisible() && await page.getByLabel('Total min (IDR)').isVisible());
+		check('purpose popup has kind and total filters', await page.getByLabel('Purpose kind filter', { exact: true }).isVisible() && await page.getByLabel('Total min (IDR)').isVisible());
 		await page.keyboard.press('Escape');
 		await page.screenshot({ path: `${ROOT}/.wrangler/ui/purposes-1440.png`, fullPage: true });
 		shots.push('purposes-1440.png');

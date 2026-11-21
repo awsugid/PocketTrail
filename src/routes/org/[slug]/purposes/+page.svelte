@@ -35,7 +35,7 @@
 <OrgShell {...data.shell} active="purposes">
 	<PageHead title="Purposes" icon="tag" />
 	<SummaryCards items={cards} />
-	<FilterBar selection={data.selection} options={data.filterOptions} purposes />
+	<FilterBar selection={data.selection} options={data.filterOptions} needsActionCount={data.summary.needsActionCount} purposes />
 	{#if data.entries.length > 0}
 		<!-- svelte-ignore a11y_no_noninteractive_tabindex (Scrollable table needs keyboard access.) -->
 		<div class="panel"><div class="table-scroll" tabindex="0" role="region" aria-label="Purposes table">

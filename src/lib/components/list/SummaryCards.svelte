@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Tooltip } from 'bits-ui';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import Icon, { type IconName } from '$lib/components/Icon.svelte';
 
 	let { items }: { items: { label: string; value: string | number; icon: IconName; tone?: string; detail?: string; title?: string }[] } = $props();
@@ -19,7 +19,7 @@
 					</div>
 				{/snippet}
 			</Tooltip.Trigger>
-			<Tooltip.Portal><Tooltip.Content role="tooltip" class="member-tooltip" sideOffset={4}>{item.title ?? item.label}</Tooltip.Content></Tooltip.Portal>
+			<Tooltip.Content role="tooltip" sideOffset={4}>{item.title ?? item.label}</Tooltip.Content>
 		</Tooltip.Root>
 		{/each}
 	</Tooltip.Provider>
