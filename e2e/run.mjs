@@ -139,8 +139,8 @@ async function runChecks() {
 		user_id: 'alice'
 	});
 	check(
-		'valid fixture sign-in redirects to organization selection',
-		signedIn.status === 303 && signedIn.headers.get('location') === '/orgs',
+		'valid fixture sign-in redirects to authenticated landing',
+		signedIn.status === 303 && signedIn.headers.get('location') === '/',
 		`${signedIn.status} ${signedIn.headers.get('location')}`
 	);
 	check(
@@ -156,6 +156,8 @@ async function runChecks() {
 	);
 
 	// -------------------------------------------------------- organization choice
+	const firstLanding = await alice.get('/');
+	check('one active organization is selected', firstLanding.headers.get('location') === '/org/demo-jakarta');
 	const orgsPage = await alice.get('/orgs');
 	const orgsHtml = await orgsPage.text();
 	check('organization selection renders', orgsPage.status === 200, String(orgsPage.status));
@@ -170,6 +172,11 @@ async function runChecks() {
 	const ledger = await alice.get('/org/demo-jakarta/transactions');
 	const ledgerHtml = await ledger.text();
 	check('ledger renders for a member', ledger.status === 200, String(ledger.status));
+	const cookie = alice.cookieHeader();
+	const rememberedLanding = await fetch(`${ORIGIN}/`, { headers: { cookie: `${cookie}; pt_org_alice=demo-jakarta` }, redirect: 'manual' });
+	check('landing opens last accessible organization', rememberedLanding.headers.get('location') === '/org/demo-jakarta');
+	const stale = await fetch(`${ORIGIN}/`, { headers: { cookie: `${cookie}; pt_org_alice=missing` }, redirect: 'manual' });
+	check('missing remembered organization falls back safely', stale.headers.get('location') === '/orgs');
 	check(
 		'exact money semantics survive rendering',
 		ledgerHtml.includes('-Rp 1.500.000') && ledgerHtml.includes('Rp 8.500.000'),

@@ -5,10 +5,10 @@
 	import Topbar from './Topbar.svelte';
 
 	interface Props {
-		user: { name: string; email: string; picture: string | null; isPlatformAdmin: boolean };
+		user: { id: string; name: string; email: string; picture: string | null; isPlatformAdmin: boolean };
 		org: { slug: string; name: string; notificationsEnabled: boolean; synthetic: boolean };
 		organizations: Array<{ slug: string; name: string }>;
-		access: { finance: boolean; inventory: boolean };
+		access: { finance: boolean; inventory: boolean; actions?: boolean };
 		csrfToken: string;
 		active: string;
 		children: Snippet;
@@ -17,7 +17,10 @@
 	let { user, org, organizations, access, csrfToken, active, children }: Props = $props();
 
 	let navOpen = $state(false);
-	afterNavigate(() => (navOpen = false));
+	afterNavigate(() => {
+		navOpen = false;
+		document.cookie = `pt_org_${encodeURIComponent(user.id)}=${encodeURIComponent(org.slug)}; Path=/; Max-Age=31536000; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
+	});
 
 	// At phone width the sidebar is a drawer: out of the tab order and the
 	// accessibility tree while closed; while open, everything behind the scrim is
@@ -48,6 +51,7 @@
 
 	const nav: Array<{ key: string; label: string; path: string; icon: IconName }> = [
 		{ key: 'actions', label: 'Actions', path: 'actions', icon: 'actions' },
+		{ key: 'approval', label: 'Approvals', path: 'approval', icon: 'check' },
 		{ key: 'transactions', label: 'Ledger', path: 'transactions', icon: 'ledger' },
 		{ key: 'purposes', label: 'Purposes', path: 'purposes', icon: 'tag' },
 		{ key: 'imports', label: 'Imports', path: 'imports', icon: 'imports' },
@@ -62,7 +66,7 @@
 	<Topbar {user} {csrfToken} {org} {organizations} locked={drawerOpen} bind:navOpen />
 	<div class="body">
 		<nav class="sidebar" id="org-nav" aria-label="Organization" inert={narrow && !navOpen} data-open={navOpen ? 'true' : undefined}>
-			{#each nav.filter((item) => item.key === 'inventory' ? access.inventory : access.finance) as item (item.key)}
+			{#each nav.filter((item) => item.key === 'actions' ? (access.actions ?? access.finance) : item.key === 'inventory' ? access.inventory : access.finance) as item (item.key)}
 				<a
 					href="/org/{org.slug}/{item.path}"
 					aria-current={active === item.key ? 'page' : undefined}

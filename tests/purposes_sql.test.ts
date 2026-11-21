@@ -45,7 +45,7 @@ function migratedAfterSeed() {
 	const files = readdirSync(MIGRATIONS_DIR).filter((name) => name.endsWith('.sql')).sort();
 	for (const file of files.filter((name) => name < '0014')) db.exec(readFileSync(join(MIGRATIONS_DIR, file), 'utf8'));
 	seedWorld();
-	db.exec(readFileSync(join(MIGRATIONS_DIR, '0014_purposes.sql'), 'utf8'));
+	for (const file of files.filter((name) => name >= '0014')) db.exec(readFileSync(join(MIGRATIONS_DIR, file), 'utf8'));
 }
 
 function seedWorld() {

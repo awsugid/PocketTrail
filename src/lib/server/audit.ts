@@ -139,7 +139,7 @@ export interface AuditEventView {
 export function listOrg(db: D1Database, org: number, page: number): Promise<AuditEventView[]> {
 	return qAll<AuditEventView>(
 		db,
-		`SELECT a.*, u.name AS actor_name FROM audit_events a LEFT JOIN users u ON u.id=a.actor_id
+		`SELECT a.*, CASE WHEN a.actor_type='AI' THEN 'AI on behalf of '||COALESCE(d.name,'unknown user') ELSE u.name END AS actor_name FROM audit_events a LEFT JOIN users u ON u.id=a.actor_id LEFT JOIN users d ON d.id=a.delegated_user_id
 		 WHERE a.org_id=?1 ORDER BY a.id DESC LIMIT ?2 OFFSET ?3`,
 		[org, PAGE_SIZE + 1, pageOffset(page)]
 	);

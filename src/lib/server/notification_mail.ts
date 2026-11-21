@@ -26,6 +26,7 @@ import type { D1Database } from '$lib/d1';
 import { fmtDate } from '$lib/fmt';
 import { fmtMoney } from '$lib/money';
 import { nowMs, qAll } from './db';
+import { parseRolePermissions } from './permissions';
 import { counterpartyDisplay } from './ledger';
 import { sendSmtp, smtpConfig, SmtpError, type SmtpConnect, type SmtpMessage } from './smtp';
 import { usableBaseUrl, workerConnect, type MailEnv } from './invitation_mail';
@@ -288,6 +289,7 @@ export function digestMessage(org: OrgRef, recipient: Recipient, txnIds: readonl
 
 /** Deliverable outbox row joined with its recipient and transaction. */
 export interface OutboxMailRow {
+	role_permissions?: string;
 	id: number;
 	kind: string;
 	to_membership_id: number;
@@ -340,6 +342,10 @@ export function messageFor(job: EmailJob, baseUrl: string): SmtpMessage {
 	const first = job.rows[0]!;
 	const org = { name: first.org_name, slug: first.org_slug };
 	const recipient = { email: first.email, name: first.name, invited: first.invited !== 0 };
+	if (parseRolePermissions(first.role_permissions ?? '[]').has('ExplainOwnActions')) {
+		const url = `${baseUrl}/org/${encodeURIComponent(first.org_slug)}/actions`;
+		return { to: recipient.email, subject: `Please explain your assigned expenses — ${org.name}`, body: `Why did these expenses happen? Please explain their purpose in your assigned Actions: ${url}\n${recipient.invited ? inviteText(org, recipient, baseUrl) : ''}`, html: `<p>Why did these expenses happen? Please explain their purpose.</p><p><a href="${escapeHtml(url)}">Open assigned Actions</a></p>${recipient.invited ? `<p>${escapeHtml(inviteText(org,recipient,baseUrl))}</p>` : ''}` };
+	}
 	if (job.kind === 'assignment') {
 		return assignmentMessage(org, recipient, job.rows.map((row) => ({
 			txnId: row.transaction_id ?? 0,
@@ -360,11 +366,12 @@ export function messageFor(job: EmailJob, baseUrl: string): SmtpMessage {
 	return digestMessage(org, recipient, digestTxnIds(first.body, first.org_slug), baseUrl);
 }
 
-const DELIVERABLE_SQL = `SELECT n.id,n.kind,n.to_membership_id,n.transaction_id,n.purpose_id,n.body,n.attempts,u.email,u.name,m.invited,o.name AS org_name,o.slug AS org_slug,t.txn_date,t.counterparty,t.amount_minor
+const DELIVERABLE_SQL = `SELECT n.id,n.kind,n.to_membership_id,n.transaction_id,n.purpose_id,n.body,n.attempts,u.email,u.name,m.invited,r.permissions AS role_permissions,o.name AS org_name,o.slug AS org_slug,t.txn_date,t.counterparty,t.amount_minor
 FROM notification_outbox n
 JOIN organizations o ON o.id=n.org_id
 JOIN memberships m ON m.id=n.to_membership_id AND m.org_id=o.id
 JOIN users u ON u.id=m.user_id
+JOIN roles r ON r.id=m.role_id AND r.org_id=o.id
 LEFT JOIN transactions t ON t.id=n.transaction_id AND t.org_id=o.id
 LEFT JOIN purposes pu ON pu.id=n.purpose_id AND pu.org_id=o.id
 WHERE n.org_id=?1 AND o.notifications_enabled=1 AND n.cancelled_at IS NULL AND n.sent_at IS NULL

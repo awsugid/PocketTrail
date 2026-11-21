@@ -21,6 +21,8 @@ import {
 	type PurposeKind
 } from '$lib/purposes';
 import { markdownToPlain } from '$lib/markdown';
+import { readListData } from './list_data';
+import { matchesCommon, paginate, type ListFilters } from './list_filters';
 import { fmtMoney, fmtSize, fmtTs } from '$lib/fmt';
 import { PERMISSION_LABELS, type Permission } from '$lib/domain';
 import type { D1Database, D1PreparedStatement, R2Bucket } from '$lib/d1';
@@ -274,6 +276,17 @@ export interface PurposesListEntry {
 	responsibles: string[];
 	allocationCount: number;
 	url: string;
+}
+
+export async function filteredPurposesPage(ctx: TxnCtx, selection: ListFilters) {
+ const data = await readListData(ctx.db,ctx.org.id,{membershipIds:ctx.memberRows.filter(m => m.user_id === ctx.user.id && m.removed_at === null && !m.invited).map(m => m.id),reviewer:ctx.can('ApproveTransactions')});
+ const rows = data.purposeEntries.filter(p => matchesCommon(selection,p,p.totalAllocatedMinor,p.transactions.flatMap(t => data.tagIds.get(t.id) ?? []))
+ && (!selection.kind || p.kind === selection.kind) && (!selection.q || p.name.toLowerCase().includes(selection.q.toLowerCase())));
+ const byStatus = {needs_details:0,pending_review:0,approved:0,changes_requested:0};
+ for (const p of rows) byStatus[p.status]++;
+ const paged = paginate(rows,selection.page);
+ return {...paged,entries:paged.entries.map(p => ({...p,kindLabel:PURPOSE_KIND_LABELS[p.kind],totalMinor:p.totalAllocatedMinor,total:fmtMoney(p.totalAllocatedMinor),statusLabel:purposeStatusLabel(p.status === 'pending_review' ? 'submitted' : p.status,false),statusTone:(p.status === 'approved' ? 'approved' : p.status === 'changes_requested' ? 'changes' : p.status === 'pending_review' ? 'review' : 'needs') as 'approved' | 'changes' | 'review' | 'needs',allocationCount:p.transactions.length,url:purposeUrl(ctx,p.id)})),
+ summary:{totalAllocated:rows.reduce((s,p) => s+p.totalAllocatedMinor,0),byStatus,needsActionCount:rows.filter(p => p.tone === 'action' || p.tone === 'review').length},selection,filterOptions:data.filterOptions,canCreate:ctx.can('DocumentTransactions')};
 }
 
 export async function purposesPage(ctx: TxnCtx, kindFilter: PurposeKind | null): Promise<{ entries: PurposesListEntry[]; canCreate: boolean }> {
@@ -671,6 +684,7 @@ export async function submittedPurposeTasks(db: D1Database, orgId: number): Prom
 		 JOIN transactions t ON t.id = a.transaction_id AND t.org_id = ?1 AND t.suppressed = 0 AND t.amount_minor < 0
 		 JOIN pockets p2 ON p2.id = t.pocket_id
 		 JOIN purposes pu ON pu.id = a.purpose_id AND pu.kind = 'expense' AND pu.status = 'submitted'
+				 AND NOT EXISTS (SELECT 1 FROM historical_approval_exemptions he WHERE he.org_id=?1 AND he.purpose_id=pu.id AND he.revoked_at IS NULL)
 		 ORDER BY t.txn_date, t.id, a.id`,
 		[orgId]
 	);

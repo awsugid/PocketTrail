@@ -62,7 +62,7 @@ export async function createOrg(event: CtxEvent, login: LoginState, form: FormDa
 	if (exists) throw error(400, 'Slug already in use.');
 	const now = nowMs();
 	// Admin role with all permissions; creator becomes its first member.
-	const all: string[] = [...ALL_PERMISSIONS];
+	const all: string[] = ALL_PERMISSIONS.filter((permission) => permission !== 'ExplainOwnActions');
 	// Org, Admin role, first membership, Main Pocket, and the audit row commit
 	// in one batch; the org id is resolved by its unique slug in SQL.
 	const orgId = '(SELECT id FROM organizations WHERE slug = ?1)';
@@ -77,6 +77,7 @@ export async function createOrg(event: CtxEvent, login: LoginState, form: FormDa
 		login.db
 			.prepare(`INSERT INTO roles (org_id, name, permissions) VALUES (${orgId}, 'Admin', ?2)`)
 			.bind(slug, JSON.stringify(all)),
+		login.db.prepare(`INSERT INTO roles (org_id, name, permissions) VALUES (${orgId}, 'Assigned Actions only', '["ExplainOwnActions"]')`).bind(slug),
 		login.db
 			.prepare(`INSERT INTO roles (org_id, name, permissions) VALUES (${orgId}, 'Inventory Maintainer', '["UpdateStock"]')`)
 			.bind(slug),

@@ -1,4 +1,5 @@
 import { sequence } from '@sveltejs/kit/hooks';
+import { error } from '@sveltejs/kit';
 import type { Handle } from '@sveltejs/kit';
 
 import { auditBegin, auditFinish, type Attempt } from '$lib/server/audit';
@@ -57,4 +58,15 @@ const auditTrail: Handle = async ({ event, resolve }) => {
 	return response;
 };
 
-export const handle = sequence(auditTrail, hygiene);
+const oauthTransport: Handle = async ({event,resolve}) => {
+ const formType=/^(application\/x-www-form-urlencoded|multipart\/form-data|text\/plain)(;|$)/i.test(event.request.headers.get('content-type') ?? '');
+ if(event.url.pathname!=='/oauth/token' && ['POST','PUT','PATCH','DELETE'].includes(event.request.method) && formType && event.request.headers.get('origin')!==event.url.origin)throw error(403,'Cross-site form submissions are forbidden.');
+ // OAuth token exchange is a non-cookie public-client endpoint. SvelteKit's
+ // browser-form CSRF gate does not apply; exact PKCE/client/resource validation does.
+ if(event.url.pathname==='/oauth/token' && event.request.method==='POST') {
+  const {POST}=await import('./routes/oauth/token/+server');
+  return POST(event);
+ }
+ return resolve(event);
+};
+export const handle = sequence(auditTrail, hygiene, oauthTransport);

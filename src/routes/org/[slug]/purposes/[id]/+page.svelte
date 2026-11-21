@@ -7,9 +7,9 @@
 	import RichComposer from '$lib/components/RichComposer.svelte';
 	import { submit, unsavedGuard } from '$lib/forms';
 	import { fmtDate } from '$lib/fmt';
-	import type { PageData } from './$types';
+	import type { ActionData, PageData } from './$types';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form?: ActionData } = $props();
 
 	const purpose = $derived(data.purpose);
 	const base = $derived(`/org/${data.shell.org.slug}/purposes`);
@@ -242,6 +242,14 @@
 						<h2 id="review-heading">Review</h2>
 					</div>
 					<div class="panel__body stack">
+						{#if data.exemption}
+							<div class="stack">
+								<p><span class="badge badge--muted"><Icon name="history" size={12} />Historical exemption</span></p>
+								<p class="muted">Excluded from the approval queue, not marked approved.</p>
+								<dl class="historical-facts"><dt>Sheet reference</dt><dd>{data.exemption.source_reference}</dd><dt>Reason</dt><dd>{data.exemption.reason}</dd></dl>
+								{#if data.historicalAdmin}<form method="POST" action="?/revokeExemption" use:submit={{ confirm: 'Remove this historical exemption? This purpose returns to normal approval rules.', confirmLabel: 'Remove exemption' }}><input type="hidden" name="csrf_token" value={data.shell.csrfToken} /><button class="btn btn--sm" type="submit">Remove exemption</button></form>{/if}
+							</div>
+						{/if}
 						{#if purpose.status === 'approved'}
 							<p><strong>Approved</strong>{purpose.approvedByName ? ` by ${purpose.approvedByName}` : ''}{purpose.approvedAt ? ` · ${purpose.approvedAt}` : ''}</p>
 							{#if purpose.approvalNote.trim() !== ''}
@@ -277,6 +285,21 @@
 							{:else if purpose.approval.ineligibleReason}
 								<p class="muted">{purpose.approval.ineligibleReason}</p>
 							{/if}
+						{/if}
+						{#if data.historicalAdmin && !data.exemption}
+							<details class="fold historical" open={!!form?.historicalError}>
+								<summary>Mark as historical</summary>
+								<form method="POST" action="?/exempt" class="form historical-form">
+									<p class="hint">Skip approval for this purpose only after verifying its historical Sheet record. Notes and unconfirmed mappings stay unchanged.</p>
+									{#if form?.historicalError}<div role="alert"><Notice tone="warning">{form.historicalError}</Notice></div>{/if}
+									<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
+									<input type="hidden" name="revision" value={purpose.revision} />
+									<div class="field"><label for="historical-source">Sheet reference <span class="req" aria-hidden="true">*</span></label><input class="input" id="historical-source" name="source_reference" required maxlength="2000" placeholder="Sheet name, tab and row" value={form?.source ?? ''} /></div>
+									<div class="field"><label for="historical-reason">Why approval is not needed <span class="req" aria-hidden="true">*</span></label><textarea class="input" id="historical-reason" name="reason" required maxlength="2000" rows="3" value={form?.reason ?? ''}></textarea></div>
+									<label class="check historical-confirm"><input type="checkbox" name="confirmed" value="yes" required /><span>I verified this exact Sheet record matches this purpose.</span></label>
+									<div class="form-actions"><button class="btn" type="submit"><Icon name="history" size={16} />Save historical exemption</button></div>
+								</form>
+							</details>
 						{/if}
 					</div>
 				</section>
@@ -359,3 +382,14 @@
 		</aside>
 	</div>
 </OrgShell>
+
+<style>
+	.historical { border-top: 1px solid var(--border); padding-top: 16px; }
+	.historical-form { margin-top: 16px; max-width: 560px; }
+	.historical-confirm { align-items: flex-start; line-height: 1.5; }
+	.historical-confirm input { flex-shrink: 0; margin-top: 4px; }
+	.historical-confirm span, .historical-facts dd { min-width: 0; overflow-wrap: anywhere; }
+	.historical-facts { display: grid; gap: 4px; margin: 0; }
+	.historical-facts dt { font-weight: 600; }
+	.historical-facts dd { margin: 0 0 8px; }
+</style>

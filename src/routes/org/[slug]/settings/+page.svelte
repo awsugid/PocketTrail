@@ -91,6 +91,17 @@
 	{#if s.msg}<Notice tone="success">{s.msg}</Notice>{/if}
 
 	<div class="stack">
+	<section class="panel mcp-section" aria-labelledby="mcp-heading">
+		<div class="panel__head"><Icon name="settings" size={16}/><h2 id="mcp-heading">MCP · AI connections</h2><span class="badge badge--muted">{data.mcp.configured?'OAuth available':'Client setup needed'}</span></div>
+		<div class="panel__body stack">
+			<p>Connect an AI client using your existing Google sign-in. Choose one organization and approve requested access. Activity is labeled <strong>AI on behalf of you</strong>.</p>
+			<div class="field"><label for="mcp-endpoint">MCP server URL</label><input class="input" id="mcp-endpoint" readonly value={data.mcp.endpoint}/></div>
+			<p class="hint">Supports summaries, transaction details, income notes and tags. Writes require explicit consent and your current documentation permission. No approvals, exemptions, payments or member management.</p>
+			<details class="fold"><summary>How to connect</summary><ol class="stack"><li>Add this server URL to your client's MCP connector and choose OAuth.</li><li>Sign in with Google on PocketTrail, choose this organization, and review requested access.</li><li>Allow access only for a client you trust. Tokens expire after 15 minutes; reconnect when needed.</li></ol>{#if !data.mcp.configured}<p class="hint">Administrator must first register the client's exact callback URL and allowed scopes. No client is enabled yet; this URL alone grants no access.</p>{/if}</details>
+			{#if data.mcp.grants.length}<h3>Your delegated connections</h3><ul class="rows">{#each data.mcp.grants as grant}<li><span class="rows__main"><strong>{grant.client_id}</strong><span class="rows__sub">{grant.scope}</span></span><form method="POST" action="?/revokeMcp"><input type="hidden" name="csrf_token" value={data.shell.csrfToken}/><input type="hidden" name="grant_id" value={grant.id}/><button class="btn btn--sm" type="submit">Revoke access</button></form></li>{/each}</ul>{/if}
+		</div>
+	</section>
+
 		<nav class="panel" aria-label="Settings status">
 			<ul class="rows rows--link">
 				{#each rows as row (row.key)}
@@ -138,4 +149,6 @@
 			{/if}
 		{/if}
 	</div>
+
 </OrgShell>
+<style>.mcp-section .panel__head{flex-wrap:wrap;}.mcp-section p,.mcp-section li{overflow-wrap:anywhere;}</style>

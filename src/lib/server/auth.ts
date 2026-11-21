@@ -201,10 +201,11 @@ export async function shellContext(ctx: TenantContext) {
 	const organizations = await orgsOfUser(ctx.db, ctx.user.id);
 	return {
 		user: {
+			id: ctx.user.id,
 			name: ctx.user.name,
 			email: ctx.user.email,
 			picture: ctx.user.picture ? googlePicture(ctx.user.picture) : null,
-			isPlatformAdmin: ctx.user.is_platform_admin !== 0
+			isPlatformAdmin: !ctx.can('ExplainOwnActions') && ctx.user.is_platform_admin !== 0
 		},
 		org: {
 			slug: ctx.org.slug,
@@ -215,9 +216,10 @@ export async function shellContext(ctx: TenantContext) {
 		organizations,
 		access: {
 			finance: ctx.can('ViewTransactions'),
+						actions: ctx.can('ViewTransactions') || ctx.can('ExplainOwnActions'),
 			inventory: ctx.can('ViewTransactions') || ctx.can('UpdateStock')
 		},
-		members: ctx.memberRows.map((m) => ({
+		members: ctx.memberRows.filter((m) => !ctx.can('ExplainOwnActions') || m.user_id === ctx.user.id).map((m) => ({
 			id: m.id,
 			name: m.name,
 			email: m.email,
@@ -259,6 +261,7 @@ export async function requireMember(
 	const failure = authorize(members, roles, login.user.id, permission);
 	if (failure) throw error(403, `Access denied: ${authzMessage(failure)}.`);
 	const permissions = permissionsFor(members, roles, login.user.id);
+
 	return {
 		config: login.config,
 		session: login.session,

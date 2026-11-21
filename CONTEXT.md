@@ -51,6 +51,20 @@ member automatically without requiring the bank counterparty to have an
 application account.
 _Avoid_: Actor, when referring specifically to the person accountable for details.
 
+**Reviewer**:
+An organization member permitted to approve or request changes to a transaction's
+or purpose's explanation and evidence. A member can be both a reviewer and a
+responsible member.
+
+**Needs your action**:
+From the viewing member's perspective, a transaction or purpose waiting on them:
+as responsible member when details are needed or changes were requested, or as
+reviewer when it is pending review.
+
+**Waiting**:
+From the viewing member's perspective, a transaction or purpose pending review by
+someone else; no action is required from the viewer.
+
 **Transaction notification suppression**:
 An authorized decision to stop all notifications and summaries concerning a
 transaction, including mention notifications. It does not supply missing evidence
@@ -102,6 +116,13 @@ The community's record of income and expenses, currently maintained in Google
 Sheets and intended to move into PocketTrail.
 _Avoid_: Balance sheet, when referring to the income-and-expense record rather
 than a formal statement of assets, liabilities, and equity.
+
+**Allocation**:
+The portion of a bank transaction's amount assigned to one purpose; a bank
+transaction may be split across several purposes.
+
+**Purpose**:
+A named income or expense reason that one or more allocations are assigned to.
 
 **Supporting document**:
 A document associated with a financial entry to explain or substantiate it, such

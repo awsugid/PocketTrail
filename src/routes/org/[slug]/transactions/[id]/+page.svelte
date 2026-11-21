@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { fmtDateTime, parseRupiah, fmtMoney } from '$lib/fmt';
+	import { fmtDateTime, parseRupiah, fmtMoney, rupiahInput } from '$lib/fmt';
 	import Combobox from '$lib/components/ui/Combobox.svelte';
 	import MoneyInput from '$lib/components/ui/MoneyInput.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
@@ -46,6 +46,7 @@
 	let allocations = $state<AllocDraft[]>(initial.allocations);
 	let responsible = $state(initial.responsible);
 	let seededRevision: number | null = null;
+
 
 	// Re-seed when the server hands back a new revision (an action reload).
 	$effect(() => {
@@ -196,6 +197,23 @@
 									<p class="hint">Used by purposes without their own responsible members.</p>
 								</div>
 							{/if}
+							{#if allocations.length === 0}
+								<div class="field">
+									<label for="quick-purpose">Purpose</label>
+									<Combobox id="quick-purpose" name="quick_purpose" options={purposeOptions} maxlength={300} />
+									<p class="hint">Choose an existing purpose or enter a new name. The full transaction amount is allocated.</p>
+								</div>
+								<div class="field">
+									<label for="quick-notes">Description</label>
+									<textarea class="input textarea" id="quick-notes" name="quick_notes" maxlength="16000" rows="3"></textarea>
+								</div>
+								<div class="field">
+									<label for="quick-invoice">Invoice URL</label>
+									<input class="input" id="quick-invoice" name="quick_invoice" type="url" maxlength="2000" />
+									<p class="hint">Saved as a link in purpose notes, not as an uploaded document.</p>
+								</div>
+								<button class="btn btn--sm" type="button" onclick={() => { allocations = [{ purpose: '', amount: rupiahInput(bankAbs), member: '' }]; }}>Split across purposes</button>
+							{:else}
 							<fieldset class="form">
 								<legend>Purpose allocations <span class="muted">({txn.kindLabel.toLowerCase()})</span></legend>
 								<div class="split-head" aria-hidden="true">
@@ -246,6 +264,7 @@
 									{/if}
 								</p>
 							</fieldset>
+							{/if}
 							<div class="field">
 								<RichComposer
 									id="alloc-justification"
@@ -426,6 +445,28 @@
 		</div>
 
 		<aside class="stack" aria-labelledby="facts-heading">
+			<section class="panel" aria-labelledby="tags-heading">
+				<div class="panel__head"><Icon name="tag" size={16} /><h2 id="tags-heading">Tags</h2></div>
+				<div class="panel__body">
+					{#if data.tags.some((tag) => tag.assigned)}
+						<ul class="rows">
+							{#each data.tags.filter((tag) => tag.assigned) as tag (tag.id)}
+								<li><span>{tag.name}</span>
+									{#if data.canTag}<form method="POST" action="?/tag" use:submit><input type="hidden" name="csrf_token" value={data.shell.csrfToken} /><input type="hidden" name="revision" value={txn.revision} /><input type="hidden" name="remove_tag" value={tag.id} /><button class="btn btn--sm" type="submit" aria-label="Remove tag {tag.name}">Remove</button></form>{/if}
+								</li>
+							{/each}
+						</ul>
+					{:else}<p class="muted">No tags assigned.</p>{/if}
+					{#if data.canTag}
+						<form method="POST" action="?/tag" class="form gap-top" use:submit>
+							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
+							<input type="hidden" name="revision" value={txn.revision} />
+							<div class="field"><label for="transaction-tag">Add or create tag</label><input class="input" id="transaction-tag" name="tag" list="transaction-tag-options" maxlength="80" required /><datalist id="transaction-tag-options">{#each data.tags.filter((tag) => !tag.assigned) as tag (tag.id)}<option value={tag.name}></option>{/each}</datalist></div>
+							<button class="btn" type="submit">Add tag</button>
+						</form>
+					{/if}
+				</div>
+			</section>
 			<section class="panel">
 				<div class="panel__head">
 					<Icon name="info" size={16} />

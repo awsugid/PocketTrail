@@ -1,4 +1,5 @@
-import { actionForm, approve, addComment, requireOrg, numericPathId, requestChanges, saveAllocations, saveDetails, submitDocumentation, suppress, txnDetail, txnShell, unsuppress, uploadDocument } from '$lib/server/txns';
+import { actionForm, approve, addComment, requireOrg, numericPathId, requestChanges, saveAllocations, saveDetails, saveTag, submitDocumentation, suppress, txnDetail, txnShell, unsuppress, uploadDocument } from '$lib/server/txns';
+import { qAll } from '$lib/server/db';
 import type { Actions, PageServerLoad } from './$types';
 
 // Per-entry authorization: the row is looked up by (id, org_id) together, so a
@@ -11,11 +12,18 @@ export const load: PageServerLoad = async (event) => {
 	return {
 		shell: await txnShell(ctx),
 		txn,
+		tags: await qAll<{ id: number; name: string; assigned: number }>(ctx.db, 'SELECT g.id, g.name, EXISTS(SELECT 1 FROM transaction_tags tt WHERE tt.org_id=g.org_id AND tt.tag_id=g.id AND tt.transaction_id=?2) AS assigned FROM tags g WHERE g.org_id=?1 AND (?3=1 OR EXISTS(SELECT 1 FROM transaction_tags tt WHERE tt.org_id=g.org_id AND tt.tag_id=g.id AND tt.transaction_id=?2)) ORDER BY g.name COLLATE NOCASE', [ctx.org.id, txn.id, ctx.can('ViewTransactions') ? 1 : 0]),
+		canTag: ctx.can('DocumentTransactions'),
 		msg: event.url.searchParams.get('msg')
 	};
 };
 
 export const actions: Actions = {
+	tag: async (event) => {
+		const ctx = await requireOrg(event, event.params.slug);
+		const form = await actionForm(event, ctx.session);
+		return saveTag(ctx, numericPathId(event.params.id), form);
+	},
 	details: async (event) => {
 		const ctx = await requireOrg(event, event.params.slug);
 		const form = await actionForm(event, ctx.session);

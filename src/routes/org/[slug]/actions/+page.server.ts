@@ -1,11 +1,11 @@
 import { requireMember, shellContext } from '$lib/server/auth';
+import { ownActions } from '$lib/server/own_actions';
 import { qAll, qOne } from '$lib/server/db';
 import { incomeRecipients } from '$lib/domain';
-import { owedPurposeState, submittedPurposeTasks } from '$lib/server/purposes';
+import { owedPurposeState } from '$lib/server/purposes';
 import type { PageServerLoad } from './$types';
 
-// The in-app action list: the member's own documentation tasks, the reviews
-// they are eligible to decide, and in-flight imports. Expense work on
+// The in-app action list: the member's own documentation tasks and in-flight imports. Expense work on
 // allocated transactions is derived from purposes (Notes/evidence gates and
 // purpose responsibility); the legacy explanation predicates apply only to
 // income and unallocated pre-purpose records. Empty groups must not imply an
@@ -29,7 +29,7 @@ const OWED_SQL = `SELECT t.id, t.txn_date, t.counterparty, p.name AS pocket_name
 		(EXISTS(SELECT 1 FROM documents d WHERE d.transaction_id = t.id AND d.kind = 'evidence' AND d.superseded = 0)) AS has_evidence
 	FROM transactions t JOIN pockets p ON p.id = t.pocket_id AND p.org_id = t.org_id
 	WHERE t.org_id = ?1 AND t.suppressed = 0
-	ORDER BY t.txn_date ASC, t.id ASC LIMIT 500`;
+	ORDER BY t.txn_date ASC, t.id ASC`;
 
 function isOwed(row: TaskRow & { has_evidence: number }): boolean {
 	if (row.amount_minor > 0) return row.explanation.trim() === '';
@@ -40,7 +40,15 @@ function isOwed(row: TaskRow & { has_evidence: number }): boolean {
 }
 
 export const load: PageServerLoad = async (event) => {
-	const ctx = await requireMember(event, event.params.slug, 'ViewTransactions');
+	const ctx = await requireMember(event, event.params.slug, ['ViewTransactions', 'ExplainOwnActions']);
+		if (ctx.can('ExplainOwnActions')) {
+			const tasks = await ownActions(ctx);
+			return {
+				shell: await shellContext(ctx), restricted: true,
+				explain: tasks.map((t) => ({ id: t.id, date: t.txn_date, counterparty: t.counterparty, pocketName: '', income: false, purposeId: undefined as number | undefined, purposeName: undefined as string | undefined, badge: 'Why did this expense happen?' })),
+				imports: [], canImport: false
+			};
+		}
 	const rows = await qAll<TaskRow & { has_evidence: number }>(ctx.db, OWED_SQL, [ctx.org.id]);
 	const me = ctx.memberRows.find((m) => m.user_id === ctx.user.id) ?? null;
 	const myMembership = me && me.removed_at === null ? me : null;
@@ -87,7 +95,7 @@ export const load: PageServerLoad = async (event) => {
 
 	for (const row of rows) {
 		if (row.amount_minor > 0) {
-			if (incomeMine.has(row.id)) {
+			if (isOwed(row) && incomeMine.has(row.id)) {
 				addExplain({ id: row.id, date: row.txn_date, counterparty: row.counterparty, pocketName: row.pocket_name, income: true });
 			}
 			continue;
@@ -126,22 +134,6 @@ export const load: PageServerLoad = async (event) => {
 		}
 	}
 
-	// Reviews are per purpose: submitted documentation, decided by a member
-	// never responsible for it, now or before.
-	const review: Array<{ id: number; txnId: number; date: string; purposeName: string; counterparty: string; pocketName: string }> = [];
-	if (ctx.can('ApproveTransactions') && myMembership) {
-		for (const task of await submittedPurposeTasks(ctx.db, ctx.org.id)) {
-			if (task.excluded.includes(myMembership.id)) continue;
-			review.push({
-				id: task.purposeId,
-				txnId: task.txnId,
-				date: task.txnDate,
-				purposeName: task.purposeName,
-				counterparty: task.counterparty,
-				pocketName: task.pocketName
-			});
-		}
-	}
 
 	let imports: Array<{ id: number; filename: string; status: string }> = [];
 	if (ctx.can('ImportStatements')) {
@@ -155,8 +147,9 @@ export const load: PageServerLoad = async (event) => {
 	return {
 		shell: await shellContext(ctx),
 		explain,
-		review,
+
 		imports: imports.map((batch) => ({ id: batch.id, filename: batch.filename, status: batch.status })),
+		restricted: false,
 		canImport: ctx.can('ImportStatements')
 	};
 };

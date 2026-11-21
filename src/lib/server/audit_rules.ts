@@ -112,6 +112,8 @@ export function normalizeTarget(path: string): string {
  * truth; unknown codes fall back to themselves. */
 export function actionLabel(action: string): string {
 	switch (action) {
+		case 'tags_updated': return 'Tags changed';
+		case 'transaction.tags_updated': return 'Transaction tags changed';
 		case 'allocations_updated': return 'Purpose allocations saved';
 		case 'details_updated': return 'Details saved';
 		case 'documentation_submitted': return 'Submitted for review';

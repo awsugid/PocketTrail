@@ -1,5 +1,6 @@
 import { requireOrg, actionForm, txnShell } from '$lib/server/txns';
-import { purposesPage, createPurpose } from '$lib/server/purposes';
+import { filteredPurposesPage, createPurpose } from '$lib/server/purposes';
+import { parseListFilters } from '$lib/server/list_filters';
 import type { Actions, PageServerLoad } from './$types';
 import type { PurposeKind } from '$lib/purposes';
 
@@ -14,7 +15,7 @@ export const load: PageServerLoad = async (event) => {
 	return {
 		shell: await txnShell(ctx),
 		kind,
-		...(await purposesPage(ctx, kind))
+		...(await filteredPurposesPage(ctx, parseListFilters(event.url.searchParams)))
 	};
 };
 

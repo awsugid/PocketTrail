@@ -70,4 +70,8 @@ export interface Bindings extends SmtpEnv {
 	LOCAL_DEV?: string;
 	GOOGLE_CLIENT_ID?: string;
 	EMAIL_DELIVERY_ENABLED?: string;
+	/** Private per-org MCP credential configuration; never exposed to browser. */
+	MCP_READ_CREDENTIALS?: string;
+		/** Private allowlist: [{clientId,name,redirectUris,scopes}]. No client secrets. */
+		MCP_OAUTH_CLIENTS?: string;
 }

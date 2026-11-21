@@ -9,6 +9,8 @@
 import type { D1Database } from '$lib/d1';
 import { assertSafeMinor, fmtMoney } from '$lib/money';
 import { qAll, qOne } from './db';
+import { readListData, type ListViewer } from './list_data';
+import { intersects, matchesCommon, paginate, type ListFilters } from './list_filters';
 
 /** Only the filters the UI offers; anything else means "all". */
 export type LedgerFilter = 'needs_details' | 'pending' | 'approved' | 'changes_requested';
@@ -173,12 +175,12 @@ const LIST_SQL_BASE = `SELECT * FROM (
 		OR (?2='pending' AND (
 			(derived_status = 'submitted')
 			OR (derived_status = '' AND status IN ('pending','submitted')
-				AND (trim(explanation) <> '' AND (trim(evidence_unavailable_reason) <> ''
+				AND (trim(explanation) <> '' AND (amount_minor > 0 OR trim(evidence_unavailable_reason) <> ''
 					 OR EXISTS (SELECT 1 FROM documents d2 WHERE d2.transaction_id = id AND d2.kind = 'evidence' AND d2.superseded = 0))))))
 		OR (?2='needs_details' AND (
 			(derived_status = 'needs')
 			OR (derived_status = '' AND status IN ('pending','submitted','changes_requested')
-				AND NOT (trim(explanation) <> '' AND (trim(evidence_unavailable_reason) <> ''
+				AND NOT (trim(explanation) <> '' AND (amount_minor > 0 OR trim(evidence_unavailable_reason) <> ''
 					 OR EXISTS (SELECT 1 FROM documents d2 WHERE d2.transaction_id = id AND d2.kind = 'evidence' AND d2.superseded = 0))))))
 		OR (?2='approved' AND ((derived_status <> '' AND derived_status = 'approved') OR (derived_status = '' AND status = 'approved')))
 		OR (?2='changes_requested' AND ((derived_status <> '' AND derived_status = 'changes_requested') OR (derived_status = '' AND status = 'changes_requested')))
@@ -189,7 +191,7 @@ const LIST_SQL_BASE = `SELECT * FROM (
 /** The exact ledger query, exposed for SQL-level regression tests. */
 export const LIST_SQL = LIST_SQL_BASE;
 
-function toEntry(row: LedgerRow): LedgerEntry {
+export function toEntry(row: LedgerRow): LedgerEntry {
 	const amountMinor = assertSafeMinor(row.amount_minor, 'ledger amount');
 	const evidenceCount = row.evidence_count ?? 0;
 	if (row.derived_status !== '') {
@@ -207,8 +209,8 @@ function toEntry(row: LedgerRow): LedgerEntry {
 			amount: fmtMoney(amountMinor),
 			balance: fmtMoney(assertSafeMinor(row.balance_minor ?? 0, 'ledger balance')),
 			status,
-			statusLabel: statusLabel(status === 'submitted' ? 'pending' : status, !owed),
-			statusTone: statusTone(status === 'submitted' ? 'pending' : status, !owed),
+			statusLabel: statusLabel(status === 'submitted' ? 'pending' : status, owed),
+			statusTone: statusTone(status === 'submitted' ? 'pending' : status, owed),
 			needsDetails: owed,
 			suppressed: (row.suppressed ?? 0) !== 0,
 			responsibleName: row.responsible_name
@@ -247,18 +249,31 @@ export interface LedgerPage {
 	owedCount: number;
 }
 
+export async function filteredLedgerPage(db: D1Database, orgId: number, selection: ListFilters, viewer: ListViewer) {
+ const data = await readListData(db, orgId, viewer);
+ const rows = data.entries.filter(t => matchesCommon(selection,t,Math.abs(t.amountMinor),data.tagIds.get(t.id) ?? [])
+ && (!selection.q || [t.counterparty,t.bankId ?? '',...t.allocations.map(a => a.purposeName)].some(s => s.toLowerCase().includes(selection.q.toLowerCase())))
+ && (!selection.from || t.date >= selection.from) && (!selection.to || t.date <= selection.to)
+ && (!selection.dir || (selection.dir === 'in' ? t.amountMinor > 0 : t.amountMinor < 0))
+ && intersects(selection.actor,data.actorIds.get(t.id) ?? []) && intersects(selection.purpose,t.allocations.map(a => a.purposeId)));
+ const income = rows.reduce((s,t) => s+Math.max(0,t.amountMinor),0), expense = rows.reduce((s,t) => s+Math.max(0,-t.amountMinor),0);
+ const needsAction = rows.filter(t => t.tone === 'action' || t.tone === 'review');
+ const summary = {closingBalance:rows[0]?.balanceMinor ?? null,income,expense,net:income-expense,needsActionCount:needsAction.length,needsActionAmount:needsAction.reduce((s,t) => s+Math.abs(t.amountMinor),0),pendingReviewCount:rows.filter(t => t.status === 'pending_review').length,changesRequestedCount:rows.filter(t => t.status === 'changes_requested').length};
+ const paged = paginate(rows,selection.page);
+ return {...paged, entries:paged.entries.map(t => ({...t,counterparty:counterpartyDisplay(t.counterparty),amount:fmtMoney(t.amountMinor),balance:t.balanceMinor === null ? '—' : fmtMoney(t.balanceMinor),statusLabel:statusLabel(t.status,t.status === 'needs_details')})),summary,selection,filterOptions:data.filterOptions};
+}
+
 export async function ledgerPage(
 	db: D1Database,
 	orgId: number,
 	filter: LedgerFilter | null,
-	page: number
+	page: number,
+	tagId: number | null = null
 ): Promise<LedgerPage> {
-	const rows = await qAll<LedgerRow>(db, LIST_SQL, [
-		orgId,
-		filter ?? '',
-		PAGE_SIZE + 1,
-		(page - 1) * PAGE_SIZE
-	]);
+	const sql = tagId === null ? LIST_SQL : LIST_SQL.replace('WHERE t.org_id = ?1', 'WHERE t.org_id = ?1 AND EXISTS (SELECT 1 FROM transaction_tags tt WHERE tt.org_id=t.org_id AND tt.transaction_id=t.id AND tt.tag_id=?5)');
+	const params = [orgId, filter ?? '', PAGE_SIZE + 1, (page - 1) * PAGE_SIZE];
+	if (tagId !== null) params.push(tagId);
+	const rows = await qAll<LedgerRow>(db, sql, params);
 	const hasNext = rows.length > PAGE_SIZE;
 	const entries = rows.slice(0, PAGE_SIZE).map(toEntry);
 	return { entries, page, hasNext, owedCount: entries.filter((entry) => entry.needsDetails).length };

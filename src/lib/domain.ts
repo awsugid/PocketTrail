@@ -7,6 +7,7 @@
 // is derived from documentation completeness on every read.
 
 export type Permission =
+	| 'ExplainOwnActions'
 	| 'ViewTransactions'
 	| 'CommentTransactions'
 	| 'DocumentTransactions'
@@ -19,6 +20,7 @@ export type Permission =
 	| 'UpdateStock';
 
 export const PERMISSION_LABELS: Record<Permission, string> = {
+	ExplainOwnActions: 'View and explain assigned Actions only',
 	ViewTransactions: 'View transactions',
 	CommentTransactions: 'Comment on transactions',
 	DocumentTransactions: 'Document transactions',
@@ -33,6 +35,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
 
 /** All permissions in the Rust enum order, for the roles editor. */
 export const ALL_PERMISSIONS: Permission[] = [
+	'ExplainOwnActions',
 	'ViewTransactions',
 	'CommentTransactions',
 	'DocumentTransactions',

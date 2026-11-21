@@ -1,0 +1,10 @@
+CREATE TABLE mcp_grants(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),org_id INTEGER NOT NULL REFERENCES organizations(id),client_id TEXT NOT NULL,scope TEXT NOT NULL,scope_json TEXT NOT NULL,revoked_at INTEGER,created_at INTEGER NOT NULL);
+CREATE TABLE mcp_write_guard(valid INTEGER NOT NULL CHECK(valid=1));
+CREATE TRIGGER mcp_write_guard_cleanup AFTER INSERT ON mcp_write_guard BEGIN DELETE FROM mcp_write_guard; END;
+CREATE TABLE mcp_codes(code_hash TEXT PRIMARY KEY,grant_id TEXT NOT NULL REFERENCES mcp_grants(id),redirect_uri TEXT NOT NULL,challenge TEXT NOT NULL,resource TEXT NOT NULL,expires_at INTEGER NOT NULL,used_at INTEGER);
+CREATE TABLE mcp_tokens(token_hash TEXT PRIMARY KEY,grant_id TEXT NOT NULL REFERENCES mcp_grants(id),resource TEXT NOT NULL,expires_at INTEGER NOT NULL);
+ALTER TABLE audit_events ADD COLUMN actor_type TEXT NOT NULL DEFAULT 'human';
+ALTER TABLE audit_events ADD COLUMN delegated_user_id TEXT REFERENCES users(id);
+ALTER TABLE audit_events ADD COLUMN client_id TEXT;
+ALTER TABLE transaction_audit ADD COLUMN actor_type TEXT NOT NULL DEFAULT 'human';
+ALTER TABLE transaction_audit ADD COLUMN client_id TEXT;

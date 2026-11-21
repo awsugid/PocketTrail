@@ -42,7 +42,7 @@ export const load: PageServerLoad = async (event) => {
 		throw error(503, 'SECRET_SESSION_KEY is not configured; authentication fails closed.');
 	}
 	const existing = await sessionOf(event, config);
-	if (existing && !existing.uid.startsWith('preauth:')) throw redirect(303, '/orgs');
+	if (existing && !existing.uid.startsWith('preauth:')) throw redirect(303, '/');
 
 	// A short-lived challenge session carries the CSRF token the sign-in form
 	// must return, exactly as the Rust login page does.
@@ -107,7 +107,8 @@ export const actions: Actions = {
 		// First authenticated login: recorded with the actor, not just the
 		// HTTP status the request layer sees.
 		await auditEvent(env.DB, user.id, null, 'auth.login', 'session');
-		throw redirect(303, '/orgs');
+		const resume=event.cookies.get('pt_oauth_return');event.cookies.delete('pt_oauth_return',{path:'/'});
+		throw redirect(303,resume?.startsWith('/oauth/authorize?')?resume:'/');
 	},
 
 	/** Google GIS ID-token exchange: verify the credential against Google's
@@ -178,6 +179,7 @@ export const actions: Actions = {
 			await encodeCookie(secret, session),
 			sessionCookie(isHttps(event.url))
 		);
-		throw redirect(303, '/orgs');
+		const resume=event.cookies.get('pt_oauth_return');event.cookies.delete('pt_oauth_return',{path:'/'});
+		throw redirect(303,resume?.startsWith('/oauth/authorize?')?resume:'/');
 	}
 };

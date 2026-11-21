@@ -6,13 +6,18 @@
 // serves it over HTTP on loopback. Nothing here touches a remote binding.
 
 import { spawn, spawnSync } from 'node:child_process';
-import { closeSync, mkdirSync, openSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, mkdirSync, openSync, writeFileSync, mkdtempSync, cpSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, basename } from 'node:path';
 import { request as httpRequest } from 'node:http';
 
-export const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
+const SOURCE = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
+export const ROOT = mkdtempSync(join(tmpdir(), 'pockettrail-e2e-'));
+cpSync(SOURCE, ROOT, { recursive: true, filter: (path) => !['node_modules', '.git', '.wrangler', '.svelte-kit', '.dev.vars', '.env', '.delta', '.playwright-mcp'].includes(basename(path)) && !basename(path).startsWith('.env.') && !basename(path).startsWith('.dev.vars.') });
+symlinkSync(join(SOURCE, 'node_modules'), join(ROOT, 'node_modules'), 'dir');
 export const PORT = Number(process.env.E2E_PORT ?? 5299);
 export const ORIGIN = `http://127.0.0.1:${PORT}`;
-/** Signing key for this run only; written to the git-ignored .dev.vars. */
+/** Synthetic signing key written only inside the isolated test workspace. */
 export const SECRET = 'e2e-session-key-with-at-least-32-chars';
 export const OTHER_SECRET = 'a-different-session-key-of-32-characters';
 
@@ -122,15 +127,14 @@ async function waitForServer(logPath, timeoutMs = 90_000) {
 	throw new Error(`wrangler dev did not become ready; see ${logPath}`);
 }
 
-/** Restarts local state from scratch: fresh local D1, synthetic fixtures, and a
- * production-shaped adapter build. */
+/** Fresh local D1 and production-shaped build inside the isolated temp copy. */
 export function prepareWorker() {
 	process.stdout.write('Preparing local database and build…\n');
-	rmSync(`${ROOT}/.wrangler/state`, { recursive: true, force: true });
+	process.stdout.write(`Isolated test workspace: ${ROOT}\n`);
 	mkdirSync(`${ROOT}/.wrangler`, { recursive: true });
 	writeFileSync(
 		`${ROOT}/.dev.vars`,
-		`LOCAL_DEV=true\nSECRET_SESSION_KEY=${SECRET}\nGOOGLE_CLIENT_ID=\n`
+		`LOCAL_DEV=true\nSECRET_SESSION_KEY=${SECRET}\nGOOGLE_CLIENT_ID=\nMCP_OAUTH_CLIENTS='${JSON.stringify([{clientId:'fixture-ai',name:'Synthetic AI client',redirectUris:['https://client.example.test/callback','https://client.example.test/alternate'],scopes:['finance:read','income:write','tags:write']}])}'\n`
 	);
 
 	run('npx', ['wrangler', 'd1', 'migrations', 'apply', 'DB', '--local']);

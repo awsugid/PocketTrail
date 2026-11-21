@@ -8,10 +8,9 @@ const config = {
 		// One app deployment: server rendering on Cloudflare Workers, bindings
 		// resolved through this directory's wrangler.toml only.
 		adapter: adapter({ config: 'wrangler.toml' }),
-		// Keep the framework's cross-origin form check on (an empty trusted-origin
-		// list means only this origin is accepted); hooks.server.ts and the route
-		// guards still perform their own explicit checks.
-		csrf: { trustedOrigins: [] }
+		// hooks.server.ts enforces the same strict form-origin gate, except the
+		// non-cookie OAuth token exchange (PKCE), which runs before route resolve.
+		csrf: { checkOrigin: false }
 	}
 };
 

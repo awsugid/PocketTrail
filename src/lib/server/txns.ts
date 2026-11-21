@@ -94,6 +94,8 @@ import { r2Bytes, type D1PreparedStatement, type R2Bucket } from '$lib/d1';
  * notification and income-role columns auth.ts's narrower type omits), fresh
  * membership/role rows, and the acting permission set. */
 export interface TxnCtx {
+	/** Server-created delegation only; never populated from forms. */
+	delegation?: { clientId: string; grantId: string; scope: string; tokenHash: string };
 	config: import('./auth').AppConfig;
 	session: Session;
 	user: UserRow;
@@ -143,6 +145,7 @@ function buildCtx(
  * src/domain_map.rs and PERMISSION_LABELS in $lib/domain. */
 function permissionLabel(permission: Permission): string {
 	const labels: Record<Permission, string> = {
+			ExplainOwnActions: 'View and explain assigned Actions only',
 		ViewTransactions: 'View transactions',
 		CommentTransactions: 'Comment on transactions',
 		DocumentTransactions: 'Document transactions',
@@ -174,6 +177,7 @@ export async function requireOrg(event: CtxEvent, slug: string, permission?: Per
 		throw error(403, 'Active organization membership required.');
 	}
 	const ctx = buildCtx(login.config, login.session, login.user, login.db, bindings(event.platform), org, memberRows, roleRows);
+	if (ctx.can('ExplainOwnActions')) throw error(403, 'Assigned Actions access only.');
 	ctx.deliverMail = () => scheduleDelivery(event, ctx.db, ctx.org.id);
 	if (permission !== undefined && !ctx.can(permission)) {
 		throw error(403, `Access denied: your role does not include “${permissionLabel(permission)}”.`);
@@ -288,9 +292,9 @@ function auditStatement(
 ): D1PreparedStatement {
 	return ctx.db
 		.prepare(
-			'INSERT INTO transaction_audit (org_id,transaction_id,actor_membership_id,action,previous_status,new_status,details,created_at) SELECT ?1,?2,?3,?4,?5,?6,?7,?8 WHERE EXISTS (SELECT 1 FROM transactions WHERE id=?2 AND org_id=?1 AND mutation_token=?9)'
+			'INSERT INTO transaction_audit (org_id,transaction_id,actor_membership_id,action,previous_status,new_status,details,created_at,actor_type,client_id) SELECT ?1,?2,?3,?4,?5,?6,?7,?8,?10,?11 WHERE EXISTS (SELECT 1 FROM transactions WHERE id=?2 AND org_id=?1 AND mutation_token=?9)'
 		)
-		.bind(ctx.org.id, t.id, me(ctx).id, action, t.status, status, JSON.stringify(details), nowMs(), token);
+		.bind(ctx.org.id, t.id, me(ctx).id, action, t.status, status, JSON.stringify(ctx.delegation ? { actor: `AI on behalf of ${ctx.user.name}`, clientId: ctx.delegation.clientId, details } : details), nowMs(), token,ctx.delegation ? 'AI' : 'human',ctx.delegation?.clientId ?? null);
 }
 
 /** Transactional audit_events row, committed in the same batch and gated by
@@ -298,15 +302,26 @@ function auditStatement(
 function auditEventStatement(ctx: TxnCtx, id: number, action: string, token: string): D1PreparedStatement {
 	return ctx.db
 		.prepare(
-			"INSERT INTO audit_events(actor_id,org_id,action,target,outcome,created_at) SELECT ?1,?2,?3,?4,'committed',?5 WHERE EXISTS(SELECT 1 FROM transactions WHERE id=?6 AND org_id=?2 AND mutation_token=?7)"
+			"INSERT INTO audit_events(actor_id,org_id,action,target,outcome,created_at,actor_type,delegated_user_id,client_id) SELECT ?1,?2,?3,?4,'committed',?5,?8,?9,?10 WHERE EXISTS(SELECT 1 FROM transactions WHERE id=?6 AND org_id=?2 AND mutation_token=?7)"
 		)
-		.bind(ctx.user.id, ctx.org.id, action, `transaction:${id}`, nowMs(), id, token);
+		.bind(ctx.delegation ? null : ctx.user.id, ctx.org.id, action, `transaction:${id}`, nowMs(), id, token, ctx.delegation ? 'AI' : 'human', ctx.delegation ? ctx.user.id : null, ctx.delegation?.clientId ?? null);
 }
 
 /** Runs one atomic batch and reports whether THIS operation won the revision
  * CAS: the winner probe reads the operation token inside the batch instead of
  * interpreting D1's meta.changes aggregate (triggers inflate that count). */
 async function commitMutation(ctx: TxnCtx, id: number, token: string, statements: D1PreparedStatement[]): Promise<boolean> {
+	if (ctx.delegation) {
+		// Revalidate at the write transaction boundary; abort rolls back every statement.
+		statements.unshift(ctx.db.prepare(`INSERT INTO mcp_write_guard(valid) SELECT CASE WHEN EXISTS(
+ SELECT 1 FROM mcp_grants g JOIN memberships m ON m.user_id=g.user_id AND m.org_id=g.org_id JOIN roles r ON r.id=m.role_id AND r.org_id=m.org_id
+ WHERE g.id=?1 AND g.user_id=?2 AND g.org_id=?3 AND g.client_id=?4 AND g.revoked_at IS NULL AND m.removed_at IS NULL AND m.invited=0
+ AND EXISTS(SELECT 1 FROM mcp_tokens t WHERE t.grant_id=g.id AND t.token_hash=?7 AND t.expires_at>?5)
+ AND EXISTS(SELECT 1 FROM json_each(g.scope_json) WHERE value=?6)
+ AND EXISTS(SELECT 1 FROM json_each(r.permissions) WHERE value='DocumentTransactions')
+ AND EXISTS(SELECT 1 FROM json_each(r.permissions) WHERE value='ViewTransactions')
+ AND NOT EXISTS(SELECT 1 FROM json_each(r.permissions) WHERE value='ExplainOwnActions')) THEN 1 ELSE 0 END`).bind(ctx.delegation.grantId,ctx.user.id,ctx.org.id,ctx.delegation.clientId,nowMs(),ctx.delegation.scope,ctx.delegation.tokenHash));
+	}
 	statements.push(
 		ctx.db
 			.prepare('SELECT mutation_token=?1 AS won FROM transactions WHERE id=?2 AND org_id=?3')
@@ -717,7 +732,7 @@ export async function txnDetail(ctx: TxnCtx, txnId: number): Promise<TxnDetail> 
 	}
 	const auditRows = await qAll<AuditViewRow>(
 		ctx.db,
-		'SELECT a.action, a.previous_status, a.new_status, a.details, a.created_at, u.name AS author_name FROM transaction_audit a JOIN memberships m ON m.id = a.actor_membership_id JOIN users u ON u.id = m.user_id WHERE a.org_id = ?1 AND a.transaction_id = ?2 ORDER BY a.id DESC LIMIT 100',
+		`SELECT a.action, a.previous_status, a.new_status, a.details, a.created_at, CASE WHEN a.actor_type='AI' THEN 'AI on behalf of '||u.name ELSE u.name END AS author_name FROM transaction_audit a JOIN memberships m ON m.id = a.actor_membership_id JOIN users u ON u.id = m.user_id WHERE a.org_id = ?1 AND a.transaction_id = ?2 ORDER BY a.id DESC LIMIT 100`,
 		[ctx.org.id, txnId]
 	);
 
@@ -871,6 +886,38 @@ export function txnShell(ctx: TxnCtx) {
 
 /** POST ?/details. Income branch rewrites notes only; expense branch updates
  * explanation, reason, responsible, and purposes behind one revision CAS. */
+export async function saveTag(ctx: TxnCtx, txnId: number, form: FormData): Promise<never> {
+	const t = await txnById(ctx.db, ctx.org.id, txnId);
+	if (!t) throw error(404, 'Transaction not found.');
+	if (!ctx.can('DocumentTransactions')) throw error(403, 'Documentation access denied.');
+	requireRevision(form, t);
+	const removeId = formInt(form, 'remove_tag');
+	const name = formStr(form, 'tag').trim();
+	if (removeId !== null) {
+		if (!Number.isSafeInteger(removeId) || removeId < 1) throw error(400, 'Invalid tag.');
+	} else if (name.length < 1 || name.length > 80 || /[\u0000-\u001f\u007f]/.test(name)) {
+		throw error(400, 'Enter a tag of up to 80 characters.');
+	}
+	const existing = removeId === null
+		? await qOne<{ id: number; name: string }>(ctx.db, 'SELECT id, name FROM tags WHERE org_id=?1 AND name=?2 COLLATE NOCASE', [ctx.org.id, name])
+		: await qOne<{ id: number; name: string }>(ctx.db, 'SELECT g.id, g.name FROM tags g JOIN transaction_tags tt ON tt.tag_id=g.id AND tt.org_id=g.org_id WHERE g.org_id=?1 AND g.id=?2 AND tt.transaction_id=?3', [ctx.org.id, removeId, txnId]);
+	if (removeId !== null && !existing) throw error(400, 'Tag is not assigned to this transaction.');
+	const token = randomHex(24);
+	const guard = 'EXISTS (SELECT 1 FROM transactions WHERE id=?2 AND org_id=?1 AND mutation_token=?3)';
+	const statements: D1PreparedStatement[] = [ctx.db.prepare('UPDATE transactions SET updated_at=?1,revision=revision+1,mutation_token=?2 WHERE id=?3 AND org_id=?4 AND revision=?5').bind(nowMs(), token, txnId, ctx.org.id, t.revision)];
+	if (removeId === null) {
+		statements.push(ctx.db.prepare(`INSERT OR IGNORE INTO tags(org_id,name) SELECT ?1,?4 WHERE ${guard}`).bind(ctx.org.id, txnId, token, name));
+		statements.push(ctx.db.prepare(`INSERT OR IGNORE INTO transaction_tags(org_id,transaction_id,tag_id) SELECT ?1,?2,id FROM tags WHERE org_id=?1 AND name=?4 COLLATE NOCASE AND ${guard}`).bind(ctx.org.id, txnId, token, name));
+	} else {
+		statements.push(ctx.db.prepare(`DELETE FROM transaction_tags WHERE org_id=?1 AND transaction_id=?2 AND tag_id=?4 AND ${guard}`).bind(ctx.org.id, txnId, token, removeId));
+	}
+	const tagName = existing?.name ?? name;
+	statements.push(auditStatement(ctx, t, 'tags_updated', t.status, { [removeId === null ? 'Added tag' : 'Removed tag']: tagName }, token));
+	statements.push(auditEventStatement(ctx, txnId, 'transaction.tags_updated', token));
+	if (!(await commitMutation(ctx, txnId, token, statements))) throw error(409, 'Transaction changed. Reload before changing tags.');
+	return destination(ctx, txnId, removeId === null ? 'Tag added' : 'Tag removed');
+}
+
 export async function saveDetails(ctx: TxnCtx, txnId: number, form: FormData): Promise<never> {
 	const loaded = await loadFull(ctx.db, ctx.org.id, txnId);
 	if (!loaded) throw error(404, 'Transaction not found.');
@@ -952,6 +999,23 @@ export async function saveAllocations(ctx: TxnCtx, txnId: number, form: FormData
 	const refs = formStrings(form, 'alloc_purpose[]');
 	const amounts = formStrings(form, 'alloc_amount[]');
 	const members = formStrings(form, 'alloc_member[]');
+	const quickPurpose = formStr(form, 'quick_purpose').trim();
+	const quickDescription = formStr(form, 'quick_notes').trim();
+	const quickInvoice = formStr(form, 'quick_invoice').trim();
+	if (quickInvoice) {
+		let url: URL;
+		try { url = new URL(quickInvoice); } catch { throw error(400, 'Enter a valid invoice URL.'); }
+		if (!['https:', 'http:'].includes(url.protocol) || byteLen(quickInvoice) > 2000) throw error(400, 'Invoice URL must be an HTTP or HTTPS URL of at most 2,000 characters.');
+	}
+	const quickNotes = [quickDescription, quickInvoice ? `Invoice URL: ${quickInvoice}` : ''].filter(Boolean).join('\n\n');
+	if (byteLen(quickNotes) > 16000) throw error(400, 'Notes are limited to 16,000 characters.');
+	if (quickPurpose || quickNotes) {
+		if (refs.length || oldAllocations.length) throw error(400, 'Quick purpose is only available for an unallocated transaction.');
+		if (!quickPurpose) throw error(400, 'Enter a purpose name.');
+		refs.push(quickPurpose);
+		amounts.push(rupiahInput(magnitude));
+		members.push('');
+	}
 	if (refs.length !== amounts.length || refs.length !== members.length) {
 		throw error(400, 'purpose rows are malformed');
 	}
@@ -1101,6 +1165,16 @@ export async function saveAllocations(ctx: TxnCtx, txnId: number, form: FormData
 		throw error(400, finalInvalid);
 	}
 
+	let quickUpdate: { id: number; revision: number; notes: string; status: string; before: string } | null = null;
+	if (quickNotes && quickPurpose) {
+		const id = nextRows[0]?.purposeId;
+		const purpose = id === undefined ? null : await purposeById(ctx.db, ctx.org.id, id);
+		if (!purpose) { await cleanupCreatedPurposes(ctx.db, createdPurposeIds); throw error(409, 'Purpose no longer exists.'); }
+		const notes = [purpose.notes.trim(), quickNotes].filter(Boolean).join('\n\n');
+		if (byteLen(notes) > 16000) { await cleanupCreatedPurposes(ctx.db, createdPurposeIds); throw error(400, 'Combined purpose notes exceed 16,000 characters.'); }
+		quickUpdate = { id: purpose.id, revision: purpose.revision, notes, status: purpose.status, before: purpose.notes };
+	}
+
 	// ------------------------------------------------------------- commit
 	const now = nowMs();
 	const token = randomHex(24);
@@ -1146,6 +1220,13 @@ export async function saveAllocations(ctx: TxnCtx, txnId: number, form: FormData
 					)
 					.bind(ctx.org.id, row.purposeId, txnId, row.amountMinor, row.override, now, token)
 		);
+	}
+	if (quickUpdate) {
+		const p = quickUpdate;
+		statements.push(ctx.db.prepare(`UPDATE purposes SET notes=?1, status=CASE WHEN kind='expense' THEN 'pending' ELSE status END, approved_by_membership_id=CASE WHEN kind='expense' THEN NULL ELSE approved_by_membership_id END, approved_at=CASE WHEN kind='expense' THEN NULL ELSE approved_at END, approval_note=CASE WHEN kind='expense' THEN '' ELSE approval_note END, updated_at=?2, revision=revision+1, mutation_token=?3 WHERE id=?4 AND org_id=?5 AND revision=?6 AND EXISTS(SELECT 1 FROM transactions WHERE id=?7 AND mutation_token=?3)`).bind(p.notes, now, token, p.id, ctx.org.id, p.revision, txnId));
+		statements.push(ctx.db.prepare("INSERT INTO purpose_audit (org_id,purpose_id,actor_membership_id,action,previous_status,new_status,details,created_at) SELECT ?1,?2,?3,'notes_updated',?4,?5,?6,?7 WHERE EXISTS(SELECT 1 FROM purposes WHERE id=?2 AND mutation_token=?8)").bind(ctx.org.id, p.id, me(ctx).id, p.status, kind === 'expense' ? 'pending' : p.status, JSON.stringify({before: markdownToPlain(p.before), after: markdownToPlain(p.notes)}), now, token));
+		// Abort the entire D1 batch if the purpose changed since it was read.
+		statements.push(ctx.db.prepare('INSERT INTO allocations(org_id,purpose_id,transaction_id,amount_minor,created_at) SELECT ?1,?2,?3,0,?4 WHERE EXISTS(SELECT 1 FROM transactions WHERE id=?3 AND mutation_token=?5) AND NOT EXISTS(SELECT 1 FROM purposes WHERE id=?2 AND mutation_token=?5)').bind(ctx.org.id, p.id, txnId, now, token));
 	}
 	// Reassignment must not launder self-approval: record the union of old and
 	// new responsible ids (inherited and override) as transaction history.

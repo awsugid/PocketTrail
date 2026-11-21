@@ -33,7 +33,8 @@ function launchOptions() {
 async function signIn(page, identity) {
 	await page.goto(`${ORIGIN}/login`);
 	await page.getByRole('button', { name: new RegExp(identity) }).click();
-	await page.waitForURL(`${ORIGIN}/orgs`);
+	await page.waitForURL(url => url.pathname !== '/login');
+		await page.goto(`${ORIGIN}/orgs`);
 }
 
 async function overflow(page) {
@@ -109,36 +110,56 @@ await withWorker(async () => {
 			shots.push(name);
 		}
 
+		const card = page.locator('.list-summary [role="group"]').first();
+		await card.focus();
+		check('summary card has an accessible name and focus tooltip', !!(await card.getAttribute('aria-label')) && await page.getByRole('tooltip').isVisible());
+		await page.keyboard.press('Escape');
+		await page.getByRole('tooltip').waitFor({ state: 'hidden' });
+				check('Escape closes summary tooltip', await page.getByRole('tooltip').count() === 0);
+		await card.evaluate(node => node.blur());
+		await page.mouse.move(0, 0);
+		await card.hover();
+		const cardTooltip = page.getByRole('tooltip');
+		await cardTooltip.hover();
+		check('summary tooltip remains open when hovered', await cardTooltip.isVisible());
+		await page.mouse.move(0, 0);
+		await card.evaluate(node => node.blur());
+		await page.getByRole('tooltip').waitFor({ state: 'hidden' });
+		const member = page.locator('.member-avatar').first();
+		await member.scrollIntoViewIfNeeded();
+		await page.mouse.move(0, 0);
+		await member.focus();
+		check('member tooltip opens on focus', await page.getByRole('tooltip').isVisible());
+		await page.keyboard.press('Escape');
+		await page.getByRole('tooltip').waitFor({ state: 'hidden' });
+				check('Escape closes member tooltip', await page.getByRole('tooltip').count() === 0);
+		await member.evaluate(node => node.blur());
+		await page.mouse.move(0, 0);
+		await member.hover();
+		await page.getByRole('tooltip').hover();
+		check('member tooltip remains open when hovered', await page.getByRole('tooltip').isVisible());
+
 		// ----------------------------------------------------- mobile money labels
 		await page.setViewportSize({ width: 320, height: 900 });
 		await page.goto(`${ORIGIN}/org/demo-jakarta/transactions`);
-		// The `stack` action adds the roles on hydration.
-		await page.waitForFunction(() => document.querySelector('table.ledger tbody tr')?.getAttribute('role') === 'row');
-		const mobileLabels = await page.evaluate(() => {
-			const cell = document.querySelector('table.ledger td[data-label="Amount"]');
-			const table = document.querySelector('table.ledger');
-			return {
-				label: cell ? getComputedStyle(cell, '::before').content : null,
-				role: table?.getAttribute('role'),
-				rowRole: document.querySelector('table.ledger tbody tr')?.getAttribute('role')
-			};
-		});
-		check(
-			'stacked mobile cells keep a visible money label',
-			typeof mobileLabels.label === 'string' && mobileLabels.label.includes('Amount'),
-			String(mobileLabels.label)
-		);
-		check(
-			'stacked mobile rows keep their table semantics',
-			mobileLabels.role === 'table' && mobileLabels.rowRole === 'row',
-			`${mobileLabels.role}/${mobileLabels.rowRole}`
-		);
+		const mobileTable = await page.locator('.table-scroll').evaluate(node => ({
+			scrolls: node.scrollWidth > node.clientWidth,
+			focusable: node.tabIndex === 0,
+			native: getComputedStyle(node.querySelector('table')).display === 'table'
+		}));
+		check('mobile ledger scrolls inside its wrapper', mobileTable.scrolls && mobileTable.focusable);
+		check('mobile ledger keeps native table semantics', mobileTable.native);
+		const expand = page.getByRole('button', { name: /^Allocations for/ }).first();
+		await expand.click();
+		check('ledger allocations expand accessibly', await expand.getAttribute('aria-expanded') === 'true');
+		check('ledger expansion shows allocations or unassigned state', await page.locator('.allocation-list').isVisible());
+		await expand.click();
 
 		// -------------------------------------------------------------- keyboard
 		await page.setViewportSize({ width: 1440, height: 900 });
 		await page.goto(`${ORIGIN}/org/demo-jakarta/transactions`);
 		const focusOrder = [];
-		for (let i = 0; i < 16; i += 1) {
+		for (let i = 0; i < 24; i += 1) {
 			await page.keyboard.press('Tab');
 			focusOrder.push(
 				await page.evaluate(() => {
@@ -165,6 +186,24 @@ await withWorker(async () => {
 			'the current ledger filter is marked, not only coloured',
 			(await page.locator('nav[aria-label="Status filter"] a[aria-current="true"]').count()) === 1
 		);
+
+		// ------------------------------------------------------- revised list filters
+		await page.getByRole('button', { name: /^Filters/ }).click();
+		await page.getByLabel('Amount min (IDR)').fill('100');
+		await page.getByRole('button', { name: 'Apply', exact: true }).click();
+		await page.waitForURL(url => url.searchParams.get('min') === '100');
+		check('popup applies IDR amounts through URL', new URL(page.url()).searchParams.get('min') === '100');
+		await page.getByRole('link', { name: 'Approved', exact: true }).click();
+		await page.waitForURL(url => url.searchParams.get('status') === 'approved');
+		check('status pills preserve popup filters and reset page', new URL(page.url()).searchParams.get('min') === '100' && !new URL(page.url()).searchParams.has('page'));
+		await page.goto(`${ORIGIN}/org/demo-jakarta/purposes`);
+		check('purposes summary and creation form remain available', await page.getByRole('definition').count() === 6 && await page.getByRole('button', { name: 'Add purpose', exact: true }).isVisible());
+		await page.getByRole('button', { name: /^Filters/ }).click();
+		check('purpose popup has kind and total filters', await page.getByLabel('Kind', { exact: true }).isVisible() && await page.getByLabel('Total min (IDR)').isVisible());
+		await page.keyboard.press('Escape');
+		await page.screenshot({ path: `${ROOT}/.wrangler/ui/purposes-1440.png`, fullPage: true });
+		shots.push('purposes-1440.png');
+		await page.goto(`${ORIGIN}/org/demo-jakarta/transactions`);
 
 		// ------------------------------------------------------- menus + avatar
 		const accountMenu = page.locator('details.menu', { has: page.locator('summary[aria-label^="Account"]') });

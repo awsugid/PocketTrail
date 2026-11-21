@@ -92,6 +92,31 @@ describe('saveAllocations failure paths leave no orphan purposes', () => {
 	});
 });
 
+describe('quick purpose documentation', () => {
+	it('creates a full allocation and notes in one save', async () => {
+		const { db, ctx } = world();
+		const form = allocationsForm({ justification: 'Initial allocation', quick_purpose: 'Hosting', quick_notes: 'June meetup', quick_invoice: 'https://example.test/invoice' });
+		form.delete('alloc_purpose[]'); form.delete('alloc_amount[]'); form.delete('alloc_member[]');
+		const result = await saveAllocations(ctx, 7, form).catch((cause: unknown) => cause);
+		expect(isRedirect(result)).toBe(true);
+		const row = await one<{ notes: string; amount_minor: number }>(db, 'SELECT p.notes, a.amount_minor FROM purposes p JOIN allocations a ON a.purpose_id=p.id');
+		expect(row).toEqual({ notes: 'June meetup\n\nInvoice URL: https://example.test/invoice', amount_minor: 12000000 });
+		expect((await one<{ n: number }>(db, "SELECT count(*) AS n FROM purpose_audit WHERE action='notes_updated'"))!.n).toBe(1);
+	});
+
+	it('rejects notes without a name or an unsafe URL before writing', async () => {
+		const { db, ctx } = world();
+		const invalidFields: Record<string, string>[] = [{ quick_notes: 'Description' }, { quick_purpose: 'Hosting', quick_invoice: 'javascript:alert(1)' }];
+				for (const fields of invalidFields) {
+			const form = allocationsForm({ justification: 'Initial allocation', ...fields });
+			form.delete('alloc_purpose[]'); form.delete('alloc_amount[]'); form.delete('alloc_member[]');
+			const result = await saveAllocations(ctx, 7, form).catch((cause: unknown) => cause);
+			expect(isHttpError(result) && result.status === 400).toBe(true);
+		}
+		expect((await one<{ n: number }>(db, 'SELECT count(*) AS n FROM purposes'))!.n).toBe(0);
+	});
+});
+
 describe('purpose name uniqueness', () => {
 	it('keeps legacy duplicate labels from the migration while guarding creation', async () => {
 		const { db } = world();

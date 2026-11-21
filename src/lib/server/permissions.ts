@@ -7,6 +7,7 @@
 // or a rendered flag.
 
 export const PERMISSIONS = [
+	'ExplainOwnActions',
 	'ViewTransactions',
 	'CommentTransactions',
 	'DocumentTransactions',
@@ -74,6 +75,8 @@ export function permissionsFor(
 		if (role.id !== member.roleId) continue;
 		for (const permission of parseRolePermissions(role.permissions)) granted.add(permission);
 	}
+	// Restricted invitation roles cannot acquire broader access through mixed grants.
+	if (granted.has('ExplainOwnActions')) return new Set(['ExplainOwnActions']);
 	return granted;
 }
 

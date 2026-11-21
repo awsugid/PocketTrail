@@ -8,7 +8,7 @@
 
 	let { data }: { data: PageData } = $props();
 	const slug = $derived(data.shell.org.slug);
-	const empty = $derived(data.explain.length === 0 && data.review.length === 0 && data.imports.length === 0);
+	const empty = $derived(data.explain.length === 0 && data.imports.length === 0);
 
 	const groups = $derived<
 		Array<{ key: string; title: string; icon: IconName; rows: Array<{ href: string; title: string; sub: string; badge: string; tone: string }> }>
@@ -18,7 +18,7 @@
 			title: 'To explain',
 			icon: 'comment',
 			rows: data.explain.map((task) => ({
-				href: task.purposeId ? `/org/${slug}/purposes/${task.purposeId}` : `/org/${slug}/transactions/${task.id}`,
+				href: data.restricted ? `/org/${slug}/actions/${task.id}` : task.purposeId ? `/org/${slug}/purposes/${task.purposeId}` : `/org/${slug}/transactions/${task.id}`,
 				title: task.purposeId ? (task.purposeName ?? task.counterparty) : task.counterparty,
 				sub: task.purposeId
 					? `${fmtDate(task.date)} · ${task.pocketName} · ${task.counterparty}`
@@ -27,18 +27,7 @@
 				tone: 'needs'
 			}))
 		},
-		{
-			key: 'review',
-			title: 'To review',
-			icon: 'check',
-			rows: data.review.map((task) => ({
-				href: `/org/${slug}/purposes/${task.id}`,
-				title: task.purposeName,
-				sub: `${fmtDate(task.date)} · ${task.pocketName} · ${task.counterparty}`,
-				badge: 'Awaiting review',
-				tone: 'review'
-			}))
-		},
+
 		{
 			key: 'imports',
 			title: 'Imports',
@@ -64,7 +53,7 @@
 	{#if empty}
 		<div class="panel">
 			<Empty icon="check" title="All clear">
-				<a class="btn" href="/org/{slug}/transactions"><Icon name="ledger" size={16} />Open ledger</a>
+				{#if !data.restricted}<a class="btn" href="/org/{slug}/transactions"><Icon name="ledger" size={16} />Open ledger</a>{/if}
 			</Empty>
 		</div>
 	{:else}
