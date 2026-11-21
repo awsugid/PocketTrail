@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Button } from '$lib/components/ui/button';
 	import AuthFrame from '$lib/components/AuthFrame.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
@@ -44,13 +45,13 @@
 			</Notice>
 			<form method="POST" action="/logout" use:guard>
 				<input type="hidden" name="csrf_token" value={data.viewer.csrf} />
-				<button class="btn" type="submit"><Icon name="logout" size={16} />Sign out</button>
+				<Button class="" type="submit" variant="outline"><Icon name="logout" size={16} />Sign out</Button>
 			</form>
 		{:else}
 			<form method="POST" action="?/accept" use:submit>
 				<input type="hidden" name="csrf_token" value={data.viewer.csrf} />
 				<input type="hidden" name="token" value={data.token} />
-				<button class="btn btn--primary" type="submit"><Icon name="check" size={16} />Join {inv.orgName}</button>
+				<Button class="" type="submit" variant="default"><Icon name="check" size={16} />Join {inv.orgName}</Button>
 			</form>
 		{/if}
 	</div>

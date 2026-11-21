@@ -1,4 +1,9 @@
 <script lang="ts">
+ import { Checkbox } from '$lib/components/ui/checkbox';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import { Textarea } from '$lib/components/ui/textarea';
+	import { Button } from '$lib/components/ui/button';
 	import Icon, { type IconName } from '$lib/components/Icon.svelte';
 	import MarkdownView from '$lib/components/MarkdownView.svelte';
 	import Notice from '$lib/components/Notice.svelte';
@@ -126,13 +131,13 @@
 								name="notes"
 								label="Purpose Notes"
 								initial={purpose.notes}
-								rows="5"
+								rows={5}
 								placeholder="What this purpose covers; when evidence is missing, say why here"
 								members={purpose.members}
 								hint="Markdown: **bold**, *italic*, lists, quotes, code, links. @handle mentions."
 							/>
 							<div class="form-actions">
-								<button class="btn btn--primary" type="submit"><Icon name="check" size={16} />Save Notes</button>
+								<Button class="" type="submit" variant="default"><Icon name="check" size={16} />Save Notes</Button>
 							</div>
 						</form>
 					{/if}
@@ -167,14 +172,14 @@
 							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 							<input type="hidden" name="revision" value={purpose.revision} />
 							<div class="field">
-								<label for="evidence-file">Document <span class="muted">(PDF, PNG, JPEG)</span></label>
-								<input class="input" id="evidence-file" name="file" type="file" accept="application/pdf,image/png,image/jpeg" required />
+								<Label for="evidence-file">Document <span class="muted">(PDF, PNG, JPEG)</span></Label>
+								<Input class="" id="evidence-file" name="file" type="file" accept="application/pdf,image/png,image/jpeg" required />
 							</div>
 							<div class="field">
-								<label for="evidence-note">Note</label>
-								<input class="input" id="evidence-note" name="note" />
+								<Label for="evidence-note">Note</Label>
+								<Input class="" id="evidence-note" name="note" />
 							</div>
-							<button class="btn" type="submit"><Icon name="upload" size={16} />Attach</button>
+							<Button class="" type="submit" variant="outline"><Icon name="upload" size={16} />Attach</Button>
 						</form>
 					</div>
 				{/if}
@@ -205,22 +210,22 @@
 							<fieldset class="field">
 								<legend>Responsible members <span class="req" aria-hidden="true">*</span></legend>
 								{#each purpose.members as member (member.id)}
-									<label class="check">
-										<input type="checkbox" name="responsible_id[]" value={member.id} bind:checked={responsible[member.id]} />
+									<Label class="check" for={`responsible-${member.id}`}>
+ <Checkbox id={`responsible-${member.id}`} name="responsible_id[]" value={String(member.id)} bind:checked={() => responsible[member.id] ?? false, checked => responsible[member.id] = checked} />
 										{member.name}
-									</label>
+									</Label>
 								{/each}
 							</fieldset>
 							<div class="field">
-								<label for="responsible-justification">
+								<Label for="responsible-justification">
 									Justification <span class="req" aria-hidden="true">*</span>
 									<span class="muted"> — logged permanently in the discussion and history; new responsibles and @mentions are emailed</span>
-								</label>
+								</Label>
 								<RichComposer
 									id="responsible-justification"
 									name="justification"
 									label="Reassignment justification"
-									rows="2"
+									rows={2}
 									required
 									maxlength={4000}
 									placeholder="Why responsibility changes"
@@ -228,7 +233,7 @@
 								/>
 							</div>
 							<div class="form-actions">
-								<button class="btn btn--primary" type="submit"><Icon name="check" size={16} />Save responsibility</button>
+								<Button class="" type="submit" variant="default"><Icon name="check" size={16} />Save responsibility</Button>
 							</div>
 						</form>
 					{/if}
@@ -247,7 +252,7 @@
 								<p><span class="badge badge--muted"><Icon name="history" size={12} />Historical exemption</span></p>
 								<p class="muted">Excluded from the approval queue, not marked approved.</p>
 								<dl class="historical-facts"><dt>Sheet reference</dt><dd>{data.exemption.source_reference}</dd><dt>Reason</dt><dd>{data.exemption.reason}</dd></dl>
-								{#if data.historicalAdmin}<form method="POST" action="?/revokeExemption" use:submit={{ confirm: 'Remove this historical exemption? This purpose returns to normal approval rules.', confirmLabel: 'Remove exemption' }}><input type="hidden" name="csrf_token" value={data.shell.csrfToken} /><button class="btn btn--sm" type="submit">Remove exemption</button></form>{/if}
+								{#if data.historicalAdmin}<form method="POST" action="?/revokeExemption" use:submit={{ confirm: 'Remove this historical exemption? This purpose returns to normal approval rules.', confirmLabel: 'Remove exemption' }}><input type="hidden" name="csrf_token" value={data.shell.csrfToken} /><Button class="" type="submit" variant="outline" size="sm">Remove exemption</Button></form>{/if}
 							</div>
 						{/if}
 						{#if purpose.status === 'approved'}
@@ -268,19 +273,19 @@
 									<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 									<input type="hidden" name="revision" value={purpose.revision} />
 									<div class="field">
-										<label for="approve-note">Note</label>
-										<input class="input" id="approve-note" name="note" />
+										<Label for="approve-note">Note</Label>
+										<Input class="" id="approve-note" name="note" />
 									</div>
-									<button class="btn btn--primary" type="submit"><Icon name="check" size={16} />Approve</button>
+									<Button class="" type="submit" variant="default"><Icon name="check" size={16} />Approve</Button>
 								</form>
 								<form method="POST" action="?/requestChanges" class="form form--inline" use:submit>
 									<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 									<input type="hidden" name="revision" value={purpose.revision} />
 									<div class="field">
-										<label for="changes-note">What changes <span class="req" aria-hidden="true">*</span></label>
-										<input class="input" id="changes-note" name="note" required />
+										<Label for="changes-note">What changes <span class="req" aria-hidden="true">*</span></Label>
+										<Input class="" id="changes-note" name="note" required />
 									</div>
-									<button class="btn" type="submit"><Icon name="alert" size={16} />Request changes</button>
+									<Button class="" type="submit" variant="outline"><Icon name="alert" size={16} />Request changes</Button>
 								</form>
 							{:else if purpose.approval.ineligibleReason}
 								<p class="muted">{purpose.approval.ineligibleReason}</p>
@@ -294,10 +299,10 @@
 									{#if form?.historicalError}<div role="alert"><Notice tone="warning">{form.historicalError}</Notice></div>{/if}
 									<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 									<input type="hidden" name="revision" value={purpose.revision} />
-									<div class="field"><label for="historical-source">Sheet reference <span class="req" aria-hidden="true">*</span></label><input class="input" id="historical-source" name="source_reference" required maxlength="2000" placeholder="Sheet name, tab and row" value={form?.source ?? ''} /></div>
-									<div class="field"><label for="historical-reason">Why approval is not needed <span class="req" aria-hidden="true">*</span></label><textarea class="input" id="historical-reason" name="reason" required maxlength="2000" rows="3" value={form?.reason ?? ''}></textarea></div>
-									<label class="check historical-confirm"><input type="checkbox" name="confirmed" value="yes" required /><span>I verified this exact Sheet record matches this purpose.</span></label>
-									<div class="form-actions"><button class="btn" type="submit"><Icon name="history" size={16} />Save historical exemption</button></div>
+									<div class="field"><Label for="historical-source">Sheet reference <span class="req" aria-hidden="true">*</span></Label><Input class="" id="historical-source" name="source_reference" required maxlength={2000} placeholder="Sheet name, tab and row" value={form?.source ?? ''} /></div>
+									<div class="field"><Label for="historical-reason">Why approval is not needed <span class="req" aria-hidden="true">*</span></Label><Textarea class="" id="historical-reason" name="reason" required maxlength={2000} rows={3} value={form?.reason ?? ''}></Textarea></div>
+									<Label class="check historical-confirm" for="historical-confirm"><Checkbox id="historical-confirm" name="confirmed" value="yes" required /><span>I verified this exact Sheet record matches this purpose.</span></Label>
+									<div class="form-actions"><Button class="" type="submit" variant="outline"><Icon name="history" size={16} />Save historical exemption</Button></div>
 								</form>
 							</details>
 						{/if}
@@ -369,13 +374,13 @@
 						id="discussion-message"
 						name="body"
 						label="Discussion message"
-						rows="3"
+						rows={3}
 						required
 						placeholder="Message the team — @handle to mention"
 						members={purpose.members}
 					/>
 					<div class="form-actions">
-						<button class="btn" type="submit"><Icon name="comment" size={16} />Send</button>
+						<Button class="" type="submit" variant="outline"><Icon name="comment" size={16} />Send</Button>
 					</div>
 				</form>
 			{/if}
@@ -387,7 +392,7 @@
 	.historical { border-top: 1px solid var(--border); padding-top: 16px; }
 	.historical-form { margin-top: 16px; max-width: 560px; }
 	.historical-confirm { align-items: flex-start; line-height: 1.5; }
-	.historical-confirm input { flex-shrink: 0; margin-top: 4px; }
+	
 	.historical-confirm span, .historical-facts dd { min-width: 0; overflow-wrap: anywhere; }
 	.historical-facts { display: grid; gap: 4px; margin: 0; }
 	.historical-facts dt { font-weight: 600; }

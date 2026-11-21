@@ -64,7 +64,7 @@ await withWorker(async () => {
 		await noJsPage.goto(`${ORIGIN}/org/demo-jakarta/transactions/new`);
 		check(
 			'without JavaScript the form uses native controls',
-			(await noJsPage.locator('select[name=pocket_id], select[name=direction], input[type=date][name=date], input[type=time][name=time]').count()) === 4 &&
+			(await noJsPage.locator('select[name=pocket_id], select[name=direction], input[type=date][name=date], input[name=time]').count()) === 4 &&
 				(await noJsPage.locator('button.ui-trigger').count()) === 0
 		);
 		await noJs.close();
@@ -205,7 +205,16 @@ await withWorker(async () => {
 		shots.push('purposes-1440.png');
 		await page.goto(`${ORIGIN}/org/demo-jakarta/transactions`);
 
-		// ------------------------------------------------------- menus + avatar
+		// Purpose responsibility bindings must hydrate even for unassigned members.
+ await page.goto(`${ORIGIN}/org/demo-jakarta/purposes/1`);
+ await page.getByRole('heading', { name: 'DEMO: workshop supplies', exact: true }).waitFor();
+ const responsibleChoice = page.locator('[role=checkbox][id^=responsible-]').first();
+ const beforeResponsible = await responsibleChoice.getAttribute('aria-checked');
+ await responsibleChoice.click();
+ check('purpose responsibility checkboxes hydrate and toggle', await responsibleChoice.getAttribute('aria-checked') !== beforeResponsible);
+ await page.goto(`${ORIGIN}/org/demo-jakarta/transactions`);
+
+ // ------------------------------------------------------- menus + avatar
 		const accountMenu = page.locator('details.menu', { has: page.locator('summary[aria-label^="Account"]') });
 		await accountMenu.locator('summary').click();
 		check('the account menu opens', await accountMenu.evaluate((node) => node.open));
@@ -312,7 +321,7 @@ await withWorker(async () => {
 			disabled: document.querySelector('main form[action="?/saveRoles"] button[type=submit]')?.disabled
 		}));
 		check('roles are one matrix form with one Save, disabled until something changes', matrix.forms === 1 && matrix.saves === 1 && matrix.disabled === true, JSON.stringify(matrix));
-		await page.locator('table.matrix tbody .ui-check').first().click();
+		await page.locator('table.matrix tbody [role=checkbox]').first().click();
 		check('editing the matrix enables Save', await page.locator('main form[action="?/saveRoles"] button[type=submit]').isEnabled());
 		await page.goto(`${ORIGIN}/org/demo-jakarta/settings`);
 		await page.screenshot({ path: `${ROOT}/.wrangler/ui/settings-1440.png`, fullPage: true });
@@ -426,7 +435,7 @@ await withWorker(async () => {
 		// Nothing is preselected: the known labels depend on the pocket, chosen first.
 		await page.locator('button#mapping-pocket').click();
 		await page.getByRole('option').first().click();
-		await label.click();
+		await page.getByRole('button', { name: 'Show known labels' }).click();
 		await page.getByRole('option', { name: 'Demo Print Shop' }).waitFor();
 		check(
 			'label picker offers unmapped labels only',
@@ -441,9 +450,9 @@ await withWorker(async () => {
 			'label picker accepts a new label and submits it as typed',
 			(await page.locator('input[name="pattern"]').inputValue()) === 'Brand new vendor'
 		);
-		await label.fill('Print');
-		await page.keyboard.press('ArrowDown');
-		await page.keyboard.press('Enter');
+		await page.getByRole('button', { name: 'Show known labels' }).click();
+ await page.getByPlaceholder('Search labels…').fill('Print');
+ await page.getByRole('option', { name: 'Demo Print Shop' }).click();
 		check('label picker fills the chosen label', (await label.inputValue()) === 'Demo Print Shop', await label.inputValue());
 		await page.screenshot({ path: `${ROOT}/.wrangler/ui/routing-1440.png`, fullPage: true });
 		shots.push('routing-1440.png');
@@ -658,7 +667,7 @@ await withWorker(async () => {
 			await page.goto(`${ORIGIN}/org/demo-jakarta/settings/routing`);
 			await page.locator('button#mapping-pocket').click();
 			await page.getByRole('option').first().click();
-			await page.locator('input#mapping-pattern').click();
+			await page.getByRole('button', { name: 'Show known labels' }).click();
 			await page.getByRole('listbox').waitFor();
 			await page.screenshot({ path: `${ROOT}/.wrangler/ui/routing-picker-${width}.png` });
 			shots.push(`routing-picker-${width}.png`);

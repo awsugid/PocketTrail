@@ -1,5 +1,9 @@
 <script lang="ts">
-	import Select from '$lib/components/ui/Select.svelte';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import { Textarea } from '$lib/components/ui/textarea';
+	import { Button } from '$lib/components/ui/button';
+	import Select from '$lib/components/ui/FormSelect.svelte';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
@@ -120,11 +124,11 @@
 						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 						<div class="form-grid">
 							<div class="field">
-								<label for="import-pocket">Pocket</label>
+								<Label for="import-pocket">Pocket</Label>
 								<Select id="import-pocket" name="pocket_id" items={data.pockets.map((pocket) => ({ value: String(pocket.id), label: pocket.name }))} required />
 							</div>
 							<div class="field">
-								<label for="import-file">Original statement PDF</label>
+								<Label for="import-file">Original statement PDF</Label>
 								<input
 									class="input"
 									id="import-file"
@@ -140,10 +144,10 @@
 						</div>
 						{#if needsPassword}
 					<div class="field">
-						<label for="import-password">PDF password</label>
+						<Label for="import-password">PDF password</Label>
 						<div class="input-row">
-							<input
-								class="input"
+							<Input
+								class=""
 								id="import-password"
 								type="password"
 								autocomplete="off"
@@ -154,9 +158,9 @@
 										extract();
 									}
 								}}
-								use:focusOnMount
+								{@attach (element) => { focusOnMount(element); }}
 							/>
-							<button class="btn" type="button" disabled={busy || password === ''} onclick={extract}><Icon name="check" size={16} />Unlock</button>
+							<Button class="" type="button" disabled={busy || password === ''} onclick={extract} variant="outline"><Icon name="check" size={16} />Unlock</Button>
 						</div>
 					</div>
 				{/if}
@@ -164,13 +168,13 @@
 						{#if extractionRan || !enhanced.on}
 							<details class="fold" open={extractionFailed || !enhanced.on}>
 								<summary>Extracted text</summary>
-								<textarea class="input textarea mono-area" name="statement_text" rows="8" aria-label="Extracted statement text" bind:value={statementText}></textarea>
+								<Textarea class="mono-area" name="statement_text" rows={8} aria-label="Extracted statement text" bind:value={statementText}></Textarea>
 							</details>
 						{/if}
 						<div class="form-actions">
-							<button class="btn btn--primary" type="submit" disabled={busy || (extractionFailed && statementText.trim() === '')}>
+							<Button class="" type="submit" disabled={busy || (extractionFailed && statementText.trim() === '')} variant="default">
 								<Icon name="upload" size={16} />Stage statement
-							</button>
+							</Button>
 						</div>
 					</form>
 				{/if}

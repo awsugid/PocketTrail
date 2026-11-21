@@ -1,4 +1,6 @@
 <script lang="ts">
+ import * as Tooltip from '$lib/components/ui/tooltip';
+	import { Button } from '$lib/components/ui/button';
 	import { afterNavigate } from '$app/navigation';
 	import type { Snippet } from 'svelte';
 	import Icon, { type IconName } from './Icon.svelte';
@@ -67,16 +69,15 @@
 	<div class="body">
 		<nav class="sidebar" id="org-nav" aria-label="Organization" inert={narrow && !navOpen} data-open={navOpen ? 'true' : undefined}>
 			{#each nav.filter((item) => item.key === 'actions' ? (access.actions ?? access.finance) : item.key === 'inventory' ? access.inventory : access.finance) as item (item.key)}
-				<a
+				<Tooltip.Provider><Tooltip.Root><Tooltip.Trigger>{#snippet child({ props })}<a {...props}
 					href="/org/{org.slug}/{item.path}"
 					aria-current={active === item.key ? 'page' : undefined}
-					title={item.label}
 				>
 					<Icon name={item.icon} /><span class="sidebar__label">{item.label}</span>
-				</a>
+				</a>{/snippet}</Tooltip.Trigger><Tooltip.Content>{item.label}</Tooltip.Content></Tooltip.Root></Tooltip.Provider>
 			{/each}
 		</nav>
-		{#if navOpen}<button class="scrim" type="button" tabindex="-1" aria-label="Close menu" onclick={() => { navOpen = false; document.getElementById('menu-button')?.focus(); }}></button>{/if}
+		{#if navOpen}<Button class="scrim" type="button" tabindex={-1} aria-label="Close menu" onclick={() => { navOpen = false; document.getElementById('menu-button')?.focus(); }}></Button>{/if}
 		<main class="main" id="main" tabindex="-1" inert={drawerOpen}>
 			<div class="main__inner">
 				{@render children()}

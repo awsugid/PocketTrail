@@ -1,5 +1,7 @@
 <script lang="ts">
-	import Checkbox from '$lib/components/ui/Checkbox.svelte';
+	import { Label } from '$lib/components/ui/label';
+	import { Button } from '$lib/components/ui/button';
+	import Checkbox from '$lib/components/ui/LabeledCheckbox.svelte';
 	import DatePicker from '$lib/components/ui/DatePicker.svelte';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -47,12 +49,12 @@
 						<input type="hidden" name="preview_token" value={s.previewToken} />
 						<Checkbox name="enabled" checked={s.notifications.enabled}>Enable notifications for this organization</Checkbox>
 						<div class="field">
-							<label for="cutoff">Transaction-date cutoff</label>
+							<Label for="cutoff">Transaction-date cutoff</Label>
 							<DatePicker id="cutoff" name="cutoff_date" value={s.notificationPreviewCutoff} clearable />
 						</div>
 						<div class="form-actions">
-							<button class="btn" type="submit" formaction="?/preview"><Icon name="filter" size={16} />Preview</button>
-							<button class="btn btn--primary" type="submit"><Icon name="check" size={16} />Save</button>
+							<Button class="" type="submit" formaction="?/preview" variant="outline"><Icon name="filter" size={16} />Preview</Button>
+							<Button class="" type="submit" variant="default"><Icon name="check" size={16} />Save</Button>
 						</div>
 					</form>
 
@@ -79,9 +81,9 @@
 
 					<form method="POST" action="/org/{slug}/notifications/digest" class="form form--inline" use:guard>
 						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
-						<button class="btn" type="submit" disabled={!s.notifications.enabled} aria-describedby="digest-why">
+						<Button class="" type="submit" disabled={!s.notifications.enabled} aria-describedby="digest-why" variant="outline">
 							<Icon name="mail" size={16} />Send weekly digests
-						</button>
+						</Button>
 						{#if !s.notifications.enabled}<span class="hint" id="digest-why">Turn notifications on first.</span>{/if}
 					</form>
 				</div>

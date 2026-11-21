@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Button } from '$lib/components/ui/button';
 	import { fmtMoney } from '$lib/fmt';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -48,7 +49,7 @@
 				<tbody>
 					{#each data.entries as entry (entry.id)}
 						<tr data-tone={entry.tone}>
-							<td><button class="btn btn--quiet btn--sm btn--icon row-expand" aria-label={`Allocations for ${entry.counterparty.name}`} aria-expanded={expanded.includes(entry.id)} aria-controls={`allocations-${entry.id}`} onclick={() => expanded = expanded.includes(entry.id) ? expanded.filter(id => id !== entry.id) : [...expanded, entry.id]}><Icon name="chevron" size={16} /></button></td>
+							<td><Button class="row-expand" aria-label={`Allocations for ${entry.counterparty.name}`} aria-expanded={expanded.includes(entry.id)} aria-controls={`allocations-${entry.id}`} onclick={() => expanded = expanded.includes(entry.id) ? expanded.filter(id => id !== entry.id) : [...expanded, entry.id]}><Icon name="chevron" size={16} /></Button></td>
 							<td class="cell--nowrap">{ledgerDate(entry.date)}{#if entry.time}<span class="cell__sub">{entry.time}</span>{/if}</td>
 							<td class="row-identity"><a href="{base}/{entry.id}">{entry.counterparty.name}</a>{#if entry.bankId}<span class="cell__sub">{entry.bankId}</span>{/if}</td>
 							<td class="cell--num" class:amount--in={entry.amountMinor > 0} class:amount--out={entry.amountMinor < 0}>{entry.amountMinor > 0 ? '+' : ''}{fmtMoney(entry.amountMinor)}</td>

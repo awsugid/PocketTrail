@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { Label } from '$lib/components/ui/label';
+	import { Textarea } from '$lib/components/ui/textarea';
+	import { Button } from '$lib/components/ui/button';
 	import OrgShell from '$lib/components/OrgShell.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
 	import type { PageData } from './$types';
@@ -13,9 +16,9 @@
 		<form method="POST" class="stack">
 			<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 			<input type="hidden" name="revision" value={data.task.revision} />
-			<label for="explanation">Why did this expense happen? What was its purpose?</label>
-			<textarea id="explanation" name="explanation" required maxlength="10000" rows="6">{data.task.explanation}</textarea>
-			<button class="btn" type="submit">Save explanation</button>
+			<Label for="explanation">Why did this expense happen? What was its purpose?</Label>
+			<Textarea id="explanation" name="explanation" required maxlength={10000} rows={6} value={data.task.explanation} />
+			<Button class="" type="submit" variant="outline">Save explanation</Button>
 		</form>
 	</section>
 </OrgShell>

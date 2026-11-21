@@ -1,5 +1,8 @@
 <script lang="ts">
-	import Checkbox from '$lib/components/ui/Checkbox.svelte';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import { Button } from '$lib/components/ui/button';
+	import Checkbox from '$lib/components/ui/LabeledCheckbox.svelte';
 	import AccountShell from '$lib/components/AccountShell.svelte';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -65,10 +68,10 @@
 											<input type="hidden" name="csrf_token" value={data.csrfToken} />
 											<input type="hidden" name="user_id" value={account.id} />
 											<input type="hidden" name="admin" value={account.admin ? 'false' : 'true'} />
-											<button class="btn btn--sm {account.admin ? 'btn--danger' : ''}" type="submit">
+											<Button  type="submit" variant={account.admin ? 'destructive' : 'outline'} size="sm">
 												<Icon name={account.admin ? 'close' : 'plus'} size={14} />
 												{account.admin ? 'Revoke admin' : 'Make admin'}
-											</button>
+											</Button>
 										</form>
 									{/if}
 								</td>
@@ -108,8 +111,8 @@
 				<form method="POST" action="/platform/role-templates" class="form" use:guard>
 					<input type="hidden" name="csrf_token" value={data.csrfToken} />
 					<div class="field">
-						<label for="template-name">New template <span class="req" aria-hidden="true">*</span></label>
-						<input class="input" id="template-name" name="name" required maxlength="100" placeholder="Name" />
+						<Label for="template-name">New template <span class="req" aria-hidden="true">*</span></Label>
+						<Input class="" id="template-name" name="name" required maxlength={100} placeholder="Name" />
 					</div>
 					<fieldset>
 						<legend class="visually-hidden">Permissions</legend>
@@ -120,7 +123,7 @@
 						</div>
 					</fieldset>
 					<div class="form-actions">
-						<button class="btn btn--primary" type="submit"><Icon name="check" size={16} />Save template</button>
+						<Button class="" type="submit" variant="default"><Icon name="check" size={16} />Save template</Button>
 					</div>
 				</form>
 			</div>

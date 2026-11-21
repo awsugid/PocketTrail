@@ -1,4 +1,6 @@
 <script lang="ts">
+ import * as Tooltip from '$lib/components/ui/tooltip';
+	import { Button } from '$lib/components/ui/button';
 	import { guard } from '$lib/forms';
 	import { menu } from '$lib/menu';
 	import Icon from './Icon.svelte';
@@ -39,9 +41,9 @@
 
 <header class="topbar">
 	{#if org}
-		<button
+		<Button
 			id="menu-button"
-			class="btn btn--quiet btn--icon menu-button"
+			class="menu-button"
 			type="button"
 			aria-expanded={navOpen}
 			aria-controls="org-nav"
@@ -49,7 +51,7 @@
 			onclick={() => (navOpen = !navOpen)}
 		>
 			<Icon name={navOpen ? 'close' : 'menu'} />
-		</button>
+		</Button>
 	{/if}
 	<a class="brand" href="/orgs" inert={locked} aria-label="PocketTrail, all organizations">
 		<span class="brand__mark"><Icon name="pocket" size={16} /></span>
@@ -83,7 +85,7 @@
 	<span class="topbar__spacer"></span>
 
 	{#if org?.synthetic}
-		<span class="badge badge--info topbar__chip" role="status" title="Synthetic demo data, not real records"><Icon name="info" size={12} /><span>Synthetic data</span></span>
+		<Tooltip.Provider><Tooltip.Root><Tooltip.Trigger>{#snippet child({ props })}<span {...props} class="badge badge--info topbar__chip" role="status"><Icon name="info" size={12} /><span>Synthetic data</span></span>{/snippet}</Tooltip.Trigger><Tooltip.Content>Synthetic demo data, not real records</Tooltip.Content></Tooltip.Root></Tooltip.Provider>
 	{/if}
 
 	<details class="menu" use:menu inert={locked}>
@@ -105,7 +107,7 @@
 			{/if}
 			<form method="POST" action="/logout" use:guard>
 				<input type="hidden" name="csrf_token" value={csrfToken} />
-				<button class="menu__item" type="submit"><Icon name="logout" size={16} />Sign out</button>
+				<Button class="menu__item" type="submit" variant="outline"><Icon name="logout" size={16} />Sign out</Button>
 			</form>
 		</div>
 	</details>

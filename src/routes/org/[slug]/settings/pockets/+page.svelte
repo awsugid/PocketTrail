@@ -1,6 +1,9 @@
 <script lang="ts">
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import { Button } from '$lib/components/ui/button';
 	import MoneyInput from '$lib/components/ui/MoneyInput.svelte';
-	import Select from '$lib/components/ui/Select.svelte';
+	import Select from '$lib/components/ui/FormSelect.svelte';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
@@ -49,9 +52,9 @@
 								<form method="POST" action="?/setPocketOwner" class="form form--inline" use:submit>
 									<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 									<input type="hidden" name="id" value={pocket.id} />
-									<label class="visually-hidden" for="owner-{pocket.id}">Owner of {pocket.name}</label>
+									<Label class="visually-hidden" for="owner-{pocket.id}">Owner of {pocket.name}</Label>
 									<Select id="owner-{pocket.id}" name="owner_membership_id" items={activeMembers.map((member) => ({ value: String(member.id), label: member.name }))} value={pocket.ownerName ? String(pocket.ownerMembershipId) : ''} required auto />
-									<button class="btn" type="submit"><Icon name="check" size={16} />Save</button>
+									<Button class="" type="submit" variant="outline"><Icon name="check" size={16} />Save</Button>
 								</form>
 							{/if}
 						</li>
@@ -68,20 +71,20 @@
 						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 						<div class="form-grid">
 							<div class="field">
-								<label for="pocket-name">Name <span class="req" aria-hidden="true">*</span></label>
-								<input class="input" id="pocket-name" name="name" required maxlength="120" />
+								<Label for="pocket-name">Name <span class="req" aria-hidden="true">*</span></Label>
+								<Input class="" id="pocket-name" name="name" required maxlength={120} />
 							</div>
 							<div class="field">
-								<label for="pocket-opening">Opening balance (IDR)</label>
+								<Label for="pocket-opening">Opening balance (IDR)</Label>
 								<MoneyInput id="pocket-opening" name="opening_balance" value="0" required />
 							</div>
 							<div class="field">
-								<label for="pocket-owner">Owner</label>
+								<Label for="pocket-owner">Owner</Label>
 								<Select id="pocket-owner" name="owner_membership_id" items={activeMembers.map((member) => ({ value: String(member.id), label: member.name }))} value={String(s.defaultOwnerId ?? '')} required />
 							</div>
 						</div>
 						<div class="form-actions">
-							<button class="btn btn--primary" type="submit"><Icon name="plus" size={16} />Add pocket</button>
+							<Button class="" type="submit" variant="default"><Icon name="plus" size={16} />Add pocket</Button>
 						</div>
 					</form>
 				</div>

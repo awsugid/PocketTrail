@@ -1,5 +1,8 @@
 <script lang="ts">
-	import Select from '$lib/components/ui/Select.svelte';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import { Button } from '$lib/components/ui/button';
+	import Select from '$lib/components/ui/FormSelect.svelte';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
@@ -46,9 +49,9 @@
 								<form method="POST" action="?/setRole" class="form form--inline" use:submit>
 									<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 									<input type="hidden" name="id" value={member.id} />
-									<label class="visually-hidden" for="role-of-{member.id}">Role for {member.name}</label>
+									<Label class="visually-hidden" for="role-of-{member.id}">Role for {member.name}</Label>
 									<Select id="role-of-{member.id}" name="role_id" items={s.roles.map((role) => ({ value: String(role.id), label: role.name }))} value={String(member.roleId)} required auto />
-									<button class="btn btn--sm" type="submit"><Icon name="check" size={14} />Save</button>
+									<Button class="" type="submit" variant="outline" size="sm"><Icon name="check" size={14} />Save</Button>
 								</form>
 								{#if member.active}
 									<form
@@ -63,17 +66,17 @@
 									>
 										<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 										<input type="hidden" name="id" value={member.id} />
-										<button class="btn btn--sm btn--danger" type="submit">
+										<Button class="" type="submit" variant="destructive" size="sm">
 											<Icon name="close" size={14} />Revoke<span class="visually-hidden"> access for {member.name}</span>
-										</button>
+										</Button>
 									</form>
 								{:else}
 									<form method="POST" action="?/restoreMember" use:submit>
 										<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 										<input type="hidden" name="id" value={member.id} />
-										<button class="btn btn--sm" type="submit">
+										<Button class="" type="submit" variant="outline" size="sm">
 											<Icon name="check" size={14} />Restore<span class="visually-hidden"> access for {member.name}</span>
-										</button>
+										</Button>
 									</form>
 								{/if}
 							</div>
@@ -85,16 +88,16 @@
 						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 						<div class="form-grid">
 							<div class="field">
-								<label for="member-identity">Email <span class="req" aria-hidden="true">*</span></label>
-								<input class="input" id="member-identity" name="email" type="email" required />
+								<Label for="member-identity">Email <span class="req" aria-hidden="true">*</span></Label>
+								<Input class="" id="member-identity" name="email" type="email" required />
 							</div>
 							<div class="field">
-								<label for="member-role">Role</label>
+								<Label for="member-role">Role</Label>
 								<Select id="member-role" name="role_id" items={s.roles.map((role) => ({ value: String(role.id), label: role.name }))} required />
 							</div>
 						</div>
 						<div class="form-actions">
-							<button class="btn btn--primary" type="submit"><Icon name="plus" size={16} />Add person</button>
+							<Button class="" type="submit" variant="default"><Icon name="plus" size={16} />Add person</Button>
 						</div>
 						<p class="hint">Existing users get access immediately. New users accept an invitation after signing in with Google.{#if !data.invitationDeliveryEnabled} Email delivery is disabled; no email is sent.{/if}</p>
 					</form>
@@ -122,9 +125,9 @@
 								<div class="rows__actions">
 									<form method="POST" action="/org/{slug}/settings/invitations/{invitation.id}/resend" use:guard>
 										<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
-										<button class="btn btn--sm" type="submit">
+										<Button class="" type="submit" variant="outline" size="sm">
 											<Icon name="mail" size={14} />Resend<span class="visually-hidden"> to {invitation.email}</span>
-										</button>
+										</Button>
 									</form>
 									<form
 										method="POST"
@@ -135,9 +138,9 @@
 										}}
 									>
 										<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
-										<button class="btn btn--sm btn--danger" type="submit">
+										<Button class="" type="submit" variant="destructive" size="sm">
 											<Icon name="close" size={14} />Revoke<span class="visually-hidden"> invitation for {invitation.email}</span>
-										</button>
+										</Button>
 									</form>
 								</div>
 							</li>

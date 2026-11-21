@@ -1,8 +1,12 @@
 <script lang="ts">
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import { Textarea } from '$lib/components/ui/textarea';
+	import { Button } from '$lib/components/ui/button';
 	import { fmtDateTime, parseRupiah, fmtMoney, rupiahInput } from '$lib/fmt';
-	import Combobox from '$lib/components/ui/Combobox.svelte';
+	import Combobox from '$lib/components/ui/LabelCombobox.svelte';
 	import MoneyInput from '$lib/components/ui/MoneyInput.svelte';
-	import Select from '$lib/components/ui/Select.svelte';
+	import Select from '$lib/components/ui/FormSelect.svelte';
 	import Icon, { type IconName } from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
@@ -148,11 +152,11 @@
 							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 							<input type="hidden" name="revision" value={txn.revision} />
 							<div class="field">
-								<label for="explanation">Notes <span class="req" aria-hidden="true">*</span></label>
-								<textarea class="input textarea" id="explanation" name="explanation" required>{txn.explanation}</textarea>
+								<Label for="explanation">Notes <span class="req" aria-hidden="true">*</span></Label>
+								<Textarea class="" id="explanation" name="explanation" required value={txn.explanation} />
 							</div>
 							<div class="form-actions">
-								<button class="btn btn--primary" type="submit"><Icon name="check" size={16} />Save notes</button>
+								<Button class="" type="submit" variant="default"><Icon name="check" size={16} />Save notes</Button>
 							</div>
 						</form>
 					</div>
@@ -187,7 +191,7 @@
 							<input type="hidden" name="revision" value={txn.revision} />
 							{#if !txn.isIncome}
 								<div class="field">
-									<label for="responsible">Inherited responsible member</label>
+									<Label for="responsible">Inherited responsible member</Label>
 									<Select
 										id="responsible"
 										name="responsible_member_id"
@@ -199,20 +203,20 @@
 							{/if}
 							{#if allocations.length === 0}
 								<div class="field">
-									<label for="quick-purpose">Purpose</label>
+									<Label for="quick-purpose">Purpose</Label>
 									<Combobox id="quick-purpose" name="quick_purpose" options={purposeOptions} maxlength={300} />
 									<p class="hint">Choose an existing purpose or enter a new name. The full transaction amount is allocated.</p>
 								</div>
 								<div class="field">
-									<label for="quick-notes">Description</label>
-									<textarea class="input textarea" id="quick-notes" name="quick_notes" maxlength="16000" rows="3"></textarea>
+									<Label for="quick-notes">Description</Label>
+									<Textarea class="" id="quick-notes" name="quick_notes" maxlength={16000} rows={3}></Textarea>
 								</div>
 								<div class="field">
-									<label for="quick-invoice">Invoice URL</label>
-									<input class="input" id="quick-invoice" name="quick_invoice" type="url" maxlength="2000" />
+									<Label for="quick-invoice">Invoice URL</Label>
+									<Input class="" id="quick-invoice" name="quick_invoice" type="url" maxlength={2000} />
 									<p class="hint">Saved as a link in purpose notes, not as an uploaded document.</p>
 								</div>
-								<button class="btn btn--sm" type="button" onclick={() => { allocations = [{ purpose: '', amount: rupiahInput(bankAbs), member: '' }]; }}>Split across purposes</button>
+								<Button class="" type="button" onclick={() => { allocations = [{ purpose: '', amount: rupiahInput(bankAbs), member: '' }]; }}>Split across purposes</Button>
 							{:else}
 							<fieldset class="form">
 								<legend>Purpose allocations <span class="muted">({txn.kindLabel.toLowerCase()})</span></legend>
@@ -225,31 +229,31 @@
 								{#each allocations as row, index (index)}
 									<div class="split-row">
 										<div class="field">
-											<label class="visually-hidden" for="alloc-purpose-{index}">Purpose {index + 1}</label>
+											<Label class="visually-hidden" for="alloc-purpose-{index}">Purpose {index + 1}</Label>
 											<Combobox id="alloc-purpose-{index}" name="alloc_purpose[]" options={purposeOptions} bind:value={row.purpose} required maxlength={300} />
 										</div>
 										<div class="field">
-											<label class="visually-hidden" for="alloc-amount-{index}">Amount {index + 1}</label>
+											<Label class="visually-hidden" for="alloc-amount-{index}">Amount {index + 1}</Label>
 											<MoneyInput id="alloc-amount-{index}" name="alloc_amount[]" bind:value={row.amount} required />
 										</div>
 										<div class="field">
-											<label class="visually-hidden" for="alloc-member-{index}">Responsible override {index + 1}</label>
+											<Label class="visually-hidden" for="alloc-member-{index}">Responsible override {index + 1}</Label>
 											<Select id="alloc-member-{index}" name="alloc_member[]" items={memberItems} bind:value={row.member} />
 										</div>
-										<button
-											class="btn btn--sm row-action"
+										<Button
+											class="row-action"
 											type="button"
 											aria-label="Remove purpose {index + 1}"
 											onclick={() => removeAllocation(index)}
 										>
 											<Icon name="trash" size={16} />
-										</button>
+										</Button>
 									</div>
 								{/each}
 								<div class="form-actions">
-									<button class="btn btn--sm" type="button" aria-label="Add purpose" onclick={addAllocation}>
+									<Button class="" type="button" aria-label="Add purpose" onclick={addAllocation} variant="outline" size="sm">
 										<Icon name="plus" size={14} />Add
-									</button>
+									</Button>
 								</div>
 								<p class="hint" role="status">
 									{#if draftTotal === null}
@@ -270,21 +274,21 @@
 									id="alloc-justification"
 									name="justification"
 									label="Justification (required when responsibility changes)"
-									rows="2"
+									rows={2}
 									maxlength={4000}
 									placeholder="Required whenever responsibility changes; new responsibles and @mentions are emailed"
 									members={txn.members}
 								/>
 							</div>
 							<div class="form-actions">
-								<button class="btn btn--primary" type="submit"><Icon name="check" size={16} />Save allocations</button>
+								<Button class="" type="submit" variant="default"><Icon name="check" size={16} />Save allocations</Button>
 							</div>
 						</form>
 						{#if txn.can.submit && !txn.isIncome}
 							<form method="POST" action="?/submit" class="gap-top" use:submit>
 								<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 								<input type="hidden" name="revision" value={txn.revision} />
-								<button class="btn" type="submit"><Icon name="next" size={16} />Submit for purpose review</button>
+								<Button class="" type="submit" variant="outline"><Icon name="next" size={16} />Submit for purpose review</Button>
 							</form>
 						{/if}
 					</div>
@@ -360,14 +364,14 @@
 								<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 								<input type="hidden" name="revision" value={txn.revision} />
 								<div class="field">
-									<label for="evidence-file">Document <span class="muted">(PDF, PNG, JPEG)</span></label>
-									<input class="input" id="evidence-file" name="file" type="file" accept="application/pdf,image/png,image/jpeg" required />
+									<Label for="evidence-file">Document <span class="muted">(PDF, PNG, JPEG)</span></Label>
+									<Input class="" id="evidence-file" name="file" type="file" accept="application/pdf,image/png,image/jpeg" required />
 								</div>
 								<div class="field">
-									<label for="evidence-note">Note</label>
-									<input class="input" id="evidence-note" name="note" />
+									<Label for="evidence-note">Note</Label>
+									<Input class="" id="evidence-note" name="note" />
 								</div>
-								<button class="btn" type="submit"><Icon name="upload" size={16} />Attach</button>
+								<Button class="" type="submit" variant="outline"><Icon name="upload" size={16} />Attach</Button>
 							</form>
 						</div>
 					{/if}
@@ -401,13 +405,13 @@
 									id="comment-body"
 									name="body"
 									label="Comment"
-									rows="3"
+									rows={3}
 									required
 									placeholder="Mention a member with @handle"
 									members={txn.members}
 								/>
 								<div class="form-actions">
-									<button class="btn" type="submit"><Icon name="comment" size={16} />Comment</button>
+									<Button class="" type="submit" variant="outline"><Icon name="comment" size={16} />Comment</Button>
 								</div>
 							</form>
 						</div>
@@ -452,7 +456,7 @@
 						<ul class="rows">
 							{#each data.tags.filter((tag) => tag.assigned) as tag (tag.id)}
 								<li><span>{tag.name}</span>
-									{#if data.canTag}<form method="POST" action="?/tag" use:submit><input type="hidden" name="csrf_token" value={data.shell.csrfToken} /><input type="hidden" name="revision" value={txn.revision} /><input type="hidden" name="remove_tag" value={tag.id} /><button class="btn btn--sm" type="submit" aria-label="Remove tag {tag.name}">Remove</button></form>{/if}
+									{#if data.canTag}<form method="POST" action="?/tag" use:submit><input type="hidden" name="csrf_token" value={data.shell.csrfToken} /><input type="hidden" name="revision" value={txn.revision} /><input type="hidden" name="remove_tag" value={tag.id} /><Button class="" type="submit" aria-label="Remove tag {tag.name}" variant="outline" size="sm">Remove</Button></form>{/if}
 								</li>
 							{/each}
 						</ul>
@@ -461,8 +465,8 @@
 						<form method="POST" action="?/tag" class="form gap-top" use:submit>
 							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 							<input type="hidden" name="revision" value={txn.revision} />
-							<div class="field"><label for="transaction-tag">Add or create tag</label><input class="input" id="transaction-tag" name="tag" list="transaction-tag-options" maxlength="80" required /><datalist id="transaction-tag-options">{#each data.tags.filter((tag) => !tag.assigned) as tag (tag.id)}<option value={tag.name}></option>{/each}</datalist></div>
-							<button class="btn" type="submit">Add tag</button>
+							<div class="field"><Label for="transaction-tag">Add or create tag</Label><Input class="" id="transaction-tag" name="tag" list="transaction-tag-options" maxlength={80} required /><datalist id="transaction-tag-options">{#each data.tags.filter((tag) => !tag.assigned) as tag (tag.id)}<option value={tag.name}></option>{/each}</datalist></div>
+							<Button class="" type="submit" variant="outline">Add tag</Button>
 						</form>
 					{/if}
 				</div>
@@ -520,21 +524,21 @@
 							<form method="POST" action="?/unsuppress" class="gap-top" use:submit>
 								<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 								<input type="hidden" name="revision" value={txn.revision} />
-								<button class="btn" type="submit">Resume notifications</button>
+								<Button class="" type="submit" variant="outline">Resume notifications</Button>
 							</form>
 						{:else}
 							<form method="POST" action="?/suppress" class="form" use:submit>
 								<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 								<input type="hidden" name="revision" value={txn.revision} />
 								<div class="field">
-									<label for="suppress-reason">
+									<Label for="suppress-reason">
 										Suppression reason <span class="req" aria-hidden="true">*</span>
-									</label>
-									<input class="input" id="suppress-reason" name="reason" required />
+									</Label>
+									<Input class="" id="suppress-reason" name="reason" required />
 									<p class="hint">Stops notifications about this movement only; shared purposes keep their own discussion notices.</p>
 								</div>
 								<div class="form-actions">
-									<button class="btn" type="submit">Suppress</button>
+									<Button class="" type="submit" variant="outline">Suppress</Button>
 								</div>
 							</form>
 						{/if}

@@ -1,6 +1,9 @@
 <script lang="ts">
-	import Checkbox from '$lib/components/ui/Checkbox.svelte';
-	import Select from '$lib/components/ui/Select.svelte';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import { Button } from '$lib/components/ui/button';
+	import Checkbox from '$lib/components/ui/LabeledCheckbox.svelte';
+	import Select from '$lib/components/ui/FormSelect.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
@@ -71,8 +74,8 @@
 									<th scope="col">Permission</th>
 									{#each s.roles as role (role.id)}
 										<th scope="col">
-											<label class="visually-hidden" for="role-name-{role.id}">Name of {role.name}</label>
-											<input class="input" id="role-name-{role.id}" name="name:{role.id}" bind:value={draft[role.id]!.name} required maxlength="100" />
+											<Label class="visually-hidden" for="role-name-{role.id}">Name of {role.name}</Label>
+											<Input class="" id="role-name-{role.id}" name="name:{role.id}" bind:value={draft[role.id]!.name} required maxlength={100} />
 										</th>
 									{/each}
 								</tr>
@@ -98,7 +101,7 @@
 					</div>
 					<div class="panel__body panel__body--ruled">
 						<div class="form-actions">
-							<button class="btn btn--primary" type="submit" disabled={enhanced.on && !dirty}><Icon name="check" size={16} />Save</button>
+							<Button class="" type="submit" disabled={enhanced.on && !dirty} variant="default"><Icon name="check" size={16} />Save</Button>
 						</div>
 					</div>
 				</form>
@@ -110,8 +113,8 @@
 					<form method="POST" action="?/createRole" class="form" use:submit={{ reset: true }}>
 						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 						<div class="field">
-							<label for="new-role-name">Name <span class="req" aria-hidden="true">*</span></label>
-							<input class="input" id="new-role-name" name="name" required maxlength="100" />
+							<Label for="new-role-name">Name <span class="req" aria-hidden="true">*</span></Label>
+							<Input class="" id="new-role-name" name="name" required maxlength={100} />
 						</div>
 						<fieldset>
 							<legend class="visually-hidden">Permissions</legend>
@@ -122,7 +125,7 @@
 							</div>
 						</fieldset>
 						<div class="form-actions">
-							<button class="btn btn--primary" type="submit"><Icon name="plus" size={16} />Add role</button>
+							<Button class="" type="submit" variant="default"><Icon name="plus" size={16} />Add role</Button>
 						</div>
 					</form>
 				</div>
@@ -131,10 +134,10 @@
 						<form method="POST" action="?/applyTemplate" class="form form--inline" use:submit>
 							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 							<div class="field">
-								<label for="template-pick">Copy a platform template</label>
+								<Label for="template-pick">Copy a platform template</Label>
 								<Select id="template-pick" name="template_id" items={s.roleTemplates.map((template) => ({ value: String(template.id), label: template.name }))} required />
 							</div>
-							<button class="btn" type="submit"><Icon name="plus" size={16} />Add as role</button>
+							<Button class="" type="submit" variant="outline"><Icon name="plus" size={16} />Add as role</Button>
 						</form>
 					</div>
 				{/if}

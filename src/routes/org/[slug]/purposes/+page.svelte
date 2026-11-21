@@ -1,10 +1,13 @@
 <script lang="ts">
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import { Button } from '$lib/components/ui/button';
 	import { fmtMoney, fmtDate } from '$lib/fmt';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import OrgShell from '$lib/components/OrgShell.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
-	import Select from '$lib/components/ui/Select.svelte';
+	import Select from '$lib/components/ui/FormSelect.svelte';
 	import AvatarStack from '$lib/components/list/AvatarStack.svelte';
 	import FilterBar from '$lib/components/list/FilterBar.svelte';
 	import SummaryCards from '$lib/components/list/SummaryCards.svelte';
@@ -45,7 +48,7 @@
 				<tbody>
 					{#each data.entries as entry (entry.id)}
 						<tr data-tone={entry.tone}>
-							<td><button class="btn btn--quiet btn--sm btn--icon row-expand" aria-label={`Transactions for ${entry.name}`} aria-expanded={expanded.includes(entry.id)} aria-controls={`transactions-${entry.id}`} onclick={() => expanded = expanded.includes(entry.id) ? expanded.filter(id => id !== entry.id) : [...expanded, entry.id]}><Icon name="chevron" size={16} /></button></td>
+							<td><Button class="row-expand" aria-label={`Transactions for ${entry.name}`} aria-expanded={expanded.includes(entry.id)} aria-controls={`transactions-${entry.id}`} onclick={() => expanded = expanded.includes(entry.id) ? expanded.filter(id => id !== entry.id) : [...expanded, entry.id]}><Icon name="chevron" size={16} /></Button></td>
 							<td class="row-identity"><a href={entry.url}>{entry.name}</a><span class="cell__sub">{entry.kindLabel}</span></td>
 							<td class="cell--num">{fmtMoney(entry.totalAllocatedMinor)}</td>
 							<td class="cell--num">{entry.allocationCount}</td>
@@ -79,9 +82,9 @@
 			<div class="panel__body">
 				<form method="POST" action="?/create" class="form form--inline" use:submit use:unsavedGuard>
 					<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
-					<div class="field"><label for="purpose-name">Name</label><input class="input" id="purpose-name" name="name" required maxlength="300" placeholder="Food for June meetup" /></div>
-					<div class="field"><label for="purpose-kind">Records</label><Select id="purpose-kind" name="kind" items={[{ value: 'expense', label: 'Expense' }, { value: 'income', label: 'Income' }]} bind:value={kind} required /></div>
-					<button class="btn btn--primary" type="submit"><Icon name="plus" size={16} />Add purpose</button>
+					<div class="field"><Label for="purpose-name">Name</Label><Input class="" id="purpose-name" name="name" required maxlength={300} placeholder="Food for June meetup" /></div>
+					<div class="field"><Label for="purpose-kind">Records</Label><Select id="purpose-kind" name="kind" items={[{ value: 'expense', label: 'Expense' }, { value: 'income', label: 'Income' }]} bind:value={kind} required /></div>
+					<Button class="" type="submit" variant="default"><Icon name="plus" size={16} />Add purpose</Button>
 				</form>
 			</div>
 		</section>

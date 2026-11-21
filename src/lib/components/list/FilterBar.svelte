@@ -98,5 +98,5 @@
    </Popover.Content>
   </Popover.Root>
  </div>
- {#if chips.length}<div class="mt-2 flex flex-wrap items-center gap-2" aria-label="Active filters">{#each chips as chip (chip.label)}<Badge variant="secondary" class="gap-1">{chip.label}<button type="button" class="inline-flex rounded-sm focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Remove ${chip.label}`} onclick={() => remove(chip)}><Icon name="close" size={12} /></button></Badge>{/each}<Button variant="ghost" size="sm" onclick={() => void navigate(page.url.pathname)}>Clear all</Button></div>{/if}
+ {#if chips.length}<div class="mt-2 flex flex-wrap items-center gap-2" aria-label="Active filters">{#each chips as chip (chip.label)}<Badge variant="secondary" class="gap-1">{chip.label}<Button variant="ghost" size="icon-xs" type="button" class="inline-flex rounded-sm focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Remove ${chip.label}`} onclick={() => remove(chip)}><Icon name="close" size={12} /></Button></Badge>{/each}<Button variant="ghost" size="sm" onclick={() => void navigate(page.url.pathname)}>Clear all</Button></div>{/if}
 </div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Button } from '$lib/components/ui/button';
 	import { fmtDateTime } from '$lib/fmt';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -124,7 +125,7 @@
 			{#if data.ready}
 				<form method="POST" action="?/confirm" use:submit>
 					<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
-					<button class="btn btn--primary" type="submit"><Icon name="check" size={16} />Confirm import</button>
+					<Button class="" type="submit" variant="default"><Icon name="check" size={16} />Confirm import</Button>
 				</form>
 				<span class="muted">Only the new movements above are recorded.</span>
 			{:else}

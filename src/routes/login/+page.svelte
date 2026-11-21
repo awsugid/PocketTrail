@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Button } from '$lib/components/ui/button';
 	import AuthFrame from '$lib/components/AuthFrame.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import { submit } from '$lib/forms';
@@ -105,10 +106,10 @@ interface GoogleIdentity {
 						<form method="POST" action="?/dev" use:submit>
 							<input type="hidden" name="csrf_token" value={data.csrfToken} />
 							<input type="hidden" name="user_id" value={user.id} />
-							<button class="row-button" type="submit">
+							<Button class="row-button" type="submit" variant="outline">
 								<span class="rows__main"><strong>{user.name}</strong><span class="cell__sub">{user.email}</span></span>
 								<Icon name="next" size={16} />
-							</button>
+							</Button>
 						</form>
 					</li>
 				{/each}

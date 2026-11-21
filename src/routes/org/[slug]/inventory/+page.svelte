@@ -1,5 +1,8 @@
 <script lang="ts">
-	import Select from '$lib/components/ui/Select.svelte';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import { Button } from '$lib/components/ui/button';
+	import Select from '$lib/components/ui/FormSelect.svelte';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Notice from '$lib/components/Notice.svelte';
@@ -92,10 +95,10 @@
 											<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 											<input type="hidden" name="id" value={location.id} />
 											<div class="field">
-												<label for="location-name-{location.id}">Name</label>
-												<input class="input" id="location-name-{location.id}" name="name" value={location.name} maxlength="100" required />
+												<Label for="location-name-{location.id}">Name</Label>
+												<Input class="" id="location-name-{location.id}" name="name" value={location.name} maxlength={100} required />
 											</div>
-											<div class="form-actions"><button class="btn" type="submit"><Icon name="check" size={14} />Save location</button></div>
+											<div class="form-actions"><Button class="" type="submit" variant="outline"><Icon name="check" size={14} />Save location</Button></div>
 										</form>
 									</details>
 								{/if}
@@ -105,13 +108,13 @@
 									<form method="POST" action="?/restoreLocation" use:submit>
 										<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 										<input type="hidden" name="id" value={location.id} />
-										<button class="btn btn--sm" type="submit">Restore<span class="visually-hidden"> {location.name}</span></button>
+										<Button class="" type="submit" variant="outline" size="sm">Restore<span class="visually-hidden"> {location.name}</span></Button>
 									</form>
 								{:else}
 									<form method="POST" action="?/archiveLocation" use:submit={{ confirm: `Archive ${location.name}? Stock must be zero. History is retained.`, confirmLabel: 'Archive' }}>
 										<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 										<input type="hidden" name="id" value={location.id} />
-										<button class="btn btn--sm btn--danger" type="submit">Archive<span class="visually-hidden"> {location.name}</span></button>
+										<Button class="" type="submit" variant="destructive" size="sm">Archive<span class="visually-hidden"> {location.name}</span></Button>
 									</form>
 								{/if}
 							{/if}
@@ -129,29 +132,29 @@
 						<form method="POST" action="?/updateStock" class="form" use:submit={{ reset: true }}>
 							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 							<div class="field">
-								<label for="stock-item">Item</label>
+								<Label for="stock-item">Item</Label>
 								<Select id="stock-item" name="item_id" items={data.stockItems.map((item) => ({ value: String(item.id), label: item.name + (item.variant ? ` — ${item.variant}` : '') }))} required />
 							</div>
 							<div class="field">
-								<label for="stock-location">Location</label>
+								<Label for="stock-location">Location</Label>
 								<Select id="stock-location" name="location_id" items={data.locations.map((location) => ({ value: String(location.id), label: location.name }))} required />
 							</div>
 							<div class="form-grid">
 								<div class="field">
-									<label for="stock-direction">Direction</label>
+									<Label for="stock-direction">Direction</Label>
 									<Select id="stock-direction" name="direction" items={[{ value: 'add', label: 'Add' }, { value: 'remove', label: 'Remove' }]} value="add" required />
 								</div>
 								<div class="field">
-									<label for="stock-quantity">Quantity</label>
-									<input class="input" id="stock-quantity" name="quantity" type="number" min="1" step="1" required />
+									<Label for="stock-quantity">Quantity</Label>
+									<Input class="" id="stock-quantity" name="quantity" type="number" min="1" step="1" required />
 								</div>
 							</div>
 							<div class="field">
-								<label for="stock-reason">Reason <span class="req" aria-hidden="true">*</span></label>
-								<input class="input" id="stock-reason" name="reason" required />
+								<Label for="stock-reason">Reason <span class="req" aria-hidden="true">*</span></Label>
+								<Input class="" id="stock-reason" name="reason" required />
 							</div>
 							<div class="form-actions">
-								<button class="btn btn--primary" type="submit"><Icon name="check" size={16} />Record</button>
+								<Button class="" type="submit" variant="default"><Icon name="check" size={16} />Record</Button>
 							</div>
 						</form>
 					</div>
@@ -165,16 +168,16 @@
 								<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 								<div class="form-grid">
 									<div class="field">
-										<label for="item-name">Name <span class="req" aria-hidden="true">*</span></label>
-										<input class="input" id="item-name" name="name" maxlength="100" required />
+										<Label for="item-name">Name <span class="req" aria-hidden="true">*</span></Label>
+										<Input class="" id="item-name" name="name" maxlength={100} required />
 									</div>
 									<div class="field">
-										<label for="item-variant">Variant</label>
-										<input class="input" id="item-variant" name="variant" maxlength="100" placeholder="Size M" />
+										<Label for="item-variant">Variant</Label>
+										<Input class="" id="item-variant" name="variant" maxlength={100} placeholder="Size M" />
 									</div>
 								</div>
 								<div class="form-actions">
-									<button class="btn" type="submit"><Icon name="plus" size={16} />Add item</button>
+									<Button class="" type="submit" variant="outline"><Icon name="plus" size={16} />Add item</Button>
 								</div>
 							</form>
 						</div>
@@ -186,11 +189,11 @@
 							<form method="POST" action="?/addLocation" class="form" use:submit={{ reset: true }}>
 								<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 								<div class="field">
-									<label for="location-name">Name <span class="req" aria-hidden="true">*</span></label>
-									<input class="input" id="location-name" name="name" maxlength="100" required placeholder="Storage or holder" />
+									<Label for="location-name">Name <span class="req" aria-hidden="true">*</span></Label>
+									<Input class="" id="location-name" name="name" maxlength={100} required placeholder="Storage or holder" />
 								</div>
 								<div class="form-actions">
-									<button class="btn" type="submit"><Icon name="plus" size={16} />Add location</button>
+									<Button class="" type="submit" variant="outline"><Icon name="plus" size={16} />Add location</Button>
 								</div>
 							</form>
 						</div>

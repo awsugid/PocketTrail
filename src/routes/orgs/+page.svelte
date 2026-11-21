@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import { Button } from '$lib/components/ui/button';
 	import AccountShell from '$lib/components/AccountShell.svelte';
 	import Empty from '$lib/components/Empty.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -36,9 +39,9 @@
 							</div>
 							<form method="POST" action="/invitations/{invitation.id}/accept" use:guard>
 								<input type="hidden" name="csrf_token" value={data.csrfToken} />
-								<button class="btn btn--primary btn--sm" type="submit">
+								<Button class="" type="submit" variant="default" size="sm">
 									<Icon name="check" size={16} />Accept<span class="visually-hidden"> invitation to {invitation.orgName}</span>
-								</button>
+								</Button>
 							</form>
 						</li>
 					{/each}
@@ -75,13 +78,13 @@
 						<input type="hidden" name="csrf_token" value={data.csrfToken} />
 						<div class="form-grid">
 							<div class="field">
-								<label for="org-name">Name <span class="req" aria-hidden="true">*</span></label>
-								<input class="input" id="org-name" name="name" required maxlength="120" />
+								<Label for="org-name">Name <span class="req" aria-hidden="true">*</span></Label>
+								<Input class="" id="org-name" name="name" required maxlength={120} />
 							</div>
 							<div class="field">
-								<label for="org-slug">URL identifier <span class="req" aria-hidden="true">*</span></label>
-								<input
-									class="input"
+								<Label for="org-slug">URL identifier <span class="req" aria-hidden="true">*</span></Label>
+								<Input
+									class=""
 									id="org-slug"
 									name="slug"
 									required
@@ -93,7 +96,7 @@
 							</div>
 						</div>
 						<div class="form-actions">
-							<button class="btn btn--primary" type="submit"><Icon name="plus" size={16} />Create</button>
+							<Button class="" type="submit" variant="default"><Icon name="plus" size={16} />Create</Button>
 						</div>
 					</form>
 				</div>

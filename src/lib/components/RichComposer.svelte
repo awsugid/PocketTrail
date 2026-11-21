@@ -1,4 +1,9 @@
 <script lang="ts">
+ import * as Tooltip from '$lib/components/ui/tooltip';
+ import { Textarea } from '$lib/components/ui/textarea';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import { Button } from '$lib/components/ui/button';
 	// Dual-mode composer: rich text (contenteditable) and Markdown source,
 	// sharing one restricted-Markdown document (src/lib/markdown.ts renders,
 	// this component serializes back). No-JS baseline: a native textarea under
@@ -39,7 +44,7 @@
 		hint = ''
 	}: Props = $props();
 
-	let textarea: HTMLTextAreaElement;
+	let textarea = $state<HTMLTextAreaElement>(null!);
 	let editor: HTMLDivElement | null = $state(null);
 	let mode: 'rich' | 'md' = $state('rich');
 	let mounted = $state(false);
@@ -552,37 +557,36 @@
 <div class="composer">
 	<div class="composer__bar" role="group" aria-label="Formatting">
 		<div class="seg" role="group" aria-label="Editor mode">
-			<button type="button" class="seg__btn" class:seg__btn--on={mode === 'rich'} aria-pressed={mode === 'rich'} onclick={() => switchMode('rich')}>Rich text</button>
-			<button type="button" class="seg__btn" class:seg__btn--on={mode === 'md'} aria-pressed={mode === 'md'} onclick={() => switchMode('md')}>Markdown</button>
+			<Button type="button" variant={mode === 'rich' ? 'secondary' : 'ghost'} aria-pressed={mode === 'rich'} onclick={() => switchMode('rich')}>Rich text</Button>
+			<Button type="button" variant={mode === 'md' ? 'secondary' : 'ghost'} aria-pressed={mode === 'md'} onclick={() => switchMode('md')}>Markdown</Button>
 		</div>
 		{#if mounted}
 			<div class="composer__tools">
 				{#each TOOLS as tool (tool.key)}
-					<button type="button" class="tool {tool.cls ?? ''}" title={tool.title} aria-label={tool.title} onmousedown={saveSelection} onclick={() => applyTool(tool.key)}>{tool.label}</button>
+					<Tooltip.Provider><Tooltip.Root><Tooltip.Trigger>{#snippet child({ props })}<Button {...props} type="button" class="tool {tool.cls ?? ''}" aria-label={tool.title} onmousedown={saveSelection} onclick={() => applyTool(tool.key)}>{tool.label}</Button>{/snippet}</Tooltip.Trigger><Tooltip.Content>{tool.title}</Tooltip.Content></Tooltip.Root></Tooltip.Provider>
 				{/each}
 			</div>
 		{/if}
 	</div>
 	{#if linkOpen}
 		<div class="composer__link">
-			<label class="visually-hidden" for="{id}-link-url">Link URL</label>
-			<input class="input input--sm" id="{id}-link-url" type="url" bind:value={linkUrl} placeholder="https://" />
-			<button type="button" class="btn btn--sm" onclick={applyLink}>Apply link</button>
-			<button type="button" class="btn btn--sm" onclick={() => (linkOpen = false)}>Cancel</button>
+			<Label class="visually-hidden" for="{id}-link-url">Link URL</Label>
+			<Input class="" id="{id}-link-url" type="url" bind:value={linkUrl} placeholder="https://" />
+			<Button type="button" class="" onclick={applyLink} variant="outline" size="sm">Apply link</Button>
+			<Button type="button" class="" onclick={() => (linkOpen = false)}>Cancel</Button>
 		</div>
 	{/if}
-	<label class="visually-hidden" for={id}>{label}</label>
-	<textarea
-		class="input textarea composer__source"
-		class:composer__source--hidden={mounted && mode === 'rich'}
-		bind:this={textarea}
+	<Label class="visually-hidden" for={id}>{label}</Label>
+	<Textarea
+		class={`composer__source ${mounted && mode === 'rich' ? 'composer__source--hidden' : ''}`}
+		bind:ref={textarea}
 		{id}
 		{name}
 		{placeholder}
 		{required}
 		{maxlength}
 		rows={Number(rows)}
-	>{initial}</textarea>
+	 value={initial} />
 	{#if mounted && mode === 'rich'}
 		<div
 			class="composer__editor md"
@@ -603,12 +607,12 @@
 	{#if mounted && mode === 'rich' && mentionOpen && mentionMatches.length > 0}
 		<div class="composer__mentions" role="listbox" aria-label="Mention a member">
 			{#each mentionMatches as member, index (member.id)}
-				<button
+				<Button
 					type="button"
 					class="composer__mention"
 					role="option"
 					aria-selected={index === mentionIndex}
-					class:composer__mention--on={index === mentionIndex}
+					data-active={index === mentionIndex}
 					onmousedown={(event) => {
 						event.preventDefault();
 						insertMention(member);
@@ -616,7 +620,7 @@
 				>
 					@{member.handle}
 					<span class="muted">{member.name}</span>
-				</button>
+				</Button>
 			{/each}
 		</div>
 	{/if}

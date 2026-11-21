@@ -1,5 +1,9 @@
 <script lang="ts">
-	import Select from '$lib/components/ui/Select.svelte';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import { Textarea } from '$lib/components/ui/textarea';
+	import { Button } from '$lib/components/ui/button';
+	import Select from '$lib/components/ui/FormSelect.svelte';
 	import DatePicker from '$lib/components/ui/DatePicker.svelte';
 	import MoneyInput from '$lib/components/ui/MoneyInput.svelte';
 	import TimeField from '$lib/components/ui/TimeField.svelte';
@@ -37,52 +41,52 @@
 					<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 					<div class="form-grid">
 						<div class="field">
-							<label for="new-pocket">Pocket</label>
+							<Label for="new-pocket">Pocket</Label>
 							<Select id="new-pocket" name="pocket_id" items={data.pockets.map((pocket) => ({ value: String(pocket.id), label: pocket.name }))} required />
 						</div>
 						<div class="field">
-							<label for="new-direction">Direction</label>
+							<Label for="new-direction">Direction</Label>
 							<Select id="new-direction" name="direction" items={[{ value: 'out', label: 'Money out' }, { value: 'in', label: 'Money in' }]} value="out" required />
 						</div>
 						<div class="field">
-							<label for="new-amount">Amount (IDR) <span class="req" aria-hidden="true">*</span></label>
+							<Label for="new-amount">Amount (IDR) <span class="req" aria-hidden="true">*</span></Label>
 							<MoneyInput id="new-amount" name="amount" required />
 						</div>
 						<div class="field">
-							<label for="new-date">Date</label>
+							<Label for="new-date">Date</Label>
 							<DatePicker id="new-date" name="date" value={data.today} required />
 						</div>
 						<div class="field">
-							<label for="new-time">Time</label>
+							<Label for="new-time">Time</Label>
 							<TimeField id="new-time" name="time" />
 						</div>
 						<div class="field">
-							<label for="new-counterparty">Counterparty <span class="req" aria-hidden="true">*</span></label>
-							<input class="input" id="new-counterparty" name="counterparty" required />
+							<Label for="new-counterparty">Counterparty <span class="req" aria-hidden="true">*</span></Label>
+							<Input class="" id="new-counterparty" name="counterparty" required />
 						</div>
 						<div class="field">
-							<label for="new-type">Type</label>
-							<input class="input" id="new-type" name="transaction_type" placeholder="Bank transfer" />
+							<Label for="new-type">Type</Label>
+							<Input class="" id="new-type" name="transaction_type" placeholder="Bank transfer" />
 						</div>
 						<div class="field">
-							<label for="new-balance">Balance after</label>
+							<Label for="new-balance">Balance after</Label>
 							<MoneyInput id="new-balance" name="balance" />
 						</div>
 						<div class="field">
-							<label for="new-responsible">Responsible</label>
+							<Label for="new-responsible">Responsible</Label>
 							<Select id="new-responsible" name="responsible_member_id" items={[{ value: '', label: 'Unassigned' }, ...data.members.map((member) => ({ value: String(member.id), label: member.name }))]} />
 						</div>
 					</div>
 					<div class="field">
-						<label for="new-notes">Bank notes</label>
-						<input class="input" id="new-notes" name="notes" />
+						<Label for="new-notes">Bank notes</Label>
+						<Input class="" id="new-notes" name="notes" />
 					</div>
 					<div class="field">
-						<label for="new-explanation">Explanation</label>
-						<textarea class="input textarea" id="new-explanation" name="explanation"></textarea>
+						<Label for="new-explanation">Explanation</Label>
+						<Textarea class="" id="new-explanation" name="explanation"></Textarea>
 					</div>
 					<div class="form-actions">
-						<button class="btn btn--primary" type="submit"><Icon name="check" size={16} />Record</button>
+						<Button class="" type="submit" variant="default"><Icon name="check" size={16} />Record</Button>
 					</div>
 				</form>
 			</div>
