@@ -24,3 +24,7 @@ __pycache__/
 .svelte-kit/
 
 GoogleSheet/*
+.playwright-mcp/
+.serena/
+.review/
+historical-mobile-view.png
