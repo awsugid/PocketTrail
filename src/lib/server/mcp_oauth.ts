@@ -59,7 +59,7 @@ export async function resolveOAuthClient(id:string,config:string|undefined,fetch
  const cached=clientCache.get(id);if(cached && cached.expires>nowMs())return cached.client;
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),5000);
  try {
- const response=await fetcher(id,{redirect:'error',signal:controller.signal,headers:{accept:'application/json'}});
+ const response=await fetcher(id,{redirect:'manual',signal:controller.signal,headers:{accept:'application/json'}});
  if(!response.ok || Number(response.headers.get('content-length'))>5120 || !response.body)return null;
  const reader=response.body.getReader();let size=0;const chunks:Uint8Array[]=[];
  try {while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>5120){await reader.cancel();return null;}chunks.push(value);}}finally{reader.releaseLock();}
@@ -70,7 +70,7 @@ export async function resolveOAuthClient(id:string,config:string|undefined,fetch
  const control=response.headers.get('cache-control') ?? '',maxAge=Number(control.match(/max-age=(\d+)/i)?.[1] ?? 300);
  if(!/no-store|no-cache/i.test(control) && maxAge>0){if(clientCache.size>=100)clientCache.delete(clientCache.keys().next().value!);clientCache.set(id,{client,expires:nowMs()+Math.min(maxAge,300)*1000});}
  return client;
- }catch{return null;}finally{clearTimeout(timer);}
+ }catch(err){console.warn('CIMD fetch failed',id,err instanceof Error?err.message:err);return null;}finally{clearTimeout(timer);}
 }
 export function pkce(verifier:string){return createHash('sha256').update(verifier).digest('base64url');}
 export async function delegatedCredential(event:Pick<CtxEvent,'platform'|'request'|'url'>){

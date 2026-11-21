@@ -8,10 +8,15 @@ it('validates CIMD identity and public-client metadata',async()=>{
  for(const value of [{...doc,client_id:id+'x'},{...doc,redirect_uris:['http://evil.example/callback']},{...doc,token_endpoint_auth_method:'client_secret_basic'},{...doc,client_name:''}])expect(await resolveOAuthClient(id,undefined,fetcher(value) as typeof fetch)).toBeNull();
  expect(await resolveOAuthClient(id,undefined,fetcher({...doc,padding:'x'.repeat(5120)}) as typeof fetch)).toBeNull();
 });
-it('rejects failed fetches and redirects without following them',async()=>{
+it('uses Workers-compatible manual redirects for CIMD',async()=>{
  let options:RequestInit|undefined;
- expect(await resolveOAuthClient(id,undefined,(async(_url,init)=>{options=init;throw new Error('redirect');}) as typeof fetch)).toBeNull();
- expect(options?.redirect).toBe('error');expect(options?.signal).toBeInstanceOf(AbortSignal);
+ const fetcher=(async(_url,init)=>{options=init;if(init?.redirect!=='manual' && init?.redirect!=='follow')throw new TypeError('Invalid redirect value');return new Response(JSON.stringify(doc),{headers:{'cache-control':'no-store'}});}) as typeof fetch;
+ expect((await resolveOAuthClient(id,undefined,fetcher))?.name).toBe('Client');
+ expect(options?.redirect).toBe('manual');expect(options?.signal).toBeInstanceOf(AbortSignal);
+});
+it('rejects failed fetches and redirects without following them',async()=>{
+ expect(await resolveOAuthClient(id,undefined,(async()=>{throw new Error('redirect');}) as typeof fetch)).toBeNull();
+ expect(await resolveOAuthClient(id,undefined,(async()=>new Response(null,{status:302,headers:{location:'https://other.example/doc'}})) as typeof fetch)).toBeNull();
  expect(await resolveOAuthClient(id,undefined,(async()=>new Response('{}',{status:500})) as typeof fetch)).toBeNull();
 });
 it('blocks non-HTTPS, private, local and IPv6 metadata URLs',()=>{
