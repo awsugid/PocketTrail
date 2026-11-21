@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { encodeToken, hashToken } from '$lib/server/tokens';
-import { googlePicture, validEmail } from '$lib/server/profile';
-import { hostIsLoopback } from '$lib/server/session';
+import { encodeToken, hashToken } from '#lib/server/tokens.ts';
+import { googlePicture, validEmail } from '#lib/server/profile.ts';
+import { hostIsLoopback } from '#lib/server/session.ts';
 
 describe('invitation tokens', () => {
 	it('is url-safe and fixed width', () => {

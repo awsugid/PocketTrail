@@ -1,7 +1,7 @@
 <script lang="ts">
- import {Button} from '$lib/components/ui/button';
-  import {Label} from '$lib/components/ui/label';
-  import * as Select from '$lib/components/ui/select';
+ import {Button} from '#lib/components/ui/button/index.ts';
+  import {Label} from '#lib/components/ui/label/index.ts';
+  import * as Select from '#lib/components/ui/select/index.ts';
   import type {PageData} from './$types';
  let {data}:{data:PageData}=$props();
   let organization=$state('');

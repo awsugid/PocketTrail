@@ -7,8 +7,8 @@
 // join conditions: inventory_levels has no org_id column, so scope rides the
 // item/location joins.
 
-import type { D1Database, D1PreparedStatement } from '$lib/d1';
-import { parseMinor } from '$lib/fmt';
+import type { D1Database, D1PreparedStatement } from '#lib/d1.ts';
+import { parseMinor } from '#lib/fmt.ts';
 import { committedIfChanged } from './audit';
 import { nowMs, qAll } from './db';
 import { memActive, type MemRow } from './rows';

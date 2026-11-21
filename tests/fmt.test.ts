@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { fmtMoney, fmtSize, fmtTs, parseMinor, parseRupiah, rupiahInput, validDate, validTime } from '$lib/fmt';
+import { fmtMoney, fmtSize, fmtTs, parseMinor, parseRupiah, rupiahInput, validDate, validTime } from '#lib/fmt.ts';
 
 describe('money formatting', () => {
 	it('formats the UI contract exactly', () => {

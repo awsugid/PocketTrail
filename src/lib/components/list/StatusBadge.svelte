@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Icon, { type IconName } from '../Icon.svelte';
-	 import { Badge } from '$lib/components/ui/badge';
+	 import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { statuses, type Status } from './helpers';
 	let { status }: { status: Status } = $props();
 	const styles: Record<Status, { tone: string; icon: IconName }> = {

@@ -3,7 +3,7 @@
 # Existing deployment bindings are preserved. Local development uses Wrangler's
 # local D1/R2 emulation; deployment and remote migrations require authorization.
 name = "pockettrail"
-main = ".svelte-kit/cloudflare/_worker.js"
+
 compatibility_date = "2025-09-01"
 # SvelteKit's server runtime imports a small amount of Node surface; the
 # adapter documentation requires this flag for that import graph.

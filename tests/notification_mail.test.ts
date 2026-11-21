@@ -7,12 +7,12 @@ import {
 	digestTxnIds,
 	MAX_ATTEMPTS,
 	scheduleDelivery
-} from '$lib/server/notification_mail';
-import { sendSmtp } from '$lib/server/smtp';
+} from '#lib/server/notification_mail.ts';
+import { sendSmtp } from '#lib/server/smtp.ts';
 
 vi.mock('cloudflare:sockets', () => ({ connect: vi.fn() }));
-vi.mock('$lib/server/smtp', async (original) => {
-	const real = await original<typeof import('$lib/server/smtp')>();
+vi.mock('#lib/server/smtp.ts', async (original) => {
+	const real = await original<typeof import('#lib/server/smtp.ts')>();
 	return { ...real, sendSmtp: vi.fn() };
 });
 

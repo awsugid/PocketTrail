@@ -1,20 +1,20 @@
 <script lang="ts">
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Button } from '$lib/components/ui/button';
-	import { fmtMoney, fmtDate } from '$lib/fmt';
-	import Empty from '$lib/components/Empty.svelte';
-	import Icon from '$lib/components/Icon.svelte';
-	import OrgShell from '$lib/components/OrgShell.svelte';
-	import PageHead from '$lib/components/PageHead.svelte';
-	import Select from '$lib/components/ui/FormSelect.svelte';
-	import AvatarStack from '$lib/components/list/AvatarStack.svelte';
-	import FilterBar from '$lib/components/list/FilterBar.svelte';
-	import SummaryCards from '$lib/components/list/SummaryCards.svelte';
-	import Pagination from '$lib/components/list/Pagination.svelte';
-	import StatusBadge from '$lib/components/list/StatusBadge.svelte';
-	import { statuses, type Status } from '$lib/components/list/helpers';
-	import { submit, unsavedGuard } from '$lib/forms';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { fmtMoney, fmtDate } from '#lib/fmt.ts';
+	import Empty from '#lib/components/Empty.svelte';
+	import Icon from '#lib/components/Icon.svelte';
+	import OrgShell from '#lib/components/OrgShell.svelte';
+	import PageHead from '#lib/components/PageHead.svelte';
+	import Select from '#lib/components/ui/FormSelect.svelte';
+	import AvatarStack from '#lib/components/list/AvatarStack.svelte';
+	import FilterBar from '#lib/components/list/FilterBar.svelte';
+	import SummaryCards from '#lib/components/list/SummaryCards.svelte';
+	import Pagination from '#lib/components/list/Pagination.svelte';
+	import StatusBadge from '#lib/components/list/StatusBadge.svelte';
+	import { statuses, type Status } from '#lib/components/list/helpers.ts';
+	import { submit, unsavedGuard } from '#lib/forms.ts';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

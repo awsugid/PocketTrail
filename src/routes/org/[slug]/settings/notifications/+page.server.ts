@@ -1,10 +1,10 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-import { bindings, requireMember, shellContext } from '$lib/server/auth';
-import { validDate } from '$lib/fmt';
-import { saveNotifications, settingsPageData } from '$lib/server/settings';
-import { settingsForm } from '$lib/server/settings_actions';
+import { bindings, requireMember, shellContext } from '#lib/server/auth.ts';
+import { validDate } from '#lib/fmt.ts';
+import { saveNotifications, settingsPageData } from '#lib/server/settings.ts';
+import { settingsForm } from '#lib/server/settings_actions.ts';
 
 // Notifications: defaults, the transaction-date cutoff, recipient preview, and
 // the outbox (emailed when EMAIL_DELIVERY_ENABLED). Enabling requires a

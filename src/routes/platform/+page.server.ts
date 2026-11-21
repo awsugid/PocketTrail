@@ -1,7 +1,7 @@
 import type { PageServerLoad } from './$types';
 
-import { orgsOfUser } from '$lib/server/auth';
-import { platformPageData, requirePlatformAdmin } from '$lib/server/platform';
+import { orgsOfUser } from '#lib/server/auth.ts';
+import { platformPageData, requirePlatformAdmin } from '#lib/server/platform.ts';
 
 // Platform administration. Being a platform administrator grants no
 // organization access: the page shows accounts, role templates, the global

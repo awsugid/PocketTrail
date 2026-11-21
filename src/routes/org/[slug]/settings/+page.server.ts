@@ -1,10 +1,10 @@
 import type { Actions,PageServerLoad } from './$types';
 
 import { error,redirect } from '@sveltejs/kit';
-import { qAll,nowMs } from '$lib/server/db';
+import { qAll,nowMs } from '#lib/server/db.ts';
 
-import { requireMember, shellContext,verifiedForm } from '$lib/server/auth';
-import { settingsPageData } from '$lib/server/settings';
+import { requireMember, shellContext,verifiedForm } from '#lib/server/auth.ts';
+import { settingsPageData } from '#lib/server/settings.ts';
 
 // Settings index: one page per focused section. This route only summarizes and
 // links; every mutation lives on its section route and re-checks its own

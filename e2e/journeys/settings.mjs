@@ -141,7 +141,7 @@ export async function checks(ctx) {
 	});
 	check('an inventory-only role can be created', inventoryRole.status === 303);
 	const rolesHtml = await (await alice.get('/org/demo-jakarta/settings/roles')).text();
-	const inventoryRoleId = rolesHtml.match(/id="role-name-(\d+)"[^>]*value="Inventory Maintainer"/)?.[1];
+	const inventoryRoleId = rolesHtml.match(/(?=[^>]*value="Inventory Maintainer")[^>]*id="role-name-(\d+)"/)?.[1];
 	check('the inventory role is available for assignment', Boolean(inventoryRoleId));
 	if (inventoryRoleId) {
 		const assigned = await alice.postForm('/org/demo-jakarta/settings/people?/setRole', {

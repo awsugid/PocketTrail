@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import type { D1Database } from '$lib/d1';
+import type { D1Database } from '#lib/d1.ts';
 import { hashToken } from './tokens';
 import { qAll, qOne, exec, nowMs } from './db';
 

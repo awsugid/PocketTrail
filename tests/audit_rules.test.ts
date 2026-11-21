@@ -12,7 +12,7 @@ import {
 	pageOffset,
 	successOwned,
 	targetLabel
-} from '$lib/server/audit_rules';
+} from '#lib/server/audit_rules.ts';
 
 describe('observe', () => {
 	it('records intent for mutations and downloads', () => {

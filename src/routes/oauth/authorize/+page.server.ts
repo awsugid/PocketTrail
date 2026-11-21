@@ -1,6 +1,6 @@
 import { redirect } from '@sveltejs/kit';
-import { requireLogin,orgsOfUser,verifiedForm } from '$lib/server/auth';
-import { authorizationRequest,issueCode } from '$lib/server/mcp_oauth';
+import { requireLogin,orgsOfUser,verifiedForm } from '#lib/server/auth.ts';
+import { authorizationRequest,issueCode } from '#lib/server/mcp_oauth.ts';
 import type { PageServerLoad,Actions } from './$types';
 export const load:PageServerLoad=async(event)=>{
  const request=await authorizationRequest(event);
@@ -10,6 +10,6 @@ export const load:PageServerLoad=async(event)=>{
 };
 export const actions:Actions={default:async(event)=>{
  const login=await requireLogin(event),form=await verifiedForm(event,login.session);
- if(form.get('decision')!=='allow'){const r=await authorizationRequest(event),url=new URL(r.redirectUri);url.searchParams.set('error','access_denied');url.searchParams.set('state',r.state);redirect(303,url.href);}
- redirect(303,await issueCode(event,String(form.get('org_slug') ?? '')));
+ if(form.get('decision')!=='allow'){const r=await authorizationRequest(event),url=new URL(r.redirectUri);url.searchParams.set('error','access_denied');url.searchParams.set('state',r.state);redirect(303,url.href,{external:true});}
+ redirect(303,await issueCode(event,String(form.get('org_slug') ?? '')),{external:true});
 }};

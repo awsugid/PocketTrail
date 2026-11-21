@@ -1,6 +1,6 @@
 <script lang="ts">
  import * as Select from './select';
- import { enhanced, onFormReset } from '$lib/controls.svelte';
+ import { enhanced, onFormReset } from '#lib/controls.svelte.ts';
  interface Props { id: string; name: string; items: { value: string; label: string }[]; value?: string; required?: boolean; disabled?: boolean; auto?: boolean; placeholder?: string; onchange?: (value: string) => void }
  let { id, name, items, value = $bindable(''), required = false, disabled = false, auto = false, placeholder = 'Choose…', onchange }: Props = $props();
  const initial = value;

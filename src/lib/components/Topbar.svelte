@@ -1,8 +1,8 @@
 <script lang="ts">
- import * as Tooltip from '$lib/components/ui/tooltip';
-	import { Button } from '$lib/components/ui/button';
-	import { guard } from '$lib/forms';
-	import { menu } from '$lib/menu';
+ import * as Tooltip from '#lib/components/ui/tooltip/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { guard } from '#lib/forms.ts';
+	import { menu } from '#lib/menu.ts';
 	import Icon from './Icon.svelte';
 
 	interface Props {

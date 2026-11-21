@@ -1,9 +1,9 @@
 <script lang="ts">
- import * as Popover from '$lib/components/ui/popover';
- import * as Command from '$lib/components/ui/command';
- import { Button } from '$lib/components/ui/button';
- import { Badge } from '$lib/components/ui/badge';
- import { Checkbox } from '$lib/components/ui/checkbox';
+ import * as Popover from '#lib/components/ui/popover/index.ts';
+ import * as Command from '#lib/components/ui/command/index.ts';
+ import { Button } from '#lib/components/ui/button/index.ts';
+ import { Badge } from '#lib/components/ui/badge/index.ts';
+ import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
  let { label, items, selected, onchange, members = false }: { label: string; items: { id: number; name: string; usageCount?: number }[]; selected: number[]; onchange: (id: number) => void; members?: boolean } = $props();
 </script>
 <Popover.Root>

@@ -1,16 +1,16 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-import { requireMember, shellContext, verifiedForm, type TenantContext } from '$lib/server/auth';
-import { updateStock } from '$lib/server/stock_action';
-import { maintainInventory } from '$lib/server/inventory_actions';
+import { requireMember, shellContext, verifiedForm, type TenantContext } from '#lib/server/auth.ts';
+import { updateStock } from '#lib/server/stock_action.ts';
+import { maintainInventory } from '#lib/server/inventory_actions.ts';
 import {
 	addItemStatements,
 	addLocationStatements,
 	inventoryItems,
 	inventoryLevels,
 	inventoryLocations
-} from '$lib/server/inventory';
+} from '#lib/server/inventory.ts';
 
 // Inventory viewing accepts ledger viewers or independent inventory maintainers;
 // recording changes requires UpdateStock. Every mutation re-checks its own

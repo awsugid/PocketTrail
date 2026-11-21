@@ -1,6 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { orgsOfUser, requireLogin } from '$lib/server/auth';
+import { orgsOfUser, requireLogin } from '#lib/server/auth.ts';
 
 // Sign-in state decides the landing page; the guards themselves live in
 // $lib/server/auth.

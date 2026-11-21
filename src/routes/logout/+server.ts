@@ -4,8 +4,8 @@ import {
 	assertFormCsrf,
 	assertSameOrigin,
 	sessionOf
-} from '$lib/server/auth';
-import { SESSION_COOKIE } from '$lib/server/session';
+} from '#lib/server/auth.ts';
+import { SESSION_COOKIE } from '#lib/server/session.ts';
 import type { RequestHandler } from './$types';
 
 /** Clears the session cookie. A pre-authentication challenge session keeps the

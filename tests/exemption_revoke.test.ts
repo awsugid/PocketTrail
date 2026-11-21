@@ -1,7 +1,7 @@
 import { it, expect, vi } from 'vitest';
 import { testDatabase } from './helpers/sqlite';
 const state=vi.hoisted(()=>({ctx:null as any,form:null as FormData|null}));
-vi.mock('$lib/server/txns',()=>({requireOrg:async()=>state.ctx,actionForm:async()=>state.form,numericPathId:(raw:string)=>Number(raw),txnShell:async()=>({})}));
+vi.mock('#lib/server/txns.ts',()=>({requireOrg:async()=>state.ctx,actionForm:async()=>state.form,numericPathId:(raw:string)=>Number(raw),txnShell:async()=>({})}));
 import { actions } from '../src/routes/org/[slug]/purposes/[id]/+page.server';
 it('revocation audit identifies exact exemption and scope',async()=>{
  const {db}=testDatabase();

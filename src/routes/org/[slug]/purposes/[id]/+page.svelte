@@ -1,17 +1,17 @@
 <script lang="ts">
- import { Checkbox } from '$lib/components/ui/checkbox';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import { Button } from '$lib/components/ui/button';
-	import Icon, { type IconName } from '$lib/components/Icon.svelte';
-	import MarkdownView from '$lib/components/MarkdownView.svelte';
-	import Notice from '$lib/components/Notice.svelte';
-	import OrgShell from '$lib/components/OrgShell.svelte';
-	import PageHead from '$lib/components/PageHead.svelte';
-	import RichComposer from '$lib/components/RichComposer.svelte';
-	import { submit, unsavedGuard } from '$lib/forms';
-	import { fmtDate } from '$lib/fmt';
+ import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Textarea } from '#lib/components/ui/textarea/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import Icon, { type IconName } from '#lib/components/Icon.svelte';
+	import MarkdownView from '#lib/components/MarkdownView.svelte';
+	import Notice from '#lib/components/Notice.svelte';
+	import OrgShell from '#lib/components/OrgShell.svelte';
+	import PageHead from '#lib/components/PageHead.svelte';
+	import RichComposer from '#lib/components/RichComposer.svelte';
+	import { submit, unsavedGuard } from '#lib/forms.ts';
+	import { fmtDate } from '#lib/fmt.ts';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form?: ActionData } = $props();

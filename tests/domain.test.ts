@@ -13,7 +13,7 @@ import {
 	validateDocumentation,
 	type DecisionOrg,
 	type DomTxn
-} from '$lib/domain';
+} from '#lib/domain.ts';
 
 function org(grants: ReadonlySet<string>): DecisionOrg {
 	return {

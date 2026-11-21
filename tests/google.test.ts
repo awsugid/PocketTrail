@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { headerKid } from '$lib/server/google';
+import { headerKid } from '#lib/server/google.ts';
 
 const part = (json: string) => Buffer.from(json, 'utf8').toString('base64url');
 

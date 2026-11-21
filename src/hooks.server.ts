@@ -1,11 +1,11 @@
-import { sequence } from '@sveltejs/kit/hooks';
+import { env, waitUntil } from 'cloudflare:workers';
 import { error } from '@sveltejs/kit';
-import type { Handle } from '@sveltejs/kit';
+import { sequence, type Handle } from '@sveltejs/kit/hooks';
 
-import { auditBegin, auditFinish, type Attempt } from '$lib/server/audit';
-import { classify, isRealActor } from '$lib/server/audit_rules';
-import { appConfig, sessionOf } from '$lib/server/auth';
-import { bindings } from '$lib/server/auth';
+import { auditBegin, auditFinish, type Attempt } from '#lib/server/audit.ts';
+import { classify, isRealActor } from '#lib/server/audit_rules.ts';
+import { appConfig, sessionOf } from '#lib/server/auth.ts';
+import { bindings } from '#lib/server/auth.ts';
 
 // Response hygiene applied to every response, mirroring `html()` in
 // src/web/mod.rs: authenticated workspace pages are never cached by a shared
@@ -32,7 +32,7 @@ const hygiene: Handle = async ({ event, resolve }) => {
 const auditTrail: Handle = async ({ event, resolve }) => {
 	const post = event.request.method === 'POST';
 	let attempt: Attempt | null = null;
-	let db: import('$lib/d1').D1Database | null = null;
+	let db: import('#lib/d1.ts').D1Database | null = null;
 	try {
 		const config = appConfig(event.platform);
 		if (config.secret) {
@@ -58,15 +58,20 @@ const auditTrail: Handle = async ({ event, resolve }) => {
 	return response;
 };
 
-const oauthTransport: Handle = async ({event,resolve}) => {
- const formType=/^(application\/x-www-form-urlencoded|multipart\/form-data|text\/plain)(;|$)/i.test(event.request.headers.get('content-type') ?? '');
- if(event.url.pathname!=='/oauth/token' && ['POST','PUT','PATCH','DELETE'].includes(event.request.method) && formType && event.request.headers.get('origin')!==event.url.origin)throw error(403,'Cross-site form submissions are forbidden.');
- // OAuth token exchange is a non-cookie public-client endpoint. SvelteKit's
- // browser-form CSRF gate does not apply; exact PKCE/client/resource validation does.
+const oauthTransport: Handle = async ({ event, resolve }) => {
+	const formType = (/^(application\/x-www-form-urlencoded|multipart\/form-data|text\/plain)(;|$)/i).test(event.request.headers.get('content-type') ?? '');
+	if (event.url.pathname !== '/oauth/token' && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(event.request.method) && formType && event.request.headers.get('origin') !== event.url.origin) throw error(403, 'Cross-site form submissions are forbidden.');
+	// OAuth token exchange is a non-cookie public-client endpoint. SvelteKit's
+	// browser-form CSRF gate does not apply; exact PKCE/client/resource validation does.
  if(event.url.pathname==='/oauth/token' && event.request.method==='POST') {
   const {POST}=await import('./routes/oauth/token/+server');
-  return POST(event);
- }
- return resolve(event);
+		return POST(event);
+	}
+	return resolve(event);
 };
-export const handle = sequence(auditTrail, hygiene, oauthTransport);
+// Keep request-scoped binding consumers and their test fixtures unchanged.
+const workerBindings: Handle = ({ event, resolve }) => {
+	Object.assign(event, { platform: { env, ctx: { waitUntil } } });
+	return resolve(event);
+};
+export const handle = sequence(workerBindings, auditTrail, hygiene, oauthTransport);

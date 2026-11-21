@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import AuthFrame from '$lib/components/AuthFrame.svelte';
-	import Icon from '$lib/components/Icon.svelte';
-	import Notice from '$lib/components/Notice.svelte';
-	import { fmtMoment } from '$lib/fmt';
-	import { guard, submit } from '$lib/forms';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import AuthFrame from '#lib/components/AuthFrame.svelte';
+	import Icon from '#lib/components/Icon.svelte';
+	import Notice from '#lib/components/Notice.svelte';
+	import { fmtMoment } from '#lib/fmt.ts';
+	import { guard, submit } from '#lib/forms.ts';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

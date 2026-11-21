@@ -19,13 +19,13 @@ import {
 	purposeStatusLabel,
 	PURPOSE_KIND_LABELS,
 	type PurposeKind
-} from '$lib/purposes';
-import { markdownToPlain } from '$lib/markdown';
+} from '#lib/purposes.ts';
+import { markdownToPlain } from '#lib/markdown.ts';
 import { readListData } from './list_data';
 import { matchesCommon, paginate, type ListFilters } from './list_filters';
-import { fmtMoney, fmtSize, fmtTs } from '$lib/fmt';
-import { PERMISSION_LABELS, type Permission } from '$lib/domain';
-import type { D1Database, D1PreparedStatement, R2Bucket } from '$lib/d1';
+import { fmtMoney, fmtSize, fmtTs } from '#lib/fmt.ts';
+import { PERMISSION_LABELS, type Permission } from '#lib/domain.ts';
+import type { D1Database, D1PreparedStatement, R2Bucket } from '#lib/d1.ts';
 
 // ------------------------------------------------------------------- rows
 

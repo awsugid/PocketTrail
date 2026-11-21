@@ -1,9 +1,9 @@
 import type { Actions, PageServerLoad } from './$types';
 
-import { bindings, requireMember, shellContext } from '$lib/server/auth';
-import { removeMember, restoreMember, setRole, settingsPageData } from '$lib/server/settings';
-import { addPerson } from '$lib/server/people';
-import { intField, settingsForm } from '$lib/server/settings_actions';
+import { bindings, requireMember, shellContext } from '#lib/server/auth.ts';
+import { removeMember, restoreMember, setRole, settingsPageData } from '#lib/server/settings.ts';
+import { addPerson } from '#lib/server/people.ts';
+import { intField, settingsForm } from '#lib/server/settings_actions.ts';
 
 // People: one add action selects immediate membership or a pending invitation.
 // Every action re-checks ManageMembers before reading the form.

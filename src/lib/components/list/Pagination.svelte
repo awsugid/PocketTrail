@@ -1,7 +1,7 @@
 <script lang="ts">
  import { page as current } from '$app/state';
- import * as Pagination from '$lib/components/ui/pagination';
- import { Button } from '$lib/components/ui/button';
+ import * as Pagination from '#lib/components/ui/pagination/index.ts';
+ import { Button } from '#lib/components/ui/button/index.ts';
  import { pageNumbers } from './helpers';
  let { page, pageCount, total, label }: { page: number; pageCount: number; total: number; label: string } = $props();
  const numbers = $derived(pageNumbers(page, pageCount));

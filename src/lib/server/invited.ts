@@ -3,7 +3,7 @@
 // See CONTEXT.md "Invited member". Statements here are composed into the
 // caller's D1 batch so the invitation and its membership change atomically.
 
-import type { D1Database, D1PreparedStatement } from '$lib/d1';
+import type { D1Database, D1PreparedStatement } from '#lib/d1.ts';
 import { PLACEHOLDER_USER_PREFIX } from './rows';
 import { randomHex } from './tokens';
 

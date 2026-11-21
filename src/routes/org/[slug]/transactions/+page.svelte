@@ -1,16 +1,16 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import { fmtMoney } from '$lib/fmt';
-	import Empty from '$lib/components/Empty.svelte';
-	import Icon from '$lib/components/Icon.svelte';
-	import OrgShell from '$lib/components/OrgShell.svelte';
-	import PageHead from '$lib/components/PageHead.svelte';
-	import AvatarStack from '$lib/components/list/AvatarStack.svelte';
-	import FilterBar from '$lib/components/list/FilterBar.svelte';
-	import SummaryCards from '$lib/components/list/SummaryCards.svelte';
-	import Pagination from '$lib/components/list/Pagination.svelte';
-	import StatusBadge from '$lib/components/list/StatusBadge.svelte';
-	import { ledgerDate } from '$lib/components/list/helpers';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { fmtMoney } from '#lib/fmt.ts';
+	import Empty from '#lib/components/Empty.svelte';
+	import Icon from '#lib/components/Icon.svelte';
+	import OrgShell from '#lib/components/OrgShell.svelte';
+	import PageHead from '#lib/components/PageHead.svelte';
+	import AvatarStack from '#lib/components/list/AvatarStack.svelte';
+	import FilterBar from '#lib/components/list/FilterBar.svelte';
+	import SummaryCards from '#lib/components/list/SummaryCards.svelte';
+	import Pagination from '#lib/components/list/Pagination.svelte';
+	import StatusBadge from '#lib/components/list/StatusBadge.svelte';
+	import { ledgerDate } from '#lib/components/list/helpers.ts';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

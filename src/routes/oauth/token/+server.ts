@@ -1,8 +1,8 @@
 import {json} from '@sveltejs/kit';
-import {bindings} from '$lib/server/auth';
-import {resolveOAuthClient,redirectMatches,pkce} from '$lib/server/mcp_oauth';
-import {encodeToken,hashToken} from '$lib/server/tokens';
-import {qOne,nowMs} from '$lib/server/db';
+import {bindings} from '#lib/server/auth.ts';
+import {resolveOAuthClient,redirectMatches,pkce} from '#lib/server/mcp_oauth.ts';
+import {encodeToken,hashToken} from '#lib/server/tokens.ts';
+import {qOne,nowMs} from '#lib/server/db.ts';
 import type {RequestHandler} from '@sveltejs/kit';
 const headers={'cache-control':'no-store','access-control-allow-origin':'*'};
 export const OPTIONS:RequestHandler=()=>new Response(null,{status:204,headers:{'access-control-allow-origin':'*','access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'content-type'}});

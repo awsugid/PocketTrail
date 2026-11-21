@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { DIGEST_WEEK_MS, digestBody, digestDue, shouldNotify } from '$lib/notify_rules';
+import { DIGEST_WEEK_MS, digestBody, digestDue, shouldNotify } from '#lib/notify_rules.ts';
 
 describe('notification gates', () => {
 	it('blocks everything when the org disables notifications', () => {

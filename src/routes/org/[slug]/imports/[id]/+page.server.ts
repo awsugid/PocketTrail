@@ -1,7 +1,7 @@
 import type { Actions, PageServerLoad } from './$types';
 
-import { confirmImport, importBatchPage } from '$lib/server/imports';
-import { actionForm, numericPathId, requireOrg, txnShell } from '$lib/server/txns';
+import { confirmImport, importBatchPage } from '#lib/server/imports.ts';
+import { actionForm, numericPathId, requireOrg, txnShell } from '#lib/server/txns.ts';
 
 // One staged batch: preview before committing, then a result view. The id is
 // looked up with the org id, so a batch from another organization is missing.

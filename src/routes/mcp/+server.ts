@@ -1,10 +1,10 @@
 import { error, json } from '@sveltejs/kit';
-import { bindings } from '$lib/server/auth';
-import { mcpMessage, rpcError, MCP_VERSION, validInitialize } from '$lib/server/mcp';
-import { qOne, exec, nowMs } from '$lib/server/db';
+import { bindings } from '#lib/server/auth.ts';
+import { mcpMessage, rpcError, MCP_VERSION, validInitialize } from '#lib/server/mcp.ts';
+import { qOne, exec, nowMs } from '#lib/server/db.ts';
 import type { RequestHandler } from './$types';
 
-import { delegatedCredential } from '$lib/server/mcp_oauth';
+import { delegatedCredential } from '#lib/server/mcp_oauth.ts';
 async function credentialFor(event:Parameters<RequestHandler>[0]) {
  if(event.url.protocol!=='https:' && !['127.0.0.1','localhost'].includes(event.url.hostname))throw error(403,'HTTPS required.');
  const origin=event.request.headers.get('origin');if(origin && origin!==event.url.origin)throw error(403,'Untrusted MCP Origin.');

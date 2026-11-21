@@ -11,13 +11,13 @@
 // link (product decision); mention and digest emails stay link-only. Rows
 // queued here are emailed when the caller runs scheduleDelivery.
 
-import { extractMentions } from '$lib/mentions';
-import { documentationOwed, incomeComplete, incomeRecipients } from '$lib/domain';
-import { shouldNotify } from '$lib/notify_rules';
+import { extractMentions } from '#lib/mentions.ts';
+import { documentationOwed, incomeComplete, incomeRecipients } from '#lib/domain.ts';
+import { shouldNotify } from '#lib/notify_rules.ts';
 import { permissionsFor, type Permission } from './permissions';
 import { exec, nowMs, qOne } from './db';
 import { evidenceOf, memActive, splitsOf, type MemRow, type OrgRow, type RoleRow, type TxnRow } from './rows';
-import type { D1Database } from '$lib/d1';
+import type { D1Database } from '#lib/d1.ts';
 
 const memberRefs = (mems: readonly MemRow[]) =>
 	mems.map((row) => ({ userId: row.user_id, roleId: row.role_id, active: row.removed_at === null }));

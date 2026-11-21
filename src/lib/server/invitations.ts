@@ -6,7 +6,7 @@
 // hash, and the token never lands in audit rows, logs, or redirects.
 
 import { error, redirect } from '@sveltejs/kit';
-import type { D1Database, D1PreparedStatement, D1Result } from '$lib/d1';
+import type { D1Database, D1PreparedStatement, D1Result } from '#lib/d1.ts';
 import { assertFormCsrf, assertSameOrigin, requireLogin, type CtxEvent, type LoginState } from './auth';
 import { normalizeTarget } from './audit_rules';
 import { nowMs, qAll, qOne } from './db';
@@ -404,7 +404,7 @@ function committedEvent(
 /** Route-layer adapter: build the module context from a requireMember result. */
 export function inviteCtxFrom(
 	ctx: {
-		db: import('$lib/d1').D1Database;
+		db: import('#lib/d1.ts').D1Database;
 		user: { id: string; email: string };
 		org: { id: number; slug: string };
 		memberRows: ReadonlyArray<{ id: number; user_id: string; email: string; removed_at: number | null; invited?: number }>;

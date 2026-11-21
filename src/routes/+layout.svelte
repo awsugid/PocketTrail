@@ -1,8 +1,8 @@
 <script lang="ts">
 	import '../app.css';
 	import { onMount } from 'svelte';
-	import { enhanced } from '$lib/controls.svelte';
-	import { leaveGuard } from '$lib/forms';
+	import { enhanced } from '#lib/controls.svelte.ts';
+	import { leaveGuard } from '#lib/forms.ts';
 
 	let { children } = $props();
 	leaveGuard();

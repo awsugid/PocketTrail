@@ -1,7 +1,7 @@
 // D1 access helpers. Every statement is prepared with bound parameters: no
 // value is ever interpolated into SQL.
 
-import type { D1Database } from '$lib/d1';
+import type { D1Database } from '#lib/d1.ts';
 
 export async function qAll<T>(
 	db: D1Database,

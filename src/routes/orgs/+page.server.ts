@@ -3,8 +3,8 @@
 // Ported from list/create in src/web/orgs.rs.
 
 import type { Actions, PageServerLoad } from './$types';
-import { requireLogin } from '$lib/server/auth';
-import { createOrg, orgsPageData } from '$lib/server/orgs';
+import { requireLogin } from '#lib/server/auth.ts';
+import { createOrg, orgsPageData } from '#lib/server/orgs.ts';
 
 export const load: PageServerLoad = async (event) => {
 	const login = await requireLogin(event);

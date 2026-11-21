@@ -1,6 +1,6 @@
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import { readFileSync, readdirSync } from 'node:fs';
-import type { D1Database, D1PreparedStatement, D1Result } from '$lib/d1';
+import type { D1Database, D1PreparedStatement, D1Result } from '#lib/d1.ts';
 
 /** Adapt a raw node:sqlite database to the D1-shaped surface the server
  * modules expect (numbered bindings, transactional batch). */

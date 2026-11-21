@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { extractMentions, resolveMentions } from '$lib/mentions';
+import { extractMentions, resolveMentions } from '#lib/mentions.ts';
 
 describe('mention extraction', () => {
 	it('matches handles and skips emails', () => {

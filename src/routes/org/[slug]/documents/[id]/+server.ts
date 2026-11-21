@@ -1,4 +1,4 @@
-import { downloadDocument, numericPathId, requireOrg } from '$lib/server/txns';
+import { downloadDocument, numericPathId, requireOrg } from '#lib/server/txns.ts';
 import type { RequestHandler } from './$types';
 
 // Private evidence download. The active-member gate runs first; the row is

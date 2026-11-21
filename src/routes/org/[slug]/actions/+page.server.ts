@@ -1,8 +1,8 @@
-import { requireMember, shellContext } from '$lib/server/auth';
-import { ownActions } from '$lib/server/own_actions';
-import { qAll, qOne } from '$lib/server/db';
-import { incomeRecipients } from '$lib/domain';
-import { owedPurposeState } from '$lib/server/purposes';
+import { requireMember, shellContext } from '#lib/server/auth.ts';
+import { ownActions } from '#lib/server/own_actions.ts';
+import { qAll, qOne } from '#lib/server/db.ts';
+import { incomeRecipients } from '#lib/domain.ts';
+import { owedPurposeState } from '#lib/server/purposes.ts';
 import type { PageServerLoad } from './$types';
 
 // The in-app action list: the member's own documentation tasks and in-flight imports. Expense work on

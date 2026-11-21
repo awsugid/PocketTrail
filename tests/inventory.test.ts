@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { stockApplied, stockUpdateInput } from '$lib/server/inventory';
+import { stockApplied, stockUpdateInput } from '#lib/server/inventory.ts';
 
 describe('stock input validation', () => {
 	it('accepts whole deltas and trims the reason', () => {

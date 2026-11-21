@@ -6,7 +6,7 @@
 // navigation, so an org layout load is chrome, never a security gate.
 
 import { error, redirect, type RequestEvent } from '@sveltejs/kit';
-import type { Bindings, D1Database } from '$lib/d1';
+import type { Bindings, D1Database } from '#lib/d1.ts';
 import { nowSecs, qAll, qOne } from './db';
 import {
 	authorize,

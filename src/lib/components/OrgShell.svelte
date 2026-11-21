@@ -1,6 +1,6 @@
 <script lang="ts">
- import * as Tooltip from '$lib/components/ui/tooltip';
-	import { Button } from '$lib/components/ui/button';
+ import * as Tooltip from '#lib/components/ui/tooltip/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import { afterNavigate } from '$app/navigation';
 	import type { Snippet } from 'svelte';
 	import Icon, { type IconName } from './Icon.svelte';
@@ -19,7 +19,10 @@
 	let { user, org, organizations, access, csrfToken, active, children }: Props = $props();
 
 	let navOpen = $state(false);
-	afterNavigate(() => {
+
+	afterNavigate(({ shallow, type }) => {
+		if (shallow && type === 'goto') return;
+
 		navOpen = false;
 		document.cookie = `pt_org_${encodeURIComponent(user.id)}=${encodeURIComponent(org.slug)}; Path=/; Max-Age=31536000; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
 	});
@@ -30,7 +33,7 @@
 	let narrow = $state(false);
 	$effect(() => {
 		const query = matchMedia('(max-width: 800px)');
-		const sync = () => (narrow = query.matches);
+		const sync = () => narrow = query.matches;
 		sync();
 		query.addEventListener('change', sync);
 		return () => query.removeEventListener('change', sync);
@@ -62,26 +65,61 @@
 	];
 </script>
 
-<svelte:window onkeydown={onKey} />
+<svelte:window onkeydown={onKey}></svelte:window>
 
 <div class="frame">
-	<Topbar {user} {csrfToken} {org} {organizations} locked={drawerOpen} bind:navOpen />
+	<Topbar
+		user={user}
+		csrfToken={csrfToken}
+		org={org}
+		organizations={organizations}
+		locked={drawerOpen}
+		bind:navOpen
+	/>
+
 	<div class="body">
-		<nav class="sidebar" id="org-nav" aria-label="Organization" inert={narrow && !navOpen} data-open={navOpen ? 'true' : undefined}>
-			{#each nav.filter((item) => item.key === 'actions' ? (access.actions ?? access.finance) : item.key === 'inventory' ? access.inventory : access.finance) as item (item.key)}
-				<Tooltip.Provider><Tooltip.Root><Tooltip.Trigger>{#snippet child({ props })}<a {...props}
-					href="/org/{org.slug}/{item.path}"
-					aria-current={active === item.key ? 'page' : undefined}
-				>
+		<nav
+			class="sidebar"
+			id="org-nav"
+			aria-label="Organization"
+			inert={narrow && !navOpen}
+			data-open={navOpen ? 'true' : undefined}
+		>
+			{#each nav.filter((item) => item.key === 'actions'
+				? access.actions ?? access.finance
+				: item.key === 'inventory' ? access.inventory : access.finance) as item (item.key)}
+				<Tooltip.Provider>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<a
+									{...props}
+									href="/org/{org.slug}/{item.path}"
+									aria-current={active === item.key ? 'page' : undefined}
+								>
 					<Icon name={item.icon} /><span class="sidebar__label">{item.label}</span>
 				</a>{/snippet}</Tooltip.Trigger><Tooltip.Content>{item.label}</Tooltip.Content></Tooltip.Root></Tooltip.Provider>
 			{/each}
 		</nav>
-		{#if navOpen}<Button class="scrim" type="button" tabindex={-1} aria-label="Close menu" onclick={() => { navOpen = false; document.getElementById('menu-button')?.focus(); }}></Button>{/if}
-		<main class="main" id="main" tabindex="-1" inert={drawerOpen}>
-			<div class="main__inner">
-				{@render children()}
-			</div>
-		</main>
+
+		{#if navOpen}
+			<Button
+				class="scrim"
+				type="button"
+				tabindex={-1}
+				aria-label="Close menu"
+				onclick={() => {
+					navOpen = false;
+					document.getElementById('menu-button')?.focus();
+				}}
+			/>
+		{/if}
+
+		<main
+			class="main"
+			id="main"
+			tabindex="-1"
+			inert={drawerOpen}
+		><div class="main__inner">{@render children()}</div></main>
 	</div>
 </div>

@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 
-import { requireLogin, verifiedForm } from '$lib/server/auth';
-import { acceptFromOrganizations } from '$lib/server/invitations';
+import { requireLogin, verifiedForm } from '#lib/server/auth.ts';
+import { acceptFromOrganizations } from '#lib/server/invitations.ts';
 
 // POST /invitations/:id/accept — in-app acceptance from the Organizations
 // hub. Same-origin and session CSRF are checked before anything is read or

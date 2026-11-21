@@ -4,8 +4,8 @@
  import { Button } from './button';
  import { Input } from './input';
  import { CalendarDate, type DateValue } from '@internationalized/date';
- import { enhanced, onFormReset } from '$lib/controls.svelte';
- import { fmtDate } from '$lib/fmt';
+ import { enhanced, onFormReset } from '#lib/controls.svelte.ts';
+ import { fmtDate } from '#lib/fmt.ts';
  import Icon from '../Icon.svelte';
  let { id, name, value = $bindable(''), required = false, clearable = false, form }: { id: string; name: string; value?: string; required?: boolean; clearable?: boolean; form?: string } = $props();
  const initial = value;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { composeMessage, sendSmtp, smtpConfig, type SmtpConnect, type SmtpSocket } from '$lib/server/smtp';
+import { composeMessage, sendSmtp, smtpConfig, type SmtpConnect, type SmtpSocket } from '#lib/server/smtp.ts';
 
 const env = {
 	SMTP_HOST: 'mail.example.test', SMTP_PORT: '587',

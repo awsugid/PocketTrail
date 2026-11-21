@@ -1,5 +1,5 @@
-import { actionForm, approve, addComment, requireOrg, numericPathId, requestChanges, saveAllocations, saveDetails, saveTag, submitDocumentation, suppress, txnDetail, txnShell, unsuppress, uploadDocument } from '$lib/server/txns';
-import { qAll } from '$lib/server/db';
+import { actionForm, approve, addComment, requireOrg, numericPathId, requestChanges, saveAllocations, saveDetails, saveTag, submitDocumentation, suppress, txnDetail, txnShell, unsuppress, uploadDocument } from '#lib/server/txns.ts';
+import { qAll } from '#lib/server/db.ts';
 import type { Actions, PageServerLoad } from './$types';
 
 // Per-entry authorization: the row is looked up by (id, org_id) together, so a

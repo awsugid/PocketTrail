@@ -1,16 +1,16 @@
 <script lang="ts">
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Button } from '$lib/components/ui/button';
-	import Checkbox from '$lib/components/ui/LabeledCheckbox.svelte';
-	import Select from '$lib/components/ui/FormSelect.svelte';
-	import Icon from '$lib/components/Icon.svelte';
-	import Notice from '$lib/components/Notice.svelte';
-	import OrgShell from '$lib/components/OrgShell.svelte';
-	import PageHead from '$lib/components/PageHead.svelte';
-	import SettingsNav from '$lib/components/SettingsNav.svelte';
-	import { enhanced } from '$lib/controls.svelte';
-	import { submit, unsavedGuard } from '$lib/forms';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import Checkbox from '#lib/components/ui/LabeledCheckbox.svelte';
+	import Select from '#lib/components/ui/FormSelect.svelte';
+	import Icon from '#lib/components/Icon.svelte';
+	import Notice from '#lib/components/Notice.svelte';
+	import OrgShell from '#lib/components/OrgShell.svelte';
+	import PageHead from '#lib/components/PageHead.svelte';
+	import SettingsNav from '#lib/components/SettingsNav.svelte';
+	import { enhanced } from '#lib/controls.svelte.ts';
+	import { submit, unsavedGuard } from '#lib/forms.ts';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

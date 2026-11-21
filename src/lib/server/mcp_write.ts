@@ -29,7 +29,7 @@ export async function mcpWrite(event:RequestEvent,c:Credential,name:string,args:
   }else if(name==='allocate_transaction'){
  if(args.justification!==undefined && typeof args.justification!=='string')throw error(400,'Invalid justification.');form.set('justification',String(args.justification ?? ''));
  if(!Array.isArray(args.allocations) || args.allocations.length>100)throw error(400,'Allocations array required. This replaces all allocations.');
- const {rupiahInput}=await import('$lib/fmt');
+ const {rupiahInput}=await import('#lib/fmt.ts');
  for(const row of args.allocations){if(!row || Object.keys(row).some(k=>!['purpose_id','amount_minor','responsible_membership_id'].includes(k)) || !Number.isSafeInteger(row.purpose_id) || row.purpose_id<1 || !Number.isSafeInteger(row.amount_minor) || row.amount_minor<1 || (row.responsible_membership_id!=null && (!Number.isSafeInteger(row.responsible_membership_id)||row.responsible_membership_id<1)))throw error(400,'Invalid allocation.');form.append('alloc_purpose[]',String(row.purpose_id));form.append('alloc_amount[]',rupiahInput(row.amount_minor));form.append('alloc_member[]',row.responsible_membership_id==null?'':String(row.responsible_membership_id));}
  const t=await qOne<{responsible_membership_id:number|null}>(ctx.db,'SELECT responsible_membership_id FROM transactions WHERE id=?1 AND org_id=?2',[args.id,ctx.org.id]);if(!t)throw error(404,'Transaction not found.');if(t.responsible_membership_id!==null)form.set('responsible_member_id',String(t.responsible_membership_id));
  }else if(name==='set_income_notes'){

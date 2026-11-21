@@ -2,7 +2,7 @@
  import { Checkbox } from './checkbox';
  import { Label } from './label';
  import type { Snippet } from 'svelte';
- import { onFormReset } from '$lib/controls.svelte';
+ import { onFormReset } from '#lib/controls.svelte.ts';
  let { name, value = 'on', checked = $bindable(false), disabled = false, children }: { name: string; value?: string; checked?: boolean; disabled?: boolean; children: Snippet } = $props();
  const id = $props.id();
  const initial = checked;

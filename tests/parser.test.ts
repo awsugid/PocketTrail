@@ -5,7 +5,7 @@
 // Transaction Details at 55, Notes at 95.
 import { describe, expect, it } from 'vitest';
 
-import { counterpartyDisplay, parseIdrMinor, parseStatement, rowStart, segmentsFrom, toPayloadJson } from '$lib/server/parser';
+import { counterpartyDisplay, parseIdrMinor, parseStatement, rowStart, segmentsFrom, toPayloadJson } from '#lib/server/parser.ts';
 
 // --- synthetic.rs fixtures (same fixed-width geometry as the Rust helpers) ---
 

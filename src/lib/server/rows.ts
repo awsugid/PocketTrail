@@ -1,12 +1,12 @@
 // D1 row structs and domain-aggregate builders, ported from
 // src/web/aggregate.rs. Every read is org-scoped in SQL.
 
-import type { D1Database } from '$lib/d1';
+import type { D1Database } from '#lib/d1.ts';
 import { qAll, qOne } from './db';
 import { counterpartyDisplay } from './ledger';
-import { extractMentions, resolveMentions } from '$lib/mentions';
-import { fmtTs } from '$lib/fmt';
-import { documentationOwed, incomeComplete, runtimeStatus, validateDocumentation, type DomTxn, type DocStatus, type Documentation, type Purpose } from '$lib/domain';
+import { extractMentions, resolveMentions } from '#lib/mentions.ts';
+import { fmtTs } from '#lib/fmt.ts';
+import { documentationOwed, incomeComplete, runtimeStatus, validateDocumentation, type DomTxn, type DocStatus, type Documentation, type Purpose } from '#lib/domain.ts';
 import { parseRolePermissions, type Permission } from './permissions';
 
 export interface OrgRow {

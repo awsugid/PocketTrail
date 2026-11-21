@@ -1,9 +1,9 @@
 import { error } from '@sveltejs/kit';
-import { requireMember, shellContext } from '$lib/server/auth';
-import { fmtTsOrDash } from '$lib/fmt';
-import { inventoryItems, inventoryLevels, inventoryLocations, itemMovements } from '$lib/server/inventory';
-import { updateStock } from '$lib/server/stock_action';
-import { maintainInventory } from '$lib/server/inventory_actions';
+import { requireMember, shellContext } from '#lib/server/auth.ts';
+import { fmtTsOrDash } from '#lib/fmt.ts';
+import { inventoryItems, inventoryLevels, inventoryLocations, itemMovements } from '#lib/server/inventory.ts';
+import { updateStock } from '#lib/server/stock_action.ts';
+import { maintainInventory } from '#lib/server/inventory_actions.ts';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {

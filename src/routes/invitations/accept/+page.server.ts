@@ -1,14 +1,14 @@
 import { error } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-import { bindings } from '$lib/server/auth';
+import { bindings } from '#lib/server/auth.ts';
 import {
 	acceptByLink,
 	pendingFor,
 	tokenTarget,
 	viewerOf
-} from '$lib/server/invitations';
-import { nowMs } from '$lib/server/db';
+} from '#lib/server/invitations.ts';
+import { nowMs } from '#lib/server/db.ts';
 
 // GET /invitations/accept?token=... — the emailed-link page. Viewing needs no
 // login; accepting requires a verified Google sign-in whose email matches.

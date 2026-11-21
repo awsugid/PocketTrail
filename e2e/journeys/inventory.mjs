@@ -141,7 +141,7 @@ export async function checks(ctx) {
 	}
 	const createdHtml = await (await alice.get('/org/demo-jakarta/inventory')).text();
 	const newItem = createdHtml.match(/href="\/org\/demo-jakarta\/inventory\/(\d+)">Synthetic archive item/)?.[1];
-	const newLocation = createdHtml.match(/id="location-name-(\d+)"[^>]*value="Synthetic archive location"/)?.[1];
+	const newLocation = createdHtml.match(/(?=[^>]*value="Synthetic archive location")[^>]*id="location-name-(\d+)"/)?.[1];
 	check('new inventory records are addressable', Boolean(newItem && newLocation));
 	if (newItem && newLocation) {
 		const postItem = (action, fields = {}, token = csrfToken) => alice.postForm(`/org/demo-jakarta/inventory/${newItem}?/${action}`, { csrf_token: token, ...fields });

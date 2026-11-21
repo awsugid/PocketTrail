@@ -1,8 +1,8 @@
 import type { Actions, PageServerLoad } from './$types';
 
-import { requireMember, shellContext } from '$lib/server/auth';
-import { addPocket, setPocketOwner, settingsPageData } from '$lib/server/settings';
-import { intField, settingsForm } from '$lib/server/settings_actions';
+import { requireMember, shellContext } from '#lib/server/auth.ts';
+import { addPocket, setPocketOwner, settingsPageData } from '#lib/server/settings.ts';
+import { intField, settingsForm } from '#lib/server/settings_actions.ts';
 
 // Pockets: names, opening balances and the active owner each pocket requires.
 export const load: PageServerLoad = async (event) => {

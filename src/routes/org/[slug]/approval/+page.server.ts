@@ -1,5 +1,5 @@
-import { requireMember, shellContext } from '$lib/server/auth';
-import { submittedPurposeTasks } from '$lib/server/purposes';
+import { requireMember, shellContext } from '#lib/server/auth.ts';
+import { submittedPurposeTasks } from '#lib/server/purposes.ts';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {

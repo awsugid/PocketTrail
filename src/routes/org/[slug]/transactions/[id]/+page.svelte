@@ -1,18 +1,18 @@
 <script lang="ts">
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import { Button } from '$lib/components/ui/button';
-	import { fmtDateTime, parseRupiah, fmtMoney, rupiahInput } from '$lib/fmt';
-	import Combobox from '$lib/components/ui/LabelCombobox.svelte';
-	import MoneyInput from '$lib/components/ui/MoneyInput.svelte';
-	import Select from '$lib/components/ui/FormSelect.svelte';
-	import Icon, { type IconName } from '$lib/components/Icon.svelte';
-	import Notice from '$lib/components/Notice.svelte';
-	import OrgShell from '$lib/components/OrgShell.svelte';
-	import PageHead from '$lib/components/PageHead.svelte';
-	import RichComposer from '$lib/components/RichComposer.svelte';
-	import { submit, unsavedGuard } from '$lib/forms';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Textarea } from '#lib/components/ui/textarea/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { fmtDateTime, parseRupiah, fmtMoney, rupiahInput } from '#lib/fmt.ts';
+	import Combobox from '#lib/components/ui/LabelCombobox.svelte';
+	import MoneyInput from '#lib/components/ui/MoneyInput.svelte';
+	import Select from '#lib/components/ui/FormSelect.svelte';
+	import Icon, { type IconName } from '#lib/components/Icon.svelte';
+	import Notice from '#lib/components/Notice.svelte';
+	import OrgShell from '#lib/components/OrgShell.svelte';
+	import PageHead from '#lib/components/PageHead.svelte';
+	import RichComposer from '#lib/components/RichComposer.svelte';
+	import { submit, unsavedGuard } from '#lib/forms.ts';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

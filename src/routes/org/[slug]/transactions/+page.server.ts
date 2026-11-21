@@ -1,6 +1,6 @@
-import { requireMember, shellContext } from '$lib/server/auth';
-import { filteredLedgerPage } from '$lib/server/ledger';
-import { parseListFilters } from '$lib/server/list_filters';
+import { requireMember, shellContext } from '#lib/server/auth.ts';
+import { filteredLedgerPage } from '#lib/server/ledger.ts';
+import { parseListFilters } from '#lib/server/list_filters.ts';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {

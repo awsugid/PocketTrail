@@ -3,7 +3,7 @@
  import { Button } from './button';
  import * as Popover from './popover';
  import * as Command from './command';
- import { onFormReset } from '$lib/controls.svelte';
+ import { onFormReset } from '#lib/controls.svelte.ts';
  let { id, name, options, value = $bindable(''), required = false, maxlength }: { id: string; name: string; options: string[]; value?: string; required?: boolean; maxlength?: number } = $props();
  const initial = value;
  let open = $state(false);

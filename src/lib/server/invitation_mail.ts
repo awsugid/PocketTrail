@@ -1,7 +1,7 @@
 // Durable invitation email delivery. Raw tokens live in emailed links only;
 // D1 stores the SHA-256 hash. SMTP is explicitly enabled per environment.
 
-import type { D1Database } from '$lib/d1';
+import type { D1Database } from '#lib/d1.ts';
 import { hashToken } from './tokens';
 import { nowMs, qOne } from './db';
 import { sendSmtp, smtpConfig, SmtpError, type SmtpEnv } from './smtp';

@@ -1,7 +1,7 @@
 import type { Actions, PageServerLoad } from './$types';
 
-import { createImport, importsPageData } from '$lib/server/imports';
-import { actionForm, requireOrg, txnShell } from '$lib/server/txns';
+import { createImport, importsPageData } from '#lib/server/imports.ts';
+import { actionForm, requireOrg, txnShell } from '#lib/server/txns.ts';
 
 // Import landing: batched history plus the staging form. Both the page and the
 // action require ImportStatements; the pocket list is scoped to this org.

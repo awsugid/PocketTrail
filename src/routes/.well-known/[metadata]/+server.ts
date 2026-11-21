@@ -1,5 +1,5 @@
 import {json,error} from '@sveltejs/kit';
-import {MCP_SCOPES} from '$lib/server/mcp_oauth';
+import {MCP_SCOPES} from '#lib/server/mcp_oauth.ts';
 import type {RequestHandler} from './$types';
 export const GET:RequestHandler=({params,url})=>{
  const origin=url.origin;

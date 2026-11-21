@@ -5,10 +5,10 @@
 // same D1 batch as the change it describes.
 
 import { error, redirect } from '@sveltejs/kit';
-import type { D1Database } from '$lib/d1';
-import { ALL_PERMISSIONS, documentationOwed, incomeComplete, incomeRecipients } from '$lib/domain';
-import { parseRupiah, validDate, fmtMoment, fmtTsOrDash as fmtTs } from '$lib/fmt';
-import { digestBody, digestDue } from '$lib/notify_rules';
+import type { D1Database } from '#lib/d1.ts';
+import { ALL_PERMISSIONS, documentationOwed, incomeComplete, incomeRecipients } from '#lib/domain.ts';
+import { parseRupiah, validDate, fmtMoment, fmtTsOrDash as fmtTs } from '#lib/fmt.ts';
+import { digestBody, digestDue } from '#lib/notify_rules.ts';
 import { owedPurposeState } from './purposes';
 import { committed, committedIfChanged, listOrg } from './audit';
 import {

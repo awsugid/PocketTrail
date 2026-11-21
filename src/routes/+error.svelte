@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import AuthFrame from '$lib/components/AuthFrame.svelte';
-	import Icon from '$lib/components/Icon.svelte';
+	import AuthFrame from '#lib/components/AuthFrame.svelte';
+	import Icon from '#lib/components/Icon.svelte';
 
 	const title = $derived(
 		(

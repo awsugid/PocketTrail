@@ -1,15 +1,15 @@
 <script lang="ts">
- import * as Tooltip from '$lib/components/ui/tooltip';
- import { Textarea } from '$lib/components/ui/textarea';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Button } from '$lib/components/ui/button';
+ import * as Tooltip from '#lib/components/ui/tooltip/index.ts';
+ import { Textarea } from '#lib/components/ui/textarea/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	// Dual-mode composer: rich text (contenteditable) and Markdown source,
 	// sharing one restricted-Markdown document (src/lib/markdown.ts renders,
 	// this component serializes back). No-JS baseline: a native textarea under
 	// the same name posts the Markdown source; after hydration the rich
 	// surface replaces it. Toolbar + Markdown shortcuts + @mention autocomplete.
-	import { renderMarkdown } from '$lib/markdown';
+	import { renderMarkdown } from '#lib/markdown.ts';
 
 	interface Member {
 		id: number;

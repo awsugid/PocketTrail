@@ -1,13 +1,13 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import { fmtDateTime } from '$lib/fmt';
-	import Empty from '$lib/components/Empty.svelte';
-	import Icon from '$lib/components/Icon.svelte';
-	import Notice from '$lib/components/Notice.svelte';
-	import OrgShell from '$lib/components/OrgShell.svelte';
-	import PageHead from '$lib/components/PageHead.svelte';
-	import { submit } from '$lib/forms';
-	import { stack } from '$lib/table';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { fmtDateTime } from '#lib/fmt.ts';
+	import Empty from '#lib/components/Empty.svelte';
+	import Icon from '#lib/components/Icon.svelte';
+	import Notice from '#lib/components/Notice.svelte';
+	import OrgShell from '#lib/components/OrgShell.svelte';
+	import PageHead from '#lib/components/PageHead.svelte';
+	import { submit } from '#lib/forms.ts';
+	import { stack } from '#lib/table.ts';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

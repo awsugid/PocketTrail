@@ -4,15 +4,15 @@
 // invited flag. Mirrors the claim upsert in src/routes/login/+page.server.ts
 // (Google itself cannot run in unit tests).
 import { describe, expect, it } from 'vitest';
-import type { D1Database } from '$lib/d1';
+import type { D1Database } from '#lib/d1.ts';
 import { testDatabase } from './helpers/sqlite';
-import { hashToken, encodeToken } from '$lib/server/tokens';
+import { hashToken, encodeToken } from '#lib/server/tokens.ts';
 import {
 	acceptStatements,
 	acceptedInBatch,
 	pendingInvitations
-} from '$lib/server/invitations';
-import { inviteMembershipStatements } from '$lib/server/invited';
+} from '#lib/server/invitations.ts';
+import { inviteMembershipStatements } from '#lib/server/invited.ts';
 
 const NOW = 1_000_000;
 

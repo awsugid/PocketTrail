@@ -1,17 +1,17 @@
 <script lang="ts">
-	import { Label } from '$lib/components/ui/label';
-	import { Button } from '$lib/components/ui/button';
-	import Checkbox from '$lib/components/ui/LabeledCheckbox.svelte';
-	import DatePicker from '$lib/components/ui/DatePicker.svelte';
-	import Empty from '$lib/components/Empty.svelte';
-	import Icon from '$lib/components/Icon.svelte';
-	import Notice from '$lib/components/Notice.svelte';
-	import OrgShell from '$lib/components/OrgShell.svelte';
-	import PageHead from '$lib/components/PageHead.svelte';
-	import SettingsNav from '$lib/components/SettingsNav.svelte';
-	import { fmtDate } from '$lib/fmt';
-	import { guard, submit } from '$lib/forms';
-	import { stack } from '$lib/table';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import Checkbox from '#lib/components/ui/LabeledCheckbox.svelte';
+	import DatePicker from '#lib/components/ui/DatePicker.svelte';
+	import Empty from '#lib/components/Empty.svelte';
+	import Icon from '#lib/components/Icon.svelte';
+	import Notice from '#lib/components/Notice.svelte';
+	import OrgShell from '#lib/components/OrgShell.svelte';
+	import PageHead from '#lib/components/PageHead.svelte';
+	import SettingsNav from '#lib/components/SettingsNav.svelte';
+	import { fmtDate } from '#lib/fmt.ts';
+	import { guard, submit } from '#lib/forms.ts';
+	import { stack } from '#lib/table.ts';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

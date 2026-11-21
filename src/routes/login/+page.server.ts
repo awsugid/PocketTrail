@@ -9,16 +9,16 @@ import {
 	sessionCookie,
 	sessionOf,
 	type UserRow
-} from '$lib/server/auth';
-import { auditEvent } from '$lib/server/audit';
-import { nowMs, nowSecs, qAll, qOne } from '$lib/server/db';
-import { verifyIdToken } from '$lib/server/google';
+} from '#lib/server/auth.ts';
+import { auditEvent } from '#lib/server/audit.ts';
+import { nowMs, nowSecs, qAll, qOne } from '#lib/server/db.ts';
+import { verifyIdToken } from '#lib/server/google.ts';
 import {
 	SESSION_COOKIE,
 	encodeCookie,
 	newSession,
 	type Session
-} from '$lib/server/session';
+} from '#lib/server/session.ts';
 import type { PageServerLoad } from './$types';
 
 function randomHex(bytes: number): string {

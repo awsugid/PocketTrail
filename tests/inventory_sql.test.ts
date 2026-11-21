@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { testDatabase } from './helpers/sqlite';
-import { inventoryItems, inventoryLocations, itemMovements, stockUpdateStatements } from '$lib/server/inventory';
+import { inventoryItems, inventoryLocations, itemMovements, stockUpdateStatements } from '#lib/server/inventory.ts';
 
 let database: ReturnType<typeof testDatabase>;
 beforeEach(() => {

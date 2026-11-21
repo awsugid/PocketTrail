@@ -1,6 +1,6 @@
 <script lang="ts">
-	import * as Tooltip from '$lib/components/ui/tooltip';
-	import Icon, { type IconName } from '$lib/components/Icon.svelte';
+	import * as Tooltip from '#lib/components/ui/tooltip/index.ts';
+	import Icon, { type IconName } from '#lib/components/Icon.svelte';
 
 	let { items }: { items: { label: string; value: string | number; icon: IconName; tone?: string; detail?: string; title?: string }[] } = $props();
 </script>

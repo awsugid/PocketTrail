@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 
-import { verifiedForm } from '$lib/server/auth';
-import { requirePlatformAdmin, saveTemplate } from '$lib/server/platform';
+import { verifiedForm } from '#lib/server/auth.ts';
+import { requirePlatformAdmin, saveTemplate } from '#lib/server/platform.ts';
 
 // POST /platform/role-templates — upsert a named permission bundle that
 // organizations can copy as their own role.

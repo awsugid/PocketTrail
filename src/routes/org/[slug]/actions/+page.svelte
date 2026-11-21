@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { fmtDate } from '$lib/fmt';
-	import Empty from '$lib/components/Empty.svelte';
-	import Icon, { type IconName } from '$lib/components/Icon.svelte';
-	import OrgShell from '$lib/components/OrgShell.svelte';
-	import PageHead from '$lib/components/PageHead.svelte';
+	import { fmtDate } from '#lib/fmt.ts';
+	import Empty from '#lib/components/Empty.svelte';
+	import Icon, { type IconName } from '#lib/components/Icon.svelte';
+	import OrgShell from '#lib/components/OrgShell.svelte';
+	import PageHead from '#lib/components/PageHead.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

@@ -1,4 +1,4 @@
-import { requireOrg, actionForm, numericPathId, txnShell } from '$lib/server/txns';
+import { requireOrg, actionForm, numericPathId, txnShell } from '#lib/server/txns.ts';
 import {
 	purposeDetail,
 	postPurposeMessage,
@@ -6,10 +6,10 @@ import {
 	savePurposeNotes,
 	setPurposeResponsibles,
 	uploadPurposeEvidence
-} from '$lib/server/purposes';
+} from '#lib/server/purposes.ts';
 import { error, fail, redirect } from '@sveltejs/kit';
-import { qOne, nowMs } from '$lib/server/db';
-import { committedIfChanged } from '$lib/server/audit';
+import { qOne, nowMs } from '#lib/server/db.ts';
+import { committedIfChanged } from '#lib/server/audit.ts';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {

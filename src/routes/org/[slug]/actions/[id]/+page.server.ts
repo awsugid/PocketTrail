@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
-import { requireMember, shellContext, verifiedForm } from '$lib/server/auth';
-import { ownAction, explainOwnAction } from '$lib/server/own_actions';
-import { numericPathId } from '$lib/server/txns';
+import { requireMember, shellContext, verifiedForm } from '#lib/server/auth.ts';
+import { ownAction, explainOwnAction } from '#lib/server/own_actions.ts';
+import { numericPathId } from '#lib/server/txns.ts';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {

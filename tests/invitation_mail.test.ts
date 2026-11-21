@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { testDatabase } from './helpers/sqlite';
-import { hashToken } from '$lib/server/tokens';
-import { deliverMail, usableBaseUrl } from '$lib/server/invitation_mail';
-import { sendSmtp } from '$lib/server/smtp';
+import { hashToken } from '#lib/server/tokens.ts';
+import { deliverMail, usableBaseUrl } from '#lib/server/invitation_mail.ts';
+import { sendSmtp } from '#lib/server/smtp.ts';
 
 vi.mock('cloudflare:sockets', () => ({ connect: vi.fn() }));
-vi.mock('$lib/server/smtp', async (original) => {
-	const real = await original<typeof import('$lib/server/smtp')>();
+vi.mock('#lib/server/smtp.ts', async (original) => {
+	const real = await original<typeof import('#lib/server/smtp.ts')>();
 	return { ...real, sendSmtp: vi.fn() };
 });
 

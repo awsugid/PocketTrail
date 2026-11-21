@@ -1,7 +1,7 @@
-import { actionForm, activeMembers, createTransaction, requireOrg, txnShell } from '$lib/server/txns';
-import { nowMs } from '$lib/server/db';
-import { fmtTs } from '$lib/fmt';
-import { pocketsOf } from '$lib/server/rows';
+import { actionForm, activeMembers, createTransaction, requireOrg, txnShell } from '#lib/server/txns.ts';
+import { nowMs } from '#lib/server/db.ts';
+import { fmtTs } from '#lib/fmt.ts';
+import { pocketsOf } from '#lib/server/rows.ts';
 import type { Actions, PageServerLoad } from './$types';
 
 // Manual creation. The page itself needs only ledger visibility; the create

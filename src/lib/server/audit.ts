@@ -4,7 +4,7 @@
 // same transaction. Never store request bodies, query strings, credentials, or
 // amounts.
 
-import type { D1Database, D1PreparedStatement } from '$lib/d1';
+import type { D1Database, D1PreparedStatement } from '#lib/d1.ts';
 import { exec, nowMs, qAll, qOne } from './db';
 import { PAGE_SIZE, normalizeTarget, observe, orgSlug, pageOffset, type ObserveDecision } from './audit_rules';
 

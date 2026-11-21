@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { testDatabase } from './helpers/sqlite';
 
 const state = vi.hoisted(() => ({ ctx: null as any }));
-vi.mock('$lib/server/auth', () => ({ requireMember: async () => state.ctx, shellContext: async () => ({}) }));
+vi.mock('#lib/server/auth.ts', () => ({ requireMember: async () => state.ctx, shellContext: async () => ({}) }));
 import { load } from '../src/routes/org/[slug]/actions/+page.server';
 
 describe('actions queue', () => {

@@ -24,7 +24,7 @@ export type Permission = (typeof PERMISSIONS)[number];
 /** Alternative permissions for a surface shared by independent modules. */
 export type PermissionRequirement = Permission | readonly [Permission, ...Permission[]];
 
-import { PERMISSION_LABELS } from '$lib/domain';
+import { PERMISSION_LABELS } from '#lib/domain.ts';
 
 export { PERMISSION_LABELS };
 

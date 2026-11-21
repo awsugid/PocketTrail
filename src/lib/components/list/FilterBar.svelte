@@ -2,17 +2,17 @@
  import { goto } from '$app/navigation';
  import { page } from '$app/state';
  import { parseDate, type DateValue } from '@internationalized/date';
- import { Button } from '$lib/components/ui/button';
- import { Input } from '$lib/components/ui/input';
- import { Label } from '$lib/components/ui/label';
- import { Badge } from '$lib/components/ui/badge';
- import * as Popover from '$lib/components/ui/popover';
- import * as ToggleGroup from '$lib/components/ui/toggle-group';
- import { RangeCalendar } from '$lib/components/ui/range-calendar';
+ import { Button } from '#lib/components/ui/button/index.ts';
+ import { Input } from '#lib/components/ui/input/index.ts';
+ import { Label } from '#lib/components/ui/label/index.ts';
+ import { Badge } from '#lib/components/ui/badge/index.ts';
+ import * as Popover from '#lib/components/ui/popover/index.ts';
+ import * as ToggleGroup from '#lib/components/ui/toggle-group/index.ts';
+ import { RangeCalendar } from '#lib/components/ui/range-calendar/index.ts';
  import Icon from '../Icon.svelte';
  import SearchIcon from '@lucide/svelte/icons/search';
  import FacetFilter from './FacetFilter.svelte';
- import { fmtDate, fmtMoney, rupiahInput } from '$lib/fmt';
+ import { fmtDate, fmtMoney, rupiahInput } from '#lib/fmt.ts';
  import { filterHref, statuses } from './helpers';
  interface Selection { q: string; status: string | null; from: string | null; to: string | null; min: number | null; max: number | null; dir: string | null; kind: string | null; tag: number[]; responsible: number[]; actor: number[]; purpose: number[]; }
  interface Options { tags: { id: number; name: string; usageCount: number }[]; members: { id: number; name: string }[]; actors: { id: number; name: string; pattern: string; pocketId: number }[]; purposes: { id: number; name: string }[]; }
@@ -22,8 +22,8 @@
  let draft = $state<Selection>(null!);
  let range = $state<{ start: DateValue | undefined; end: DateValue | undefined }>({ start: undefined, end: undefined });
  $effect(() => { query = selection.q; });
- function navigate(href: string) { return goto(href, { keepFocus: true, replaceState: true, noScroll: true }); }
- function change(key: string, value: string, toggle = false) { void navigate(filterHref(page.url, key, value, toggle)); }
+ function navigate(href: string) { return goto(href, { reset: false, replace: true }); }
+ function change(key: string, value: string, toggle = false) { void navigate(filterHref(new URL(page.url.href), key, value, toggle)); }
  $effect(() => {
   const value = query;
   if (value === selection.q) return;

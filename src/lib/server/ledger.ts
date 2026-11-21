@@ -6,8 +6,8 @@
 // to the Rust application. Every read is scoped by org_id in SQL; a row from
 // another organization is indistinguishable from a missing row.
 
-import type { D1Database } from '$lib/d1';
-import { assertSafeMinor, fmtMoney } from '$lib/money';
+import type { D1Database } from '#lib/d1.ts';
+import { assertSafeMinor, fmtMoney } from '#lib/money.ts';
 import { qAll, qOne } from './db';
 import { readListData, type ListViewer } from './list_data';
 import { intersects, matchesCommon, paginate, type ListFilters } from './list_filters';

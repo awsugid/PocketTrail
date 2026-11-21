@@ -97,7 +97,7 @@ export async function checks(ctx) {
 	check('an internal label can still be mapped', mapInternal.status === 303, String(mapInternal.status));
 	ledger = await (await alice.get('/org/demo-jakarta/transactions')).text();
 	check('the open expense moved to the invitee', rowWith(ledger, 'Later Vendor').includes('later@example.test'));
-	check('the internal pocket movement stays with the pocket owner', rowWith(ledger, 'Pocket Money Out').includes('Alice (fixture)'));
+	check('the internal pocket movement stays with the pocket owner', rowWith(ledger, 'JPXRSP3002').includes('Alice (fixture)'));
 
 	// A mapping never moves work that was reassigned by hand: re-mapping to
 	// the same member is a no-op, and a second identical import adds nothing.

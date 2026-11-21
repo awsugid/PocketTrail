@@ -148,7 +148,7 @@ e2e/                       runtime harness, journeys, rendered-UI checks
 docs/                      decisions, deployment notes, validation evidence
 ```
 
-`$lib/server/*` is server-only: SvelteKit refuses to bundle it into the browser,
+`#lib/server/*` is server-only: SvelteKit refuses to bundle it into the browser,
 so signing keys and permission logic cannot reach a client module. There is no
 client-side copy of permission authority; hiding a control is never the gate.
 

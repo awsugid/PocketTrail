@@ -22,9 +22,9 @@
 // transaction's date, counterparty and signed IDR amount; mention and digest
 // emails carry links only.
 
-import type { D1Database } from '$lib/d1';
-import { fmtDate } from '$lib/fmt';
-import { fmtMoney } from '$lib/money';
+import type { D1Database } from '#lib/d1.ts';
+import { fmtDate } from '#lib/fmt.ts';
+import { fmtMoney } from '#lib/money.ts';
 import { nowMs, qAll } from './db';
 import { parseRolePermissions } from './permissions';
 import { counterpartyDisplay } from './ledger';

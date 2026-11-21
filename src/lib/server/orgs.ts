@@ -3,7 +3,7 @@
 // Admin member and pocket owner in one atomic batch.
 
 import { error, redirect } from '@sveltejs/kit';
-import { ALL_PERMISSIONS } from '$lib/domain';
+import { ALL_PERMISSIONS } from '#lib/domain.ts';
 import {
 	assertFormCsrf,
 	assertSameOrigin,

@@ -69,8 +69,8 @@ import {
 	validateAllocations,
 	type AllocationInput,
 	type PurposeKind
-} from '$lib/purposes';
-import { markdownToPlain } from '$lib/markdown';
+} from '#lib/purposes.ts';
+import { markdownToPlain } from '#lib/markdown.ts';
 import {
 	approveTransaction,
 	ALL_PERMISSIONS,
@@ -84,9 +84,9 @@ import {
 	validateDocumentation,
 	type DomTxn,
 	type DomainError
-} from '$lib/domain';
-import { fmtMoney, fmtMoment, fmtSize, fmtTs, parseRupiah, rupiahInput, validDate, validTime } from '$lib/fmt';
-import { r2Bytes, type D1PreparedStatement, type R2Bucket } from '$lib/d1';
+} from '#lib/domain.ts';
+import { fmtMoney, fmtMoment, fmtSize, fmtTs, parseRupiah, rupiahInput, validDate, validTime } from '#lib/fmt.ts';
+import { r2Bytes, type D1PreparedStatement, type R2Bucket } from '#lib/d1.ts';
 
 // --------------------------------------------------------------- request ctx
 
@@ -99,9 +99,9 @@ export interface TxnCtx {
 	config: import('./auth').AppConfig;
 	session: Session;
 	user: UserRow;
-	db: import('$lib/d1').D1Database;
+	db: import('#lib/d1.ts').D1Database;
 	/** Worker bindings (DOCUMENTS bucket for evidence upload/download). */
-	env: import('$lib/d1').Bindings;
+	env: import('#lib/d1.ts').Bindings;
 	org: OrgRow;
 	memberRows: MemRow[];
 	roleRows: RoleRow[];
@@ -121,8 +121,8 @@ function buildCtx(
 	config: import('./auth').AppConfig,
 	session: Session,
 	user: UserRow,
-	db: import('$lib/d1').D1Database,
-	env: import('$lib/d1').Bindings,
+	db: import('#lib/d1.ts').D1Database,
+	env: import('#lib/d1.ts').Bindings,
 	org: OrgRow,
 	memberRows: MemRow[],
 	roleRows: RoleRow[]
@@ -258,7 +258,7 @@ interface FullTxn {
 	evidence: Awaited<ReturnType<typeof evidenceOf>>;
 }
 
-async function loadFull(db: import('$lib/d1').D1Database, orgId: number, txnId: number): Promise<FullTxn | null> {
+async function loadFull(db: import('#lib/d1.ts').D1Database, orgId: number, txnId: number): Promise<FullTxn | null> {
 	const t = await txnById(db, orgId, txnId);
 	if (!t) return null;
 	return {
@@ -967,7 +967,7 @@ export interface AllocationDraftRow {
 
 /** Removes purposes this request created but never allocated (any failure
  * path); a purpose with allocations is never touched. */
-async function cleanupCreatedPurposes(db: import('$lib/d1').D1Database, ids: readonly number[]): Promise<void> {
+async function cleanupCreatedPurposes(db: import('#lib/d1.ts').D1Database, ids: readonly number[]): Promise<void> {
 	for (const id of ids) {
 		await exec(db, 'DELETE FROM purposes WHERE id = ?1 AND NOT EXISTS (SELECT 1 FROM allocations WHERE purpose_id = ?1)', [id]);
 	}

@@ -7,7 +7,7 @@ import { defineConfig } from 'vitest/config';
 // `npm run test:e2e`, which drives the built Worker under `wrangler dev`.
 export default defineConfig({
 	resolve: {
-		// Mirrors the `$lib` alias SvelteKit generates, so tests can import the
+		// Mirrors the `#lib` alias SvelteKit generates, so tests can import the
 		// real modules under test rather than copies.
 		alias: { $lib: fileURLToPath(new URL('./src/lib', import.meta.url)) }
 	},

@@ -62,7 +62,7 @@ function askConfirm(form: HTMLFormElement, trigger: HTMLElement | null, message:
 		};
 		const arm = () => {
 			clearTimeout(timer);
-			timer = setTimeout(() => (box.contains(document.activeElement) ? arm() : done(false, false)), 5000);
+			timer = setTimeout(() => box.contains(document.activeElement) ? arm() : done(false, false), 5000);
 		};
 		yes.addEventListener('click', () => done(true, false));
 		no.addEventListener('click', () => done(false, true));
@@ -134,7 +134,7 @@ function clearError(form: HTMLFormElement) {
 	slot?.remove();
 }
 
-const submitterOf = (submitter: HTMLElement | null) => (submitter instanceof HTMLButtonElement ? submitter : null);
+const submitterOf = (submitter: HTMLElement | null) => submitter instanceof HTMLButtonElement ? submitter : null;
 
 /** `use:submit` for SvelteKit form actions on the same page. */
 export function submit(form: HTMLFormElement, options: SubmitOptions = {}) {
@@ -144,7 +144,7 @@ export function submit(form: HTMLFormElement, options: SubmitOptions = {}) {
 			cancel();
 			return;
 		}
-		if (current.confirm && !(await askConfirm(form, submitter, current.confirm, current.confirmLabel))) {
+		if (current.confirm && !await askConfirm(form, submitter, current.confirm, current.confirmLabel)) {
 			cancel();
 			return;
 		}
@@ -157,7 +157,7 @@ export function submit(form: HTMLFormElement, options: SubmitOptions = {}) {
 			if (button) button.disabled = false;
 			if (result.type === 'redirect') {
 				if (current.reset) form.reset();
-				await goto(result.location, { invalidateAll: true, noScroll: true, keepFocus: true });
+				await goto(result.location, { refreshAll: true, reset: false });
 			} else if (result.type === 'error') {
 				const status = result.status ?? 500;
 				if (status >= 500) return applyAction(result);
@@ -188,7 +188,7 @@ export function guard(form: HTMLFormElement, options: SubmitOptions = {}) {
 		event.preventDefault();
 		if (form.getAttribute('aria-busy') === 'true') return;
 		const button = submitterOf(event.submitter);
-		if (current.confirm && !(await askConfirm(form, button, current.confirm, current.confirmLabel))) return;
+		if (current.confirm && !await askConfirm(form, button, current.confirm, current.confirmLabel)) return;
 		clearError(form);
 		form.setAttribute('aria-busy', 'true');
 		if (button) button.disabled = true;
@@ -200,9 +200,9 @@ export function guard(form: HTMLFormElement, options: SubmitOptions = {}) {
 			});
 			if (response.ok) {
 				if (current.reset) form.reset();
-				await goto(response.url, { invalidateAll: true, noScroll: true, keepFocus: true });
+				await goto(response.url, { refreshAll: true, reset: false });
 			} else {
-				const body = (await response.json().catch(() => null)) as { message?: unknown; field?: unknown } | null;
+				const body = await response.json().catch(() => null) as { message?: unknown; field?: unknown } | null;
 				showError(form, String(body?.message ?? 'Not saved.'), typeof body?.field === 'string' ? body.field : undefined);
 			}
 		} catch {
@@ -232,6 +232,7 @@ const dirtyForms = new Map<HTMLFormElement, (leave: () => void) => void>();
  * form is held and the form shows an inline "Keep editing / Leave" choice. */
 export function leaveGuard() {
 	beforeNavigate((navigation) => {
+		if (navigation.shallow && navigation.type === 'goto') return;
 		if (!navigation.to || navigation.willUnload || navigation.type === 'leave') return;
 		const [form, prompt] = [...dirtyForms].find(([node]) => node.isConnected) ?? [];
 		if (!form || !prompt) return;

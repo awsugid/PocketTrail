@@ -1,5 +1,5 @@
-import type { D1Database } from '$lib/d1';
-import { effectiveResponsibles, type PurposeKind } from '$lib/purposes';
+import type { D1Database } from '#lib/d1.ts';
+import { effectiveResponsibles, type PurposeKind } from '#lib/purposes.ts';
 import { qAll } from './db';
 import { needsDetails } from './ledger';
 import { labelMatches } from './rows';

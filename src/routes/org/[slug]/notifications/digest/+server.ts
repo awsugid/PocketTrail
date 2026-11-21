@@ -1,8 +1,8 @@
 import type { RequestHandler } from './$types';
 
-import { requireMember, verifiedForm } from '$lib/server/auth';
-import { sendDigest, type SettingsCtx } from '$lib/server/settings';
-import { scheduleDelivery } from '$lib/server/notification_mail';
+import { requireMember, verifiedForm } from '#lib/server/auth.ts';
+import { sendDigest, type SettingsCtx } from '#lib/server/settings.ts';
+import { scheduleDelivery } from '#lib/server/notification_mail.ts';
 
 // POST /org/:slug/notifications/digest — the weekly digest (queued, then
 // emailed when EMAIL_DELIVERY_ENABLED), kept at

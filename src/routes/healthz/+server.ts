@@ -1,5 +1,5 @@
-import { appConfig, bindings } from '$lib/server/auth';
-import { hostIsLoopback } from '$lib/server/session';
+import { appConfig, bindings } from '#lib/server/auth.ts';
+import { hostIsLoopback } from '#lib/server/session.ts';
 import type { RequestHandler } from './$types';
 
 /** Liveness. Binding names are reported only to a loopback host in local dev,

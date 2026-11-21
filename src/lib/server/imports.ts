@@ -5,9 +5,9 @@
 // reviewable import items only.
 
 import { error, redirect } from '@sveltejs/kit';
-import { r2Bytes, type D1PreparedStatement, type R2Bucket } from '$lib/d1';
+import { r2Bytes, type D1PreparedStatement, type R2Bucket } from '#lib/d1.ts';
 import { counterpartyDisplay, parseStatement, toPayloadJson, type StatementRowPayload } from './parser';
-import { fmtMoney, fmtMoment, validDate, validTime, MAX_SAFE_MINOR } from '$lib/fmt';
+import { fmtMoney, fmtMoment, validDate, validTime, MAX_SAFE_MINOR } from '#lib/fmt.ts';
 import { activeMem, isInternalMovement, mapCounterparty, mappingsOf, pocketsOf, type MappingRow, type MemRow, type TxnRow } from './rows';
 import { exec, nowMs, qAll, qOne } from './db';
 import { committed } from './audit';

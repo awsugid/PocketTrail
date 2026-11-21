@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { invitationMessage } from '$lib/server/invitation_email';
+import { invitationMessage } from '#lib/server/invitation_email.ts';
 
 const invitation = {
 	email: 'guest@example.test',

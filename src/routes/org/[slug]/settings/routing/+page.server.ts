@@ -1,8 +1,8 @@
 import type { Actions, PageServerLoad } from './$types';
 
-import { requireMember, shellContext } from '$lib/server/auth';
-import { addMapping, deleteMapping, saveIncomeRole, settingsPageData } from '$lib/server/settings';
-import { intField, settingsForm } from '$lib/server/settings_actions';
+import { requireMember, shellContext } from '#lib/server/auth.ts';
+import { addMapping, deleteMapping, saveIncomeRole, settingsPageData } from '#lib/server/settings.ts';
+import { intField, settingsForm } from '#lib/server/settings_actions.ts';
 
 // Routing: statement-label mappings and the income explanation role. Saving a
 // mapping moves matching expenses that still need details (applyMappingToOpen).

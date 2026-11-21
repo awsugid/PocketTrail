@@ -261,7 +261,7 @@ record, and the plan text above is retained as the decision history.
 - **Schema untouched.** `migrations/0001…0010` and `tests/fixtures/seed.sql` are
   the same files the previous implementation used; no framework-coupled database
   redesign happened.
-- **Server-only authority.** `$lib/server/*` holds sessions, permission
+- **Server-only authority.** `#lib/server/*` holds sessions, permission
   evaluation, D1/R2 access, the parser, financial rules, audit and notification
   eligibility. Every protected load, action and endpoint re-authorizes against
   rows read for that request; no layout load acts as a gate.

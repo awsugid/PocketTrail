@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 
-import { verifiedForm } from '$lib/server/auth';
-import { requirePlatformAdmin, setAdmin } from '$lib/server/platform';
+import { verifiedForm } from '#lib/server/auth.ts';
+import { requirePlatformAdmin, setAdmin } from '#lib/server/platform.ts';
 
 // POST /platform/users/admin — grant or revoke platform administration with
 // the actor/count guards and the in-batch outcome probe.

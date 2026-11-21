@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 
-import { requireMember, verifiedForm } from '$lib/server/auth';
-import { inviteCtxFrom, revokeInvitation } from '$lib/server/invitations';
+import { requireMember, verifiedForm } from '#lib/server/auth.ts';
+import { inviteCtxFrom, revokeInvitation } from '#lib/server/invitations.ts';
 
 // POST /org/:slug/settings/invitations/:id/revoke
 export const POST: RequestHandler = async (event) => {
