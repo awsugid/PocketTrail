@@ -136,7 +136,7 @@ describe('read-only MCP',()=>{
  const call=(name:string,args:unknown)=>mcpMessage(db,credential,{jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:args}});
  const hidden=await call('transaction_details',{id:3});
  expect(JSON.stringify(hidden)).toContain('isError'); expect(JSON.stringify(hidden)).not.toContain('-300');
- expect(JSON.stringify(await call('finance_summary',{}))).toContain('total_minor\\\":-300');
+ expect(JSON.parse((await call('finance_summary',{}) as any).result.content[0].text).data).toMatchObject({incomeMinor:100,expenseMinor:300,netMinor:-200});
  expect(await db.prepare('SELECT actor_id,action FROM audit_events LIMIT 1').first()).toEqual({actor_id:null,action:'ai.mcp.read'});
  expect(JSON.stringify(await call('approve',{}))).toContain('Unknown read-only tool');
  expect(JSON.stringify(await call('transaction_details',{id:1,actor:'human'}))).toContain('Invalid arguments');

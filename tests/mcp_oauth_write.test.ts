@@ -29,8 +29,27 @@ it('Google-backed session consents; PKCE exchange, scoped writes and trusted ato
  expect((await (await rpc('tools/list')).json()).result.tools).toHaveLength(8);
  const call=async(name:string,args:unknown)=>(await (await rpc('tools/call',{name,arguments:args})).json()).result;
  expect((await call('list_transactions',{})).isError).toBe(false);
+  const read=async(name:string,args={})=>JSON.parse((await call(name,args)).content[0].text).data;
+  expect(await read('finance_summary')).toEqual((await read('list_transactions')).summary);
+  for(const page of [2,9999]){
+   const listed=await read('list_transactions',{filters:'page='+page});
+   expect(listed).toMatchObject({page:1,selection:{page:1,minMinor:null,maxMinor:null},total:1});
+  }
+  for(const name of ['transaction_details','purpose_details'])expect(await call(name,{id:999999999})).toEqual({isError:true,content:[{type:'text',text:name==='transaction_details'?'Transaction not found':'Purpose not found'}]});
+  const tools=(await (await rpc('tools/list')).json()).result.tools;
+  for(const tool of tools){
+   expect(tool.description.length).toBeGreaterThan(60);
+   expect(tool.annotations).toMatchObject({readOnlyHint:!['set_income_notes','set_transaction_tag','allocate_transaction'].includes(tool.name)});
+   if(!tool.annotations.readOnlyHint)expect(tool.annotations).toMatchObject({destructiveHint:true,idempotentHint:false});
+   const checkProperties=(schema:any)=>{for(const property of Object.values(schema.properties ?? {}) as any[]){expect(property.description).toBeTruthy();if(property.items)checkProperties(property.items);}};
+   checkProperties(tool.inputSchema);
+  }
+  expect(await read('transaction_details',{id:1})).toMatchObject({status:'needs_details',statusLabel:'Needs details',direction:'in',amountMinor:100,revision:0,tags:[]});
   await db.prepare("INSERT INTO purposes(id,org_id,name,kind,created_by_membership_id,created_at,updated_at) VALUES(1,1,'Sponsor','income',1,0,0)").run();
   expect((await call('list_purposes',{})).isError).toBe(false);
+   for(const page of [2,9999])expect(await read('list_purposes',{filters:'page='+page})).toMatchObject({page:1,selection:{page:1},total:1});
+   await db.prepare("INSERT INTO purposes(id,org_id,name,kind,created_by_membership_id,created_at,updated_at) VALUES(99,2,'Foreign','expense',1,0,0)").run();
+   expect(await call('purpose_details',{id:99})).toMatchObject({isError:true,content:[{text:'Purpose not found'}]});
   expect((await call('purpose_details',{id:1})).isError).toBe(false);
    expect((await call('approve_purpose',{id:1,revision:0,note:''})).isError).toBe(true);
    await db.prepare("UPDATE roles SET permissions='[\"ViewTransactions\",\"DocumentTransactions\",\"ApproveTransactions\"]' WHERE id=1").run();

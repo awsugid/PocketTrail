@@ -260,7 +260,7 @@ export async function filteredLedgerPage(db: D1Database, orgId: number, selectio
  const needsAction = rows.filter(t => t.tone === 'action' || t.tone === 'review');
  const summary = {closingBalance:rows[0]?.balanceMinor ?? null,income,expense,net:income-expense,needsActionCount:needsAction.length,needsActionAmount:needsAction.reduce((s,t) => s+Math.abs(t.amountMinor),0),pendingReviewCount:rows.filter(t => t.status === 'pending_review').length,changesRequestedCount:rows.filter(t => t.status === 'changes_requested').length};
  const paged = paginate(rows,selection.page);
- return {...paged, entries:paged.entries.map(t => ({...t,counterparty:counterpartyDisplay(t.counterparty),amount:fmtMoney(t.amountMinor),balance:t.balanceMinor === null ? '—' : fmtMoney(t.balanceMinor),statusLabel:statusLabel(t.status,t.status === 'needs_details')})),summary,selection,filterOptions:data.filterOptions};
+ return {...paged, entries:paged.entries.map(t => ({...t,counterparty:counterpartyDisplay(t.counterparty),amount:fmtMoney(t.amountMinor),balance:t.balanceMinor === null ? '—' : fmtMoney(t.balanceMinor),statusLabel:statusLabel(t.status,t.status === 'needs_details')})),summary,selection:{...selection,page:paged.page},filterOptions:data.filterOptions};
 }
 
 export async function ledgerPage(

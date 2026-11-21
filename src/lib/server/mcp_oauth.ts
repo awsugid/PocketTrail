@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { bindings, requireMember, type CtxEvent } from './auth';
 import { hashToken, encodeToken } from './tokens';
 import { qOne, nowMs } from './db';
-export const MCP_SCOPES=['finance:read','income:write','tags:write','purposes:read','purposes:write'] as const;
+export const MCP_SCOPES=['finance:read','purposes:read','income:write','tags:write','purposes:write'] as const;
 export interface OAuthClient {clientId:string;name:string;redirectUris:string[];scopes:string[]}
 export function oauthClients(config:string|undefined):OAuthClient[]{
  // Private administrator trust config: all callbacks under one client ID must

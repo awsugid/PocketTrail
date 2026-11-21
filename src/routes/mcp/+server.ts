@@ -4,13 +4,13 @@ import { mcpMessage, rpcError, MCP_VERSION, validInitialize } from '#lib/server/
 import { qOne, exec, nowMs } from '#lib/server/db.ts';
 import type { RequestHandler } from './$types';
 
-import { delegatedCredential } from '#lib/server/mcp_oauth.ts';
+import { MCP_SCOPES, delegatedCredential } from '#lib/server/mcp_oauth.ts';
 async function credentialFor(event:Parameters<RequestHandler>[0]) {
  if(event.url.protocol!=='https:' && !['127.0.0.1','localhost'].includes(event.url.hostname))throw error(403,'HTTPS required.');
  const origin=event.request.headers.get('origin');if(origin && origin!==event.url.origin)throw error(403,'Untrusted MCP Origin.');
  return delegatedCredential(event);
 }
-const unauthorized=(url:URL)=>json({error:'unauthorized'},{status:401,headers:{'WWW-Authenticate':`Bearer resource_metadata="${url.origin}/.well-known/oauth-protected-resource", scope="finance:read"`}});
+const unauthorized=(url:URL)=>json({error:'unauthorized'},{status:401,headers:{'WWW-Authenticate':`Bearer resource_metadata="${url.origin}/.well-known/oauth-protected-resource", scope="${MCP_SCOPES.join(' ')}"`}});
 export const POST: RequestHandler = async (event) => {
  const {request,url,platform}=event;
  const env=bindings(platform),credential=await credentialFor(event);
