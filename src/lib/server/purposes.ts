@@ -734,10 +734,21 @@ function purposeAuditStatement(
 		.prepare(
 			'INSERT INTO purpose_audit (org_id,purpose_id,actor_membership_id,action,previous_status,new_status,details,created_at) SELECT ?1,?2,?3,?4,?5,?6,?7,?8 WHERE EXISTS (SELECT 1 FROM purposes WHERE id=?2 AND org_id=?1 AND mutation_token=?9)'
 		)
-		.bind(ctx.org.id, p.id, actorId, action, p.status, newStatus, JSON.stringify(details), nowMs(), token);
+		.bind(ctx.org.id, p.id, actorId, action, p.status, newStatus, JSON.stringify(ctx.delegation ? { actor: `via AI client on behalf of ${ctx.user.name}`, clientId:ctx.delegation.clientId, details } : details), nowMs(), token);
 }
 
 async function commitPurposeMutation(ctx: TxnCtx, id: number, token: string, statements: D1PreparedStatement[]): Promise<boolean> {
+ if(ctx.delegation){
+ statements.unshift(ctx.db.prepare(`INSERT INTO mcp_write_guard(valid) SELECT CASE WHEN EXISTS(
+ SELECT 1 FROM mcp_grants g JOIN memberships m ON m.user_id=g.user_id AND m.org_id=g.org_id JOIN roles r ON r.id=m.role_id AND r.org_id=m.org_id
+ WHERE g.id=?1 AND g.user_id=?2 AND g.org_id=?3 AND g.client_id=?4 AND g.revoked_at IS NULL AND m.removed_at IS NULL AND m.invited=0
+ AND EXISTS(SELECT 1 FROM mcp_tokens t WHERE t.grant_id=g.id AND t.token_hash=?5 AND t.expires_at>?6)
+ AND EXISTS(SELECT 1 FROM json_each(g.scope_json) WHERE value='purposes:write')
+ AND EXISTS(SELECT 1 FROM json_each(r.permissions) WHERE value='ApproveTransactions')
+ AND EXISTS(SELECT 1 FROM json_each(r.permissions) WHERE value='ViewTransactions')
+ AND NOT EXISTS(SELECT 1 FROM json_each(r.permissions) WHERE value='ExplainOwnActions')) THEN 1 ELSE 0 END`).bind(ctx.delegation.grantId,ctx.user.id,ctx.org.id,ctx.delegation.clientId,ctx.delegation.tokenHash,nowMs()));
+ statements.push(ctx.db.prepare(`INSERT INTO audit_events(actor_id,org_id,action,target,outcome,created_at,actor_type,delegated_user_id,client_id) SELECT NULL,?1,'ai.mcp.purpose_review',?2,'committed',?3,'AI',?4,?5 WHERE EXISTS(SELECT 1 FROM purposes WHERE id=?6 AND org_id=?1 AND mutation_token=?7)`).bind(ctx.org.id,`purpose:${id}`,nowMs(),ctx.user.id,ctx.delegation.clientId,id,token));
+ }
 	statements.push(
 		ctx.db.prepare('SELECT mutation_token=?1 AS won FROM purposes WHERE id=?2 AND org_id=?3').bind(token, id, ctx.org.id)
 	);

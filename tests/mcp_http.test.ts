@@ -22,7 +22,7 @@ it('HTTP lifecycle, malformed messages, credentials and session expiry',async()=
  const headers={'mcp-session-id':id,'mcp-protocol-version':'2025-11-25'};
  expect((await post(request('tools/list'),headers)).status).toBe(400);
  expect((await post({jsonrpc:'2.0',method:'notifications/initialized'},headers)).status).toBe(202);
- expect((await (await post(request('tools/list'),headers)).json()).result.tools).toHaveLength(2);
+ expect((await (await post(request('tools/list'),headers)).json()).result.tools).toHaveLength(3);
  await expect(post(request('tools/list'),{...headers,'mcp-protocol-version':'bad'})).rejects.toMatchObject({status:400});
  await db.prepare('UPDATE mcp_sessions SET expires_at=0').run();
  await expect(post(request('tools/list'),headers)).rejects.toMatchObject({status:404});

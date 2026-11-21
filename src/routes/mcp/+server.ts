@@ -35,16 +35,16 @@ export const POST: RequestHandler = async (event) => {
  const response=await mcpMessage(env.DB,credential,body);
  if(!validInitialize(body.params) || body.id===undefined) return json(response ?? rpcError(null,-32600,'Initialization requires request ID'),{status:400});
  const session=crypto.randomUUID();
- await exec(env.DB,'INSERT INTO mcp_sessions(id,credential_hash,expires_at) VALUES(?1,?2,?3)',[session,credential.tokenHash,Math.min(credential.expiresAt,nowMs()+3600000)]);
+ await exec(env.DB,'INSERT INTO mcp_sessions(id,credential_hash,expires_at) VALUES(?1,?2,?3)',[session,credential.grantId!,nowMs()+3600000]);
  return json(response,{headers:{'Mcp-Session-Id':session}});
  }
  const sessionId=request.headers.get('mcp-session-id');
  if(!sessionId) return json(rpcError(body.id ?? null,-32000,'Initialize session first'),{status:400});
- const session=await qOne<{initialized:number}>(env.DB,'SELECT initialized FROM mcp_sessions WHERE id=?1 AND credential_hash=?2 AND expires_at>?3',[sessionId,credential.tokenHash,nowMs()]);
+ const session=await qOne<{initialized:number}>(env.DB,'SELECT initialized FROM mcp_sessions WHERE id=?1 AND credential_hash=?2 AND expires_at>?3',[sessionId,credential.grantId!,nowMs()]);
  if(!session) throw error(404,'MCP session expired or unknown.');
  if(version!==MCP_VERSION) throw error(400,'Negotiated MCP protocol version required.');
  if(body.method==='notifications/initialized' && body.id===undefined) {
- await exec(env.DB,'UPDATE mcp_sessions SET initialized=1 WHERE id=?1 AND credential_hash=?2',[sessionId,credential.tokenHash]);
+ await exec(env.DB,'UPDATE mcp_sessions SET initialized=1 WHERE id=?1 AND credential_hash=?2',[sessionId,credential.grantId!]);
  return new Response(null,{status:202});
  }
  if(!session.initialized && body.method!=='ping') return json(rpcError(body.id ?? null,-32000,'Initialization not completed'),{status:400});
@@ -60,6 +60,6 @@ export const DELETE: RequestHandler = async (event) => {
  if(!credential)return unauthorized(event.url);
  const id=request.headers.get('mcp-session-id');
  if(!id) throw error(400,'MCP session required.');
- await exec(env.DB,'DELETE FROM mcp_sessions WHERE id=?1 AND credential_hash=?2',[id,credential.tokenHash]);
+ await exec(env.DB,'DELETE FROM mcp_sessions WHERE id=?1 AND credential_hash=?2',[id,credential.grantId!]);
  return new Response(null,{status:204});
 };
