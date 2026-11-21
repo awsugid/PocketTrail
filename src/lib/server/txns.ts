@@ -493,6 +493,12 @@ export interface AuditEntryView {
 	createdAt: string;
 }
 
+function evidenceItem(d: import('./rows').DocRow, slug: string, uploadedBy: string | null): EvidenceItem {
+	return { id: String(d.id), url: `/org/${slug}/documents/${d.id}`, filename: d.filename, contentType: d.content_type, sizeBytes: d.size_bytes, sizeDisplay: fmtSize(d.size_bytes), note: d.note, uploadedBy, createdAt: fmtMoment(d.created_at) };
+}
+
+export interface EvidenceItem { id: string; url: string; filename: string; contentType: string | null; sizeBytes?: number | null; note?: string | null; uploadedBy?: string | null; createdAt?: string | null; sizeDisplay: string }
+
 export interface TxnDetail {
 	id: number;
 	revision: number;
@@ -551,6 +557,7 @@ export interface TxnDetail {
 		approveIneligibleReason: string | null;
 		notesPreview: string;
 		url: string;
+		evidence: EvidenceItem[];
 	}>;
 	allocationTotals: { amountMinor: number; allocatedMinor: number; remainderMinor: number; remainder: string; exact: boolean } | null;
 	/** Derived review state once purposes own approval (null while unallocated). */
@@ -559,7 +566,8 @@ export interface TxnDetail {
 	purposes: Array<{ id: number; name: string }>;
 	kindLabel: string;
 	members: Array<{ id: number; name: string; handle: string }>;
-	evidence: Array<{ id: number; filename: string; size: number; sizeDisplay: string; note: string; url: string }>;
+	evidence: EvidenceItem[];
+	unassignedEvidence: EvidenceItem[];
 	comments: Array<{ authorName: string; body: string; createdAt: string }>;
 	approval: { eligible: boolean; ineligibleReason: string | null };
 	reviewDecision: { status: string; statusLabel: string; authorName: string; createdAt: string; note: string } | null;
@@ -620,6 +628,7 @@ export async function txnDetail(ctx: TxnCtx, txnId: number): Promise<TxnDetail> 
 	const responsibleIdsOf = new Map<number, number[]>();
 	const historyIdsOf = new Map<number, number[]>();
 	const evidenceCounts = new Map<number, number>();
+	const purposeEvidence = new Map<number, EvidenceItem[]>();
 	for (const allocation of allocations) {
 		if (!responsibleIdsOf.has(allocation.purpose_id)) {
 			responsibleIdsOf.set(allocation.purpose_id, await purposeResponsibles(ctx.db, allocation.purpose_id));
@@ -633,12 +642,16 @@ export async function txnDetail(ctx: TxnCtx, txnId: number): Promise<TxnDetail> 
 			allocations.map((a) => a.purpose_id)
 		);
 		for (const row of rows) historyIdsOf.set(row.purpose_id, [...(historyIdsOf.get(row.purpose_id) ?? []), row.membership_id]);
-		const docs = await qAll<{ purpose_id: number; n: number }>(
+		const docs = await qAll<import('./rows').DocRow & { uploader_name: string | null }>(
 			ctx.db,
-			`SELECT purpose_id, COUNT(*) AS n FROM documents WHERE purpose_id IN (${allocations.map(() => '?').join(',')}) AND kind='evidence' AND superseded=0 GROUP BY purpose_id`,
-			allocations.map((a) => a.purpose_id)
+			`SELECT d.*, u.name AS uploader_name FROM documents d LEFT JOIN memberships m ON m.id=d.uploaded_by_membership_id LEFT JOIN users u ON u.id=m.user_id WHERE d.org_id=? AND d.purpose_id IN (${allocations.map(() => '?').join(',')}) AND d.kind='evidence' AND d.superseded=0 ORDER BY d.id`,
+			[ctx.org.id, ...allocations.map((a) => a.purpose_id)]
 		);
-		for (const row of docs) evidenceCounts.set(row.purpose_id, row.n);
+		for (const doc of docs) {
+			const id = doc.purpose_id!;
+			purposeEvidence.set(id, [...(purposeEvidence.get(id) ?? []), evidenceItem(doc, ctx.org.slug, doc.uploader_name)]);
+			evidenceCounts.set(id, (evidenceCounts.get(id) ?? 0) + 1);
+		}
 	}
 	const nameOf = (id: number | null | undefined) => memName(ctx, id) ?? 'Unassigned';
 	const allocationViews = allocations.map((a) => {
@@ -675,7 +688,8 @@ export async function txnDetail(ctx: TxnCtx, txnId: number): Promise<TxnDetail> 
 					? 'A member responsible for this purpose, now or before, cannot approve it.'
 					: null,
 			notesPreview: a.purpose_notes.trim() === '' ? '' : markdownToPlain(a.purpose_notes, 120),
-			url: `/org/${ctx.org.slug}/purposes/${a.purpose_id}`
+			url: `/org/${ctx.org.slug}/purposes/${a.purpose_id}`,
+			evidence: purposeEvidence.get(a.purpose_id) ?? []
 		};
 	});
 	const allocatedMinor = allocations.reduce((sum, a) => sum + a.amount_minor, 0);
@@ -707,6 +721,7 @@ export async function txnDetail(ctx: TxnCtx, txnId: number): Promise<TxnDetail> 
 		if (remainderMinor > 0) missing.push(`purpose allocations for the remaining ${fmtMoney(remainderMinor)}`);
 		for (const view of allocationViews) {
 			if (!view.ready) missing.push(`notes or evidence for “${view.purposeName}”`);
+			if (view.evidence.length === 0) missing.push(`${view.purposeName} has no evidence`);
 			if (view.effectiveInactive) missing.push(`an active responsible member for “${view.purposeName}”`);
 		}
 	} else {
@@ -815,14 +830,8 @@ export async function txnDetail(ctx: TxnCtx, txnId: number): Promise<TxnDetail> 
 		purposes: purposeCatalogue,
 		kindLabel: kind === 'income' ? 'Income' : 'Expense',
 		members: activeMembers(ctx),
-		evidence: evidence.map((d) => ({
-			id: d.id,
-			filename: d.filename,
-			size: d.size_bytes,
-			sizeDisplay: fmtSize(d.size_bytes),
-			note: d.note,
-			url: `/org/${ctx.org.slug}/documents/${d.id}`
-		})),
+		evidence: evidence.filter((d) => d.purpose_id === null).map((d) => evidenceItem(d, ctx.org.slug, memName(ctx, d.uploaded_by_membership_id))),
+		unassignedEvidence: t.amount_minor > 0 ? [] : evidence.filter((d) => d.purpose_id === null).map((d) => evidenceItem(d, ctx.org.slug, memName(ctx, d.uploaded_by_membership_id))),
 		comments: comments.map((c) => ({ authorName: c.author_name, body: c.body, createdAt: fmtMoment(c.created_at) })),
 		approval,
 		reviewDecision,
@@ -1317,12 +1326,17 @@ export async function submitDocumentation(ctx: TxnCtx, txnId: number, form: Form
 			throw error(400, `Purpose allocations must add up to ${fmtMoney(bankAbs)} before review.`);
 		}
 		const evidenceCounts = new Map<number, number>();
-		const docs = await qAll<{ purpose_id: number; n: number }>(
+	const purposeEvidence = new Map<number, EvidenceItem[]>();
+		const docs = await qAll<import('./rows').DocRow & { uploader_name: string | null }>(
 			ctx.db,
-			`SELECT purpose_id, COUNT(*) AS n FROM documents WHERE purpose_id IN (${allocations.map(() => '?').join(',')}) AND kind='evidence' AND superseded=0 GROUP BY purpose_id`,
-			allocations.map((a) => a.purpose_id)
+			`SELECT d.*, u.name AS uploader_name FROM documents d LEFT JOIN memberships m ON m.id=d.uploaded_by_membership_id LEFT JOIN users u ON u.id=m.user_id WHERE d.org_id=? AND d.purpose_id IN (${allocations.map(() => '?').join(',')}) AND d.kind='evidence' AND d.superseded=0 ORDER BY d.id`,
+			[ctx.org.id, ...allocations.map((a) => a.purpose_id)]
 		);
-		for (const row of docs) evidenceCounts.set(row.purpose_id, row.n);
+		for (const doc of docs) {
+			const id = doc.purpose_id!;
+			purposeEvidence.set(id, [...(purposeEvidence.get(id) ?? []), evidenceItem(doc, ctx.org.slug, doc.uploader_name)]);
+			evidenceCounts.set(id, (evidenceCounts.get(id) ?? 0) + 1);
+		}
 		for (const allocation of allocations) {
 			if (allocation.purpose_kind === 'income') continue;
 			if (!purposeReady(allocation.purpose_kind, allocation.purpose_notes, evidenceCounts.get(allocation.purpose_id) ?? 0)) {
@@ -1528,7 +1542,7 @@ async function setSuppression(ctx: TxnCtx, txnId: number, form: FormData, suppre
 export async function uploadDocument(ctx: TxnCtx, txnId: number, form: FormData): Promise<never> {
 	const t = await txnById(ctx.db, ctx.org.id, txnId);
 	if (!t) throw error(404, 'Transaction not found.');
-	if (!(await mayDocument(ctx, t))) throw error(403, 'Documentation access denied.');
+	if (t.amount_minor <= 0 || !(await mayDocument(ctx, t))) throw error(403, 'Income documentation access denied.');
 	const value = form.get('file');
 	const file = value instanceof File ? value : null;
 	if (file === null) throw error(400, 'Choose a supporting document.');
@@ -1573,11 +1587,35 @@ export async function uploadDocument(ctx: TxnCtx, txnId: number, form: FormData)
 	return destination(ctx, txnId, t.amount_minor > 0 ? 'Income attachment retained; no approval required' : 'Evidence retained; transaction requires review');
 }
 
+/** Move legacy transaction evidence to one allocated purpose atomically. */
+export async function moveEvidence(ctx: TxnCtx, txnId: number, form: FormData): Promise<never> {
+	const t = await txnById(ctx.db, ctx.org.id, txnId);
+	if (!t) throw error(404, 'Transaction not found.');
+	if (t.amount_minor > 0 || !ctx.can('DocumentTransactions')) throw error(403, 'Documentation access denied.');
+	requireRevision(form, t);
+	const documentId = formInt(form, 'documentId');
+	const purposeId = formInt(form, 'purposeId');
+	if (documentId === null || purposeId === null) throw error(400, 'Choose evidence and a purpose.');
+	const document = await docById(ctx.db, ctx.org.id, documentId);
+	if (!document || document.transaction_id !== txnId || document.purpose_id !== null || document.kind !== 'evidence' || document.superseded !== 0) throw error(404, 'Unassigned evidence not found.');
+	const allocation = await qOne<{ id: number }>(ctx.db, 'SELECT id FROM allocations WHERE org_id=?1 AND transaction_id=?2 AND purpose_id=?3', [ctx.org.id, txnId, purposeId]);
+	if (!allocation) throw error(400, 'Choose a purpose allocated to this transaction.');
+	const token = randomHex(24);
+	const won = await commitMutation(ctx, txnId, token, [
+		ctx.db.prepare('UPDATE transactions SET updated_at=?1,revision=revision+1,mutation_token=?2 WHERE id=?3 AND org_id=?4 AND revision=?5').bind(nowMs(), token, txnId, ctx.org.id, t.revision),
+		ctx.db.prepare("UPDATE documents SET purpose_id=?1,transaction_id=NULL WHERE id=?2 AND org_id=?3 AND transaction_id=?4 AND purpose_id IS NULL AND kind='evidence' AND superseded=0 AND EXISTS(SELECT 1 FROM transactions WHERE id=?4 AND mutation_token=?5) AND EXISTS(SELECT 1 FROM allocations WHERE org_id=?3 AND transaction_id=?4 AND purpose_id=?1)").bind(purposeId, documentId, ctx.org.id, txnId, token),
+		auditStatement(ctx, t, 'evidence_attached', t.status, { filename: document.filename, purposeId }, token),
+		auditEventStatement(ctx, txnId, 'transaction.evidence_attached', token)
+	]);
+	if (!won) throw error(409, 'The transaction changed. Reload before moving evidence.');
+	return destination(ctx, txnId, 'Evidence moved to purpose');
+}
+
 /** GET /org/:slug/documents/:id. Same-org lookup first; without
  * ViewTransactions only income recipients of the tied income transaction may
  * download (purpose evidence requires ViewTransactions). Missing bucket
  * content reports 404 while the metadata row stays. */
-export async function downloadDocument(ctx: TxnCtx, documentId: number): Promise<Response> {
+export async function downloadDocument(ctx: TxnCtx, documentId: number, download = false): Promise<Response> {
 	const document = await docById(ctx.db, ctx.org.id, documentId);
 	if (!document) throw error(404, 'Document not found.');
 	if (!ctx.can('ViewTransactions')) {
@@ -1597,12 +1635,14 @@ export async function downloadDocument(ctx: TxnCtx, documentId: number): Promise
 		.filter((c) => /[A-Za-z0-9._\- ]/.test(c))
 		.slice(0, 160)
 		.join('');
+	const allowed = ['application/pdf', 'image/png', 'image/jpeg'].includes(document.content_type);
 	return new Response(bytes, {
 		headers: {
-			'Content-Type': 'application/octet-stream',
-			'Content-Disposition': `attachment; filename="${filename === '' ? 'document' : filename}"`,
+			'Content-Type': allowed ? document.content_type : 'application/octet-stream',
+			'Content-Disposition': `${download || !allowed ? 'attachment' : 'inline'}; filename="${filename === '' ? 'document' : filename}"`,
 			'Cache-Control': 'private, no-store',
-			'X-Content-Type-Options': 'nosniff'
+			'X-Content-Type-Options': 'nosniff',
+			'Content-Security-Policy': "frame-ancestors 'self'"
 		}
 	});
 }

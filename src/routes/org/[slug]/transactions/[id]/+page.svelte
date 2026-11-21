@@ -8,12 +8,14 @@
 	import MoneyInput from '#lib/components/ui/MoneyInput.svelte';
 	import Select from '#lib/components/ui/FormSelect.svelte';
 	import Icon, { type IconName } from '#lib/components/Icon.svelte';
+	import EvidenceGallery from '#lib/components/EvidenceGallery.svelte';
 	import Notice from '#lib/components/Notice.svelte';
 	import OrgShell from '#lib/components/OrgShell.svelte';
 	import PageHead from '#lib/components/PageHead.svelte';
 	import RichComposer from '#lib/components/RichComposer.svelte';
 	import { submit, unsavedGuard } from '#lib/forms.ts';
 	import type { PageData } from './$types';
+	import { page } from '$app/state';
 
 	let { data }: { data: PageData } = $props();
 
@@ -107,6 +109,9 @@
 		{ value: '', label: txn.isIncome ? 'Not overridden' : 'Inherit' },
 		...txn.members.map((member) => ({ value: String(member.id), label: member.name }))
 	]);
+	let editingAllocations = $state(false);
+	let editingNotes = $state(false);
+	const tab = $derived(['allocations', 'notes', 'discussion', 'history'].includes(page.url.searchParams.get('tab') ?? '') ? page.url.searchParams.get('tab') : 'allocations');
 	const purposeOptions = $derived(txn.purposes.map((purpose) => purpose.name));
 </script>
 
@@ -125,6 +130,8 @@
 			<span>{fmtDateTime(txn.date, txn.time)}</span>
 			<span>{txn.transactionType || 'Movement'}</span>
 			<span>{txn.pocketName}</span>
+			<span>{txn.responsibleName ?? 'No responsible member'}</span>
+			<a href="?tab=discussion"><Icon name="comment" size={14} /> {txn.comments.length}</a>
 		{/snippet}
 	</PageHead>
 
@@ -132,7 +139,7 @@
 
 	{#if txn.missing.length > 0 && !txn.isIncome}
 		<Notice tone="warning">
-			<strong>Needed before review</strong>
+			<strong>Evidence and details</strong>
 			<ul>
 				{#each txn.missing as item (item)}<li>{item}</li>{/each}
 			</ul>
@@ -141,6 +148,7 @@
 
 	<div class="detail-grid">
 		<div class="stack">
+			{#if tab === 'notes'}
 			{#if txn.can.incomeNotes}
 				<section class="panel" aria-labelledby="explain-heading">
 					<div class="panel__head">
@@ -148,6 +156,10 @@
 						<h2 id="explain-heading">Income notes</h2>
 					</div>
 					<div class="panel__body">
+						{#if txn.explanation.trim()}<p class="prose-block">{txn.explanation}</p>{/if}
+						{#if txn.evidenceUnavailableReason.trim()}<p class="muted">No supporting document: {txn.evidenceUnavailableReason}</p>{/if}
+						<button class="btn" type="button" onclick={() => editingNotes = !editingNotes}>{editingNotes ? 'Cancel' : 'Edit'}</button>
+						{#if editingNotes}
 						<form method="POST" action="?/details" class="form" use:submit use:unsavedGuard>
 							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 							<input type="hidden" name="revision" value={txn.revision} />
@@ -159,6 +171,7 @@
 								<Button class="" type="submit" variant="default"><Icon name="check" size={16} />Save notes</Button>
 							</div>
 						</form>
+						{/if}
 					</div>
 				</section>
 			{:else if txn.explanation.trim() !== ''}
@@ -176,6 +189,8 @@
 				</section>
 			{/if}
 
+			{/if}
+			{#if tab === 'allocations'}
 			<section class="panel" aria-labelledby="purposes-heading">
 				<div class="panel__head">
 					<Icon name="tag" size={16} />
@@ -185,7 +200,8 @@
 					{/if}
 				</div>
 				{#if txn.can.allocate}
-					<div class="panel__body">
+					<div class="panel__body"><button class="btn" type="button" onclick={() => editingAllocations = !editingAllocations}>{editingAllocations ? 'Cancel edit' : 'Edit allocations'}</button>
+					{#if editingAllocations}
 						<form method="POST" action="?/allocations" class="form" use:submit use:unsavedGuard>
 							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 							<input type="hidden" name="revision" value={txn.revision} />
@@ -284,7 +300,11 @@
 								<Button class="" type="submit" variant="default"><Icon name="check" size={16} />Save allocations</Button>
 							</div>
 						</form>
-						{#if txn.can.submit && !txn.isIncome}
+					{/if}
+					</div>
+				{/if}
+				{#if txn.can.submit && !txn.isIncome}
+					<div class="panel__body">						{#if txn.can.submit && !txn.isIncome}
 							<form method="POST" action="?/submit" class="gap-top" use:submit>
 								<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 								<input type="hidden" name="revision" value={txn.revision} />
@@ -292,14 +312,15 @@
 							</form>
 						{/if}
 					</div>
-				{:else if txn.allocations.length > 0}
+				{/if}
+				{#if txn.allocations.length > 0}
 					<ul class="rows">
 						{#each txn.allocations as allocation (allocation.id)}
 							<li>
-								<details class="alloc">
-									<summary>
+								<div class="alloc">
+									<div class="alloc-summary">
 										<span class="rows__main">
-											<strong>{allocation.purposeName}</strong>
+											<strong><a href={allocation.url}>{allocation.purposeName}</a></strong>
 											<span class="rows__sub">
 												{allocation.overrideName ? `Handled by ${allocation.overrideName}` : allocation.effectiveNames.length > 0 ? `Responsible: ${allocation.effectiveNames.join(', ')}` : 'No responsible member'}
 											</span>
@@ -308,16 +329,17 @@
 											<span class="cell--nowrap">{allocation.amount}</span>
 											<span class="badge badge--{allocation.statusTone}"><Icon name={statusIcons[allocation.statusTone] ?? 'info'} size={12} />{allocation.statusLabel}</span>
 										</span>
-									</summary>
+									</div>
 									<div class="alloc__body">
 										{#if allocation.notesPreview !== ''}
 											<p class="rows__sub">{allocation.notesPreview}</p>
 										{:else}
 											<p class="rows__sub muted">No Notes yet.</p>
 										{/if}
-										<a class="row-button" href={allocation.url}>Open purpose<Icon name="next" size={14} /></a>
+										<EvidenceGallery items={allocation.evidence} />
+									<a class="row-button" href={allocation.url}>Open purpose<Icon name="next" size={14} /></a>
 									</div>
-								</details>
+								</div>
 							</li>
 						{/each}
 					</ul>
@@ -325,9 +347,9 @@
 						<div class="panel__body panel__body--ruled">
 							<p class="hint" role="status">
 								{#if txn.allocationTotals.exact}
-									Fully allocated.
+									Allocated {fmtMoney(txn.allocationTotals.allocatedMinor)} / {fmtMoney(txn.allocationTotals.amountMinor)}.
 								{:else}
-									{txn.allocationTotals.remainder} remains unallocated.
+									Allocated {fmtMoney(txn.allocationTotals.allocatedMinor)} / {fmtMoney(txn.allocationTotals.amountMinor)} · {txn.allocationTotals.remainder} remains.
 								{/if}
 							</p>
 						</div>
@@ -339,45 +361,35 @@
 				{/if}
 			</section>
 
-			{#if txn.evidence.length > 0 || (txn.can.upload && (txn.isIncome || txn.purposeReview === null))}
-				<section class="panel" aria-labelledby="evidence-heading">
-					<div class="panel__head">
-						<Icon name="file" size={16} />
-						<h2 id="evidence-heading">Documents</h2>
-						{#if txn.evidence.length > 0}<span class="count">{txn.evidence.length}</span>{/if}
-					</div>
-					{#if txn.evidence.length > 0}
-						<ul class="rows">
-							{#each txn.evidence as document (document.id)}
-								<li>
-									<div class="rows__main">
-										<a href={document.url}><Icon name="file" size={14} />{document.filename}</a>
-										<span class="rows__sub">{document.sizeDisplay}{document.note ? ` · ${document.note}` : ''}</span>
-									</div>
-								</li>
+			{#if txn.unassignedEvidence.length > 0}
+				<details class="panel"><summary class="panel__head">Unassigned evidence ({txn.unassignedEvidence.length})</summary>
+					<div class="panel__body"><EvidenceGallery items={txn.unassignedEvidence} />
+						{#if txn.can.allocate && txn.allocations.length > 0}
+							{#each txn.unassignedEvidence as document (document.id)}
+								<form method="POST" action="?/moveEvidence" class="form gap-top" use:submit>
+									<input type="hidden" name="csrf_token" value={data.shell.csrfToken} /><input type="hidden" name="revision" value={txn.revision} /><input type="hidden" name="documentId" value={document.id} />
+									<Label for="move-{document.id}">Move {document.filename} to purpose</Label>
+									<select class="input" id="move-{document.id}" name="purposeId" required><option value="">Choose purpose</option>{#each txn.allocations as allocation (allocation.id)}<option value={allocation.purposeId}>{allocation.purposeName}</option>{/each}</select>
+									<Button type="submit" variant="outline">Move to purpose</Button>
+								</form>
 							{/each}
-						</ul>
-					{/if}
-					{#if txn.can.upload && (txn.isIncome || txn.purposeReview === null)}
-						<div class="panel__body {txn.evidence.length > 0 ? 'panel__body--ruled' : ''}">
-							<form method="POST" action="?/document" enctype="multipart/form-data" class="form form--inline" use:submit={{ reset: true }}>
-								<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
-								<input type="hidden" name="revision" value={txn.revision} />
-								<div class="field">
-									<Label for="evidence-file">Document <span class="muted">(PDF, PNG, JPEG)</span></Label>
-									<Input class="" id="evidence-file" name="file" type="file" accept="application/pdf,image/png,image/jpeg" required />
-								</div>
-								<div class="field">
-									<Label for="evidence-note">Note</Label>
-									<Input class="" id="evidence-note" name="note" />
-								</div>
-								<Button class="" type="submit" variant="outline"><Icon name="upload" size={16} />Attach</Button>
-							</form>
-						</div>
-					{/if}
-				</section>
+						{/if}
+					</div>
+				</details>
 			{/if}
-
+			{#if txn.isIncome && (txn.evidence.length > 0 || txn.can.upload)}
+				<section class="panel"><div class="panel__head"><h2>Income documents</h2></div><div class="panel__body">
+					<EvidenceGallery items={txn.evidence} />
+					{#if txn.can.upload}<form method="POST" action="?/document" enctype="multipart/form-data" class="form gap-top" use:submit={{ reset: true }}>
+						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} /><input type="hidden" name="revision" value={txn.revision} />
+						<div class="field"><Label for="evidence-file">Document (PDF, PNG, JPEG)</Label><Input id="evidence-file" name="file" type="file" accept="application/pdf,image/png,image/jpeg" required /></div>
+						<div class="field"><Label for="evidence-note">Note</Label><Input id="evidence-note" name="note" /></div>
+						<Button type="submit" variant="outline">Attach</Button>
+					</form>{/if}
+				</div></section>
+			{/if}
+			{/if}
+			{#if tab === 'discussion'}
 			{#if txn.comments.length > 0 || txn.can.comment}
 				<section class="panel" aria-labelledby="discussion-heading">
 					<div class="panel__head">
@@ -419,7 +431,8 @@
 				</section>
 			{/if}
 
-			{#if txn.audit.length > 0}
+			{/if}
+			{#if tab === 'history' && txn.audit.length > 0}
 				<section class="panel" aria-labelledby="history-heading">
 					<div class="panel__head">
 						<Icon name="history" size={16} />
@@ -449,6 +462,11 @@
 		</div>
 
 		<aside class="stack" aria-labelledby="facts-heading">
+			<section class="panel">
+				<div class="panel__head"><Icon name="info" size={16} /><h2 id="facts-heading">Details</h2></div>
+				<dl class="panel__body facts"><dt>Bank account</dt><dd>{txn.counterpartyDisplay.bankAccount ?? '—'}</dd><dt>Jago ID</dt><dd class="mono">{txn.bankId || '—'}</dd><dt>Balance after</dt><dd>{txn.balance}</dd></dl>
+				{#if txn.bankNotes.trim()}<div class="panel__body panel__body--ruled"><h3>Bank notes</h3><p class="prose-block">{txn.bankNotes}</p></div>{/if}
+			</section>
 			<section class="panel" aria-labelledby="tags-heading">
 				<div class="panel__head"><Icon name="tag" size={16} /><h2 id="tags-heading">Tags</h2></div>
 				<div class="panel__body">
@@ -471,45 +489,6 @@
 					{/if}
 				</div>
 			</section>
-			<section class="panel">
-				<div class="panel__head">
-					<Icon name="info" size={16} />
-					<h2 id="facts-heading">Facts</h2>
-				</div>
-				<dl class="panel__body facts">
-					<dt>Date</dt>
-					<dd>{fmtDateTime(txn.date, txn.time)}</dd>
-					<dt>Amount</dt>
-					<dd>{txn.amount}</dd>
-					<dt>Balance after</dt>
-					<dd>{txn.balance}</dd>
-					<dt>Pocket</dt>
-					<dd>{txn.pocketName}</dd>
-					<dt>Counterparty</dt>
-					<dd>
-						{txn.counterpartyDisplay.name}
-						{#if txn.counterpartyDisplay.bankAccount}
-							<span class="cell__sub">{txn.counterpartyDisplay.bankAccount}</span>
-						{/if}
-					</dd>
-					<dt>Jago ID</dt>
-					<dd class="mono">{txn.bankId || '—'}</dd>
-					<dt>Inherited responsible</dt>
-					<dd>
-						{txn.responsibleName ?? '—'}
-						{#if txn.responsibleInactive}
-							<span class="cell__sub">Inactive — reassign or give a purpose its own responsible member</span>
-						{/if}
-					</dd>
-				</dl>
-				{#if txn.bankNotes.trim() !== ''}
-					<div class="panel__body panel__body--ruled">
-						<h3>Bank notes</h3>
-						<p class="prose-block">{txn.bankNotes}</p>
-					</div>
-				{/if}
-			</section>
-
 			{#if txn.can.suppress}
 				<section class="panel" aria-labelledby="suppress-heading">
 					<div class="panel__head">
@@ -548,3 +527,11 @@
 		</aside>
 	</div>
 </OrgShell>
+
+<style>
+	:global(.page-head) { position: sticky; top: var(--topbar-h); z-index: 3; background: var(--bg); }
+	.alloc-summary { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 16px; }
+	.detail-tabs { display: flex; gap: 16px; overflow-x: auto; margin: 12px 0 16px; border-bottom: 1px solid var(--border); }
+	.detail-tabs a { flex: none; padding: 8px 4px; text-transform: capitalize; }
+	.detail-tabs .active-tab { border-bottom: 2px solid var(--accent); font-weight: 650; }
+</style>

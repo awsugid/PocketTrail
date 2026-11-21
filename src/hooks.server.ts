@@ -20,7 +20,7 @@ const hygiene: Handle = async ({ event, resolve }) => {
 	}
 	response.headers.set('x-content-type-options', 'nosniff');
 	response.headers.set('referrer-policy', 'same-origin');
-	response.headers.set('x-frame-options', 'DENY');
+	response.headers.set('x-frame-options', event.request.method === 'GET' && /^\/org\/[^/]+\/documents\/\d+$/.test(event.url.pathname) && response.headers.get('content-security-policy') === "frame-ancestors 'self'" ? 'SAMEORIGIN' : 'DENY');
 	return response;
 };
 

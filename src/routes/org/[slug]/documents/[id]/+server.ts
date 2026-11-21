@@ -7,5 +7,5 @@ import type { RequestHandler } from './$types';
 // audit hook records the attempt because this shape is an instrumented route.
 export const GET: RequestHandler = async (event) => {
 	const ctx = await requireOrg(event, event.params.slug);
-	return downloadDocument(ctx, numericPathId(event.params.id));
+	return downloadDocument(ctx, numericPathId(event.params.id), event.url.searchParams.get('download') === '1');
 };

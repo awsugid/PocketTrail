@@ -23,7 +23,7 @@ import {
 import { markdownToPlain } from '#lib/markdown.ts';
 import { readListData } from './list_data';
 import { matchesCommon, paginate, type ListFilters } from './list_filters';
-import { fmtMoney, fmtSize, fmtTs } from '#lib/fmt.ts';
+import { fmtMoney, fmtSize, fmtTs, fmtMoment } from '#lib/fmt.ts';
 import { PERMISSION_LABELS, type Permission } from '#lib/domain.ts';
 import type { D1Database, D1PreparedStatement, R2Bucket } from '#lib/d1.ts';
 
@@ -40,6 +40,9 @@ export interface PurposeRow {
 	approved_at: number | null;
 	approval_note: string;
 	suppressed: number;
+	suppressed_by_membership_id: number | null;
+	suppressed_reason: string;
+	suppressed_at: number | null;
 	created_by_membership_id: number;
 	source_split_id: number | null;
 	created_at: number;
@@ -147,9 +150,9 @@ export async function messagesOf(db: D1Database, purposeId: number): Promise<Pur
 }
 
 export async function purposeEvidenceOf(db: D1Database, purposeId: number) {
-	return qAll<{ id: number; filename: string; size_bytes: number; note: string }>(
+	return qAll<{ id: number; filename: string; content_type: string; size_bytes: number; note: string; created_at: number; uploader_name: string }>(
 		db,
-		"SELECT id, filename, size_bytes, note FROM documents WHERE purpose_id = ?1 AND kind = 'evidence' AND superseded = 0 ORDER BY id",
+		"SELECT d.id, d.filename, d.content_type, d.size_bytes, d.note, d.created_at, u.name AS uploader_name FROM documents d JOIN memberships m ON m.id = d.uploaded_by_membership_id JOIN users u ON u.id = m.user_id WHERE d.purpose_id = ?1 AND d.kind = 'evidence' AND d.superseded = 0 ORDER BY d.id",
 		[purposeId]
 	);
 }
@@ -357,6 +360,13 @@ export interface PurposeDetail {
 	approvedByName: string | null;
 	approvedAt: string | null;
 	suppressed: boolean;
+	suppressedByName: string | null;
+	suppressedReason: string;
+	suppressedAt: string | null;
+	createdAt: string;
+	updatedAt: string;
+	creatorName: string;
+	sourceSplit: { id: number; label: string; url: string } | null;
 	responsibles: Array<{ id: number; name: string; active: boolean }>;
 	responsibleInactive: boolean;
 	allocations: Array<{
@@ -373,7 +383,7 @@ export interface PurposeDetail {
 		effectiveNames: string[];
 		url: string;
 	}>;
-	evidence: Array<{ id: number; filename: string; sizeDisplay: string; note: string; url: string }>;
+	evidence: Array<{ id: string; filename: string; contentType: string; sizeBytes: number; note: string; uploadedBy: string; createdAt: string; url: string }>;
 	messages: Array<{ id: number; authorName: string; authorHandle: string; authorPicture: string | null; bodyMd: string; createdAt: string; mine: boolean }>;
 	audit: Array<{ actionLabel: string; authorName: string; createdAt: string; detail: string }>;
 	members: Array<{ id: number; name: string; handle: string }>;
@@ -449,6 +459,7 @@ export async function purposeDetail(ctx: TxnCtx, purposeId: number): Promise<Pur
 		);
 		for (const t of txnRows) txnResponsibleOf.set(t.id, t.responsible_membership_id);
 	}
+	const sourceSplit = p.source_split_id === null ? null : await qOne<{ label: string; transaction_id: number }>(ctx.db, 'SELECT label, transaction_id FROM transaction_splits WHERE id = ?1', [p.source_split_id]);
 	const nameOf = (id: number | null | undefined) => memName(ctx, id) ?? 'Unassigned';
 	return {
 		id: p.id,
@@ -467,6 +478,13 @@ export async function purposeDetail(ctx: TxnCtx, purposeId: number): Promise<Pur
 		approvedByName: memName(ctx, p.approved_by_membership_id),
 		approvedAt: p.approved_at === null ? null : fmtTs(p.approved_at),
 		suppressed: p.suppressed !== 0,
+		suppressedByName: memName(ctx, p.suppressed_by_membership_id),
+		suppressedReason: p.suppressed_reason,
+		suppressedAt: p.suppressed_at === null ? null : fmtMoment(p.suppressed_at),
+		createdAt: fmtMoment(p.created_at),
+		updatedAt: fmtMoment(p.updated_at),
+		creatorName: memName(ctx, p.created_by_membership_id) ?? 'Unknown',
+		sourceSplit: sourceSplit && p.source_split_id !== null ? { id: p.source_split_id, label: sourceSplit.label, url: `/org/${ctx.org.slug}/transactions/${sourceSplit.transaction_id}` } : null,
 		responsibles: responsibleIds.map((id) => {
 			const m = ctx.memberRows.find((row) => row.id === id);
 			return { id, name: m?.name ?? 'Unknown', active: m !== undefined && memActive(m) };
@@ -487,9 +505,12 @@ export async function purposeDetail(ctx: TxnCtx, purposeId: number): Promise<Pur
 			url: `/org/${ctx.org.slug}/transactions/${a.transaction_id}`
 		})),
 		evidence: evidence.map((d) => ({
-			id: d.id,
+			id: String(d.id),
 			filename: d.filename,
-			sizeDisplay: `${Math.max(1, Math.round(d.size_bytes / 1024))} KB`,
+			contentType: d.content_type,
+			sizeBytes: d.size_bytes,
+			uploadedBy: d.uploader_name,
+			createdAt: fmtMoment(d.created_at),
 			note: d.note,
 			url: `/org/${ctx.org.slug}/documents/${d.id}`
 		})),

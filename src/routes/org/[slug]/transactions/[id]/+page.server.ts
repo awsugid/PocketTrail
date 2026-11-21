@@ -1,4 +1,4 @@
-import { actionForm, approve, addComment, requireOrg, numericPathId, requestChanges, saveAllocations, saveDetails, saveTag, submitDocumentation, suppress, txnDetail, txnShell, unsuppress, uploadDocument } from '#lib/server/txns.ts';
+import { actionForm, approve, addComment, requireOrg, numericPathId, moveEvidence, requestChanges, saveAllocations, saveDetails, saveTag, submitDocumentation, suppress, txnDetail, txnShell, unsuppress, uploadDocument } from '#lib/server/txns.ts';
 import { qAll } from '#lib/server/db.ts';
 import type { Actions, PageServerLoad } from './$types';
 
