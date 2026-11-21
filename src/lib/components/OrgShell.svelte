@@ -2,6 +2,10 @@
  import * as Tooltip from '#lib/components/ui/tooltip/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { afterNavigate } from '$app/navigation';
+		import { page } from '$app/state';
+		import { enhance } from '$app/forms';
+		import * as Alert from '#lib/components/ui/alert/index.ts';
+		import { X } from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
 	import Icon, { type IconName } from './Icon.svelte';
 	import Topbar from './Topbar.svelte';
@@ -120,6 +124,20 @@
 			id="main"
 			tabindex="-1"
 			inert={drawerOpen}
-		><div class="main__inner">{@render children()}</div></main>
+		><div class="main__inner">
+					{#if page.data.showMcpBanner}
+						<Alert.Root role="region" aria-labelledby="mcp-announcement-title" class="mb-5 p-4 pr-14">
+							<Alert.Title id="mcp-announcement-title">PocketTrail now works with AI assistants</Alert.Title>
+							<Alert.Description>
+								<p>Connect Claude, Zed or any MCP client to work with your ledger on your behalf — limited to your permissions.</p>
+								<Button href="/org/{org.slug}/settings/ai-clients" variant="link" size="sm" class="mt-1 h-auto p-0">Learn more</Button>
+							</Alert.Description>
+							<form method="POST" action="/org/{org.slug}?/dismissMcp" class="absolute right-2 top-2" use:enhance={() => async ({ update }) => { await update({ navigate: false }); }}>
+								<input type="hidden" name="csrf_token" value={csrfToken} />
+								<Button type="submit" variant="ghost" size="icon" aria-label="Dismiss"><X size={16} /></Button>
+							</form>
+						</Alert.Root>
+					{/if}
+					{@render children()}</div></main>
 	</div>
 </div>

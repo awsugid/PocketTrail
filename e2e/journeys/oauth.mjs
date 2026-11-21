@@ -27,7 +27,7 @@ export async function checks({extractCsrf}){
  sql("UPDATE mcp_grants SET scope='finance:read',scope_json='[\"finance:read\"]' WHERE client_id='fixture-ai'");check('scope downgrade denies writes',(await call('set_transaction_tag',{id:t.id,revision:t.revision+1,tag:'Denied'})).isError);
  sql("UPDATE mcp_grants SET revoked_at=1 WHERE client_id='fixture-ai'");check('revocation immediate',(await rpc('tools/list')).status===401);
  sql("UPDATE mcp_grants SET revoked_at=NULL WHERE client_id='fixture-ai'; UPDATE mcp_tokens SET expires_at=0");check('token expiry immediate',(await rpc('tools/list')).status===401);
- const settings=await (await user.get('/org/demo-jakarta/settings')).text();check('expired token not listed as active connection',!settings.includes('Your delegated connections'));
+ const settings=await (await user.get('/org/demo-jakarta/settings/ai-clients')).text();check('expired token not listed as active connection',!settings.includes('name="grant_id"'));
  sql("UPDATE mcp_tokens SET expires_at=9999999999999; UPDATE roles SET permissions='[]' WHERE id=(SELECT role_id FROM memberships WHERE user_id='alice' AND org_id=1)");check('membership permission change immediate',(await rpc('tools/list')).status===401);
  return failures;
 }

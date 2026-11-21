@@ -131,7 +131,8 @@ export async function settingsPageData(ctx: TenantContext, url: URL) {
 		roles: ctx.can('ManageRoles'),
 		members: ctx.can('ManageMembers'),
 		mappings: ctx.can('ImportStatements'),
-		notifications: ctx.can('ManageNotifications')
+		notifications: ctx.can('ManageNotifications'),
+				aiClients: ctx.can('DocumentTransactions')
 	};
 
 	const roleTemplates = can.roles

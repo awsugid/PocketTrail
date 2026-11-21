@@ -1,7 +1,4 @@
 <script lang="ts">
-	import { Input } from '#lib/components/ui/input/index.ts';
-	import { Label } from '#lib/components/ui/label/index.ts';
-	import { Button } from '#lib/components/ui/button/index.ts';
 	import Empty from '#lib/components/Empty.svelte';
 	import Icon, { type IconName } from '#lib/components/Icon.svelte';
 	import Notice from '#lib/components/Notice.svelte';
@@ -35,6 +32,7 @@
 	const rows = $derived<Row[]>(
 		(
 			[
+				{ key: 'ai-clients', href: base + '/ai-clients', title: 'AI clients', icon: 'settings', show: s.can.aiClients },
 				{
 					key: 'pockets',
 					href: `${base}/pockets`,
@@ -94,18 +92,7 @@
 	{#if s.msg}<Notice tone="success">{s.msg}</Notice>{/if}
 
 	<div class="stack">
-	<section class="panel mcp-section" aria-labelledby="mcp-heading">
-		<div class="panel__head"><Icon name="settings" size={16}/><h2 id="mcp-heading">MCP · AI connections</h2><span class="badge badge--muted">{data.mcp.configured?'OAuth available':'Client setup needed'}</span></div>
-		<div class="panel__body stack">
-			<p class="my-[14px]">Connect an AI client using your existing Google sign-in. Choose one organization and approve requested access. Activity is labeled <strong>AI on behalf of you</strong>.</p>
-			<div class="field"><Label for="mcp-endpoint">MCP server URL</Label><Input class="" id="mcp-endpoint" readonly value={data.mcp.endpoint}/></div>
-			<p class="hint">Supports summaries, transaction details, income notes and tags. Writes require explicit consent and your current documentation permission. No approvals, exemptions, payments or member management.</p>
-			<details class="fold"><summary>How to connect</summary><ol class="stack my-[14px] list-decimal pl-10"><li>Add this server URL to your client's MCP connector and choose OAuth.</li><li>Sign in with Google on PocketTrail, choose this organization, and review requested access.</li><li>Allow access only for a client you trust. Tokens expire after 15 minutes; reconnect when needed.</li></ol>{#if !data.mcp.configured}<p class="hint">Administrator must first register the client's exact callback URL and allowed scopes. No client is enabled yet; this URL alone grants no access.</p>{/if}</details>
-			{#if data.mcp.grants.length}<h3>Your delegated connections</h3><ul class="rows">{#each data.mcp.grants as grant}<li><span class="rows__main"><strong>{grant.client_id}</strong><span class="rows__sub">{grant.scope}</span></span><form method="POST" action="?/revokeMcp"><input type="hidden" name="csrf_token" value={data.shell.csrfToken}/><input type="hidden" name="grant_id" value={grant.id}/><Button class="" type="submit" variant="outline" size="sm">Revoke access</Button></form></li>{/each}</ul>{/if}
-		</div>
-	</section>
-
-		<nav class="panel" aria-label="Settings status">
+	<nav class="panel" aria-label="Settings status">
 			<ul class="rows rows--link">
 				{#each rows as row (row.key)}
 					<li>
@@ -154,4 +141,3 @@
 	</div>
 
 </OrgShell>
-<style>.mcp-section .panel__head{flex-wrap:wrap;}.mcp-section p,.mcp-section li{overflow-wrap:anywhere;}</style>

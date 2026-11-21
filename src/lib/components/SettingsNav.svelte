@@ -3,8 +3,8 @@
 
 	interface Props {
 		slug: string;
-		current: 'overview' | 'pockets' | 'routing' | 'people' | 'roles' | 'notifications';
-		can: { roles: boolean; members: boolean; mappings: boolean; notifications: boolean };
+		current: 'overview' | 'pockets' | 'routing' | 'people' | 'roles' | 'notifications' | 'ai-clients';
+		can: { roles: boolean; members: boolean; mappings: boolean; notifications: boolean; aiClients?: boolean };
 	}
 
 	let { slug, current, can }: Props = $props();
@@ -36,7 +36,8 @@
 	const items = $derived(
 		(
 			[
-				{ key: 'overview', label: 'Overview', href: `/org/${slug}/settings`, icon: 'settings', show: true },
+				{ key: 'ai-clients', label: 'AI clients', href: `/org/${slug}/settings/ai-clients`, icon: 'settings', show: can.aiClients ?? false },
+									{ key: 'overview', label: 'Overview', href: `/org/${slug}/settings`, icon: 'settings', show: true },
 				{ key: 'pockets', label: 'Pockets', href: `/org/${slug}/settings/pockets`, icon: 'pocket', show: true },
 				{ key: 'routing', label: 'Routing', href: `/org/${slug}/settings/routing`, icon: 'routing', show: can.mappings || can.roles },
 				{ key: 'people', label: 'People', href: `/org/${slug}/settings/people`, icon: 'people', show: can.members },

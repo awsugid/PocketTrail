@@ -89,7 +89,23 @@ await withWorker(async () => {
 
 		// -------------------------------------------------------------- ledger
 		await page.goto(`${ORIGIN}/org/demo-jakarta/transactions`);
-		const rows = page.locator('table.ledger tbody tr');
+		check('MCP announcement appears for documentation permission', await page.getByRole('region', { name: 'PocketTrail now works with AI assistants' }).isVisible());
+				await page.getByRole('link', { name: 'Learn more', exact: true }).click();
+				await page.waitForURL('**/settings/ai-clients');
+				check('Learn more opens AI clients setup', await page.getByRole('heading', { name: 'AI clients', exact: true }).isVisible() && await page.getByLabel('MCP server URL').inputValue() === `${ORIGIN}/mcp`);
+				await page.goto(`${ORIGIN}/org/demo-jakarta/transactions`);
+				await page.getByRole('button', { name: 'Dismiss', exact: true }).click();
+				await page.getByRole('region', { name: 'PocketTrail now works with AI assistants' }).waitFor({ state: 'hidden' });
+				check('dismiss preserves current page', new URL(page.url()).pathname.endsWith('/transactions'));
+				await page.reload();
+				check('MCP dismissal survives reload', await page.getByRole('region', { name: 'PocketTrail now works with AI assistants' }).count() === 0);
+				const anotherDevice = await browser.newContext();
+				const anotherPage = await anotherDevice.newPage();
+				await signIn(anotherPage, 'Alice');
+				await anotherPage.goto(`${ORIGIN}/org/demo-jakarta/transactions`);
+				check('MCP dismissal survives a fresh browser session', await anotherPage.getByRole('button', { name: 'Dismiss', exact: true }).count() === 0);
+				await anotherDevice.close();
+				const rows = page.locator('table.ledger tbody tr');
 		check('ledger renders bank movements as table rows', (await rows.count()) === 3, String(await rows.count()));
 		check(
 			'ledger shows exact money for the seeded fixture',
@@ -208,7 +224,8 @@ await withWorker(async () => {
 		// Purpose responsibility bindings must hydrate even for unassigned members.
  await page.goto(`${ORIGIN}/org/demo-jakarta/purposes/1`);
  await page.getByRole('heading', { name: 'DEMO: workshop supplies', exact: true }).waitFor();
- const responsibleChoice = page.locator('[role=checkbox][id^=responsible-]').first();
+ await page.getByRole('button', { name: 'Change responsible members', exact: true }).click();
+  const responsibleChoice = page.locator('[role=checkbox][id^=responsible-]').first();
  const beforeResponsible = await responsibleChoice.getAttribute('aria-checked');
  await responsibleChoice.click();
  check('purpose responsibility checkboxes hydrate and toggle', await responsibleChoice.getAttribute('aria-checked') !== beforeResponsible);
@@ -301,7 +318,7 @@ await withWorker(async () => {
 		check(
 			'settings overview links each section once, with status',
 			(await page.locator('h1').count()) === 1 &&
-				(await page.locator('nav[aria-label="Settings status"] a[href*="/settings/"]').count()) === 5 &&
+				(await page.locator('nav[aria-label="Settings status"] a[href*="/settings/"]').count()) === 6 &&
 					(await page.locator('nav[aria-label="Settings sections"] a[aria-current="page"]').innerText()).trim() === 'Overview',
 			String(await page.locator('nav[aria-label="Settings status"] a').count())
 		);
