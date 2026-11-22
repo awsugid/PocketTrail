@@ -51,6 +51,12 @@ it('Google-backed session consents; PKCE exchange, scoped writes and trusted ato
    await db.prepare("INSERT INTO purposes(id,org_id,name,kind,created_by_membership_id,created_at,updated_at) VALUES(99,2,'Foreign','expense',1,0,0)").run();
    expect(await call('purpose_details',{id:99})).toMatchObject({isError:true,content:[{text:'Purpose not found'}]});
   expect((await call('purpose_details',{id:1})).isError).toBe(false);
+  await db.prepare("INSERT INTO transactions(id,org_id,pocket_id,txn_date,amount_minor,responsible_membership_id,created_at,updated_at) VALUES(2,1,1,'2026-01-02',-100,1,0,0)").run();
+  await db.prepare("INSERT INTO purposes(id,org_id,name,kind,created_by_membership_id,created_at,updated_at) VALUES(4,1,'Expense','expense',1,0,0)").run();
+  await db.prepare('INSERT INTO allocations(org_id,transaction_id,purpose_id,amount_minor,created_at) VALUES(1,2,4,100,0)').run();
+  const purpose=await read('purpose_details',{id:4}), listed=(await read('list_purposes')).entries.find((p:any)=>p.id===4), transaction=await read('transaction_details',{id:2});
+  expect(purpose).toMatchObject({status:listed.status,statusLabel:listed.statusLabel,tone:listed.tone});
+  expect(purpose.allocations[0]).toMatchObject({isIncome:false,direction:transaction.direction});
    expect((await call('approve_purpose',{id:1,revision:0,note:''})).isError).toBe(true);
    await db.prepare("UPDATE roles SET permissions='[\"ViewTransactions\",\"DocumentTransactions\",\"ApproveTransactions\"]' WHERE id=1").run();
    await db.prepare("INSERT INTO purposes(id,org_id,name,kind,status,created_by_membership_id,created_at,updated_at) VALUES(2,1,'Review','expense','submitted',1,0,0)").run();
@@ -70,7 +76,7 @@ it('Google-backed session consents; PKCE exchange, scoped writes and trusted ato
   await db.prepare('DROP TRIGGER reject_ai_audit').run();
   expect((await call('set_transaction_tag',{id:1,revision:1,tag:'Event'})).isError).toBe(false);
  const allocation=await call('allocate_transaction',{id:1,revision:2,justification:'Assign sponsor funds',allocations:[{purpose_id:1,amount_minor:100}]});expect(allocation,JSON.stringify(allocation)).toMatchObject({isError:false});
-  expect(await db.prepare('SELECT purpose_id,amount_minor FROM allocations').first()).toEqual({purpose_id:1,amount_minor:100});
+  expect(await db.prepare('SELECT purpose_id,amount_minor FROM allocations WHERE transaction_id=1').first()).toEqual({purpose_id:1,amount_minor:100});
   await db.prepare("UPDATE mcp_grants SET scope='finance:read',scope_json='[\"finance:read\"]'").run();
  expect((await call('set_transaction_tag',{id:1,revision:2,tag:'Denied'})).isError).toBe(true);
  await db.prepare('UPDATE mcp_grants SET revoked_at=1').run();expect((await refresh(rotated.refresh_token)).status).toBe(400);expect((await rpc('tools/list')).status).toBe(401);

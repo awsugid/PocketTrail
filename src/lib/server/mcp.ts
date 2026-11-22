@@ -5,6 +5,7 @@ import { qAll, qOne, exec, nowMs } from './db';
 import { filteredLedgerPage, counterpartyDisplay, statusLabel } from './ledger';
 import { readListData } from './list_data';
 import { parseListFilters } from './list_filters';
+import { purposeStatusLabel } from '#lib/purposes.ts';
 
 const MONEY = 'Money is integer minor units: 100 minor = Rp 1. Filter params min/max are in rupiah.';
 const STATUSES = 'Statuses: needs_details = documentation incomplete; pending_review = awaiting approval; approved = accepted; changes_requested = revision requested; needs_action = needs the connected member\'s action.';
@@ -21,7 +22,7 @@ export function mcpOutput(value: unknown, key = ''): any {
   if((field==='amount' && 'amountMinor' in source) || (field==='balance' && 'balanceMinor' in source) || (field==='total' && ('totalMinor' in source || 'totalAllocatedMinor' in source))) continue;
   out[names[field] ?? field]=mcpOutput(item,field);
  }
- if(typeof source.amountMinor==='number') {out.amountMinor=Math.abs(source.amountMinor);if('bankId' in source || 'counterparty' in source)out.direction=source.amountMinor<0?'out':'in';}
+ if(typeof source.amountMinor==='number') {out.amountMinor=Math.abs(source.amountMinor);if('bankId' in source || 'counterparty' in source)out.direction=typeof source.isIncome==='boolean'?(source.isIncome?'in':'out'):(source.amountMinor<0?'out':'in');}
  if(source.selection && typeof source.page==='number')(out.selection as Record<string,unknown>).page=source.page;
  return out;
 }
@@ -98,7 +99,9 @@ export async function mcpMessage(db: D1Database, credential: Credential, body: u
 		 if(name==='purpose_details'){
 	 if(Object.keys(args).some(k=>k!=='id') || !Number.isSafeInteger(args.id) || args.id<1)throw error(400,'Valid purpose ID required.');
 	 if(!await qOne(db,'SELECT id FROM purposes WHERE org_id=?1 AND id=?2',[ctx.org.id,args.id]))throw error(404,'Purpose not found');
-	 data=await (await import('./purposes')).purposeDetail(ctx,args.id);
+	 const detail=await (await import('./purposes')).purposeDetail(ctx,args.id);
+	 const entry=(await readListData(db,ctx.org.id,{membershipIds:ctx.memberRows.filter(m=>m.user_id===ctx.user.id && m.removed_at===null && !m.invited).map(m=>m.id),reviewer:ctx.can('ApproveTransactions')})).purposeEntries.find(p=>p.id===args.id)!;
+	 data={...detail,status:entry.status,statusLabel:purposeStatusLabel(entry.status==='pending_review'?'submitted':entry.status,false),tone:entry.tone};
 	 }else{
 	 if(Object.keys(args).some(k=>k!=='filters') || (args.filters!==undefined && (typeof args.filters!=='string' || args.filters.length>4000)))throw error(400,'filters must be a ledger query string.');
 	 const filters=parseListFilters(new URLSearchParams(args.filters ?? ''));
