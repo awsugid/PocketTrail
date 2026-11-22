@@ -39,15 +39,24 @@ it('Google-backed session consents; PKCE exchange, scoped writes and trusted ato
   const tools=(await (await rpc('tools/list')).json()).result.tools;
   for(const tool of tools){
    expect(tool.description.length).toBeGreaterThan(60);
-   expect(tool.annotations).toMatchObject({readOnlyHint:!['set_income_notes','set_transaction_tag','allocate_transaction'].includes(tool.name)});
-   if(!tool.annotations.readOnlyHint)expect(tool.annotations).toMatchObject({destructiveHint:true,idempotentHint:false});
+   expect(tool.title).toMatch(/^[A-Z]/);
+   const write=['set_income_notes','set_transaction_tag','allocate_transaction','approve_purpose','request_purpose_changes'].includes(tool.name);
+   expect(tool.annotations).toMatchObject({readOnlyHint:!write,destructiveHint:tool.name==='allocate_transaction',idempotentHint:!write});
+   expect(tool.inputSchema.additionalProperties).toBe(false);
+   expect(tool.inputSchema).not.toHaveProperty('oneOf');
+   expect(tool.inputSchema).not.toHaveProperty('anyOf');
    const checkProperties=(schema:any)=>{for(const property of Object.values(schema.properties ?? {}) as any[]){expect(property.description).toBeTruthy();if(property.items)checkProperties(property.items);}};
    checkProperties(tool.inputSchema);
   }
+  expect(tools.find((tool:any)=>tool.name==='set_transaction_tag').inputSchema.required).toEqual(['id','revision']);
   expect(await read('transaction_details',{id:1})).toMatchObject({status:'needs_details',statusLabel:'Needs details',direction:'in',amountMinor:100,revision:0,tags:[]});
   await db.prepare("INSERT INTO purposes(id,org_id,name,kind,created_by_membership_id,created_at,updated_at) VALUES(1,1,'Sponsor','income',1,0,0)").run();
   expect((await call('list_purposes',{})).isError).toBe(false);
    for(const page of [2,9999])expect(await read('list_purposes',{filters:'page='+page})).toMatchObject({page:1,selection:{page:1},total:1});
+   const query='purpose=40&purpose=14&actor=1&dir=out&from=2026-01-01&to=2026-12-31';
+   const purposeSelection=(await read('list_purposes',{filters:query})).selection;
+   expect(Object.keys(purposeSelection).sort()).toEqual(['q','kind','status','responsible','tag','minMinor','maxMinor','page'].sort());
+   expect((await read('list_transactions',{filters:query})).selection).toMatchObject({purpose:[40,14],actor:[1],dir:'out',from:'2026-01-01',to:'2026-12-31'});
    await db.prepare("INSERT INTO purposes(id,org_id,name,kind,created_by_membership_id,created_at,updated_at) VALUES(99,2,'Foreign','expense',1,0,0)").run();
    expect(await call('purpose_details',{id:99})).toMatchObject({isError:true,content:[{text:'Purpose not found'}]});
   expect((await call('purpose_details',{id:1})).isError).toBe(false);
@@ -63,6 +72,8 @@ it('Google-backed session consents; PKCE exchange, scoped writes and trusted ato
    const approved=await call('approve_purpose',{id:2,revision:1,note:'Verified'});expect(approved,JSON.stringify(approved)).toMatchObject({isError:false});
    expect(await db.prepare('SELECT details FROM purpose_audit WHERE purpose_id=2').first()).toEqual({details:expect.stringContaining('via AI client on behalf of User')});
    await db.prepare("INSERT INTO purposes(id,org_id,name,kind,status,created_by_membership_id,created_at,updated_at) VALUES(3,1,'Changes','expense','submitted',1,0,0)").run();
+   expect(await call('request_purpose_changes',{id:3,revision:1,note:'  '})).toMatchObject({isError:true,content:[{text:'A review note is required (max 8,000 characters).'}]});
+   expect(await call('request_purpose_changes',{id:3,revision:1,note:'x'.repeat(8001)})).toMatchObject({isError:true,content:[{text:'Review note must be at most 8,000 characters.'}]});
    expect((await call('request_purpose_changes',{id:3,revision:1,note:'Need receipt'})).isError).toBe(false);
   expect((await call('set_income_notes',{id:1,revision:0,notes:'Sponsor support',actor:'human'})).isError).toBe(true);
  expect((await call('set_income_notes',{id:1,revision:0,notes:'Sponsor support'})).isError).toBe(false);

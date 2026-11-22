@@ -1024,9 +1024,8 @@ export async function reviewPurpose(ctx: TxnCtx, purposeId: number, form: FormDa
 	if (!p) throw error(404, 'Purpose not found.');
 	if (p.kind !== 'expense') throw error(400, 'Income purposes require no review.');
 	const note = formStr(form, 'note').trim();
-	if (byteLen(note) > 8000 || (changes && note === '')) {
-		throw error(400, 'Supply a review note of up to 8,000 characters.');
-	}
+	if (changes && note === '') throw error(400, 'A review note is required (max 8,000 characters).');
+	if (byteLen(note) > 8000) throw error(400, 'Review note must be at most 8,000 characters.');
 	if (formStr(form, 'revision') !== String(p.revision)) {
 		throw error(409, 'This purpose changed. Reload before recording a decision.');
 	}
