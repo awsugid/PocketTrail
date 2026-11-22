@@ -1,5 +1,6 @@
 <script lang="ts">
- import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
+	import MemberPicker from '#lib/components/MemberPicker.svelte';
+		import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import { Textarea } from '#lib/components/ui/textarea/index.ts';
@@ -23,17 +24,17 @@
 	const base = $derived(`/org/${data.shell.org.slug}/purposes`);
 	const statusIcons: Record<string, IconName> = { needs: 'alert', review: 'history', approved: 'check', changes: 'close' };
 
-	let responsible = $state<Record<number, boolean>>({});
-	let seeded = $state(0);
+	let responsible = $state<string[]>([]);
+	let seeded: number | undefined;
 	let editingNotes = $state(false), uploading = $state(false), assigning = $state(false);
 	let review = $state<'approve' | 'requestChanges' | null>(null);
 	const tabs = ['evidence', 'transactions', 'notes', 'history'] as const;
 	const tab = $derived(tabs.find((item) => item === page.url.searchParams.get('tab')) ?? 'evidence');
-	// Seed the checkbox row from the loaded purpose, and re-seed when an
+	// Seed the picker from the loaded purpose, and re-seed when an
 	// action reload hands back a fresh revision.
 	$effect(() => {
 		if (purpose.revision !== seeded) {
-			responsible = Object.fromEntries(purpose.responsibles.map((member) => [member.id, true]));
+			responsible = purpose.responsibles.map((member) => String(member.id));
 			seeded = purpose.revision;
 		}
 	});
@@ -84,15 +85,11 @@
 		{#if assigning && purpose.can.assign}<div class="panel assignment"><form method="POST" action="?/responsibles" class="form" use:submit use:unsavedGuard>
 							<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
 							<input type="hidden" name="revision" value={purpose.revision} />
-							<fieldset class="field">
-								<legend>Responsible members <span class="req" aria-hidden="true">*</span></legend>
-								{#each purpose.members as member (member.id)}
-									<Label class="check" for={`responsible-${member.id}`}>
- <Checkbox id={`responsible-${member.id}`} name="responsible_id[]" value={String(member.id)} bind:checked={() => responsible[member.id] ?? false, checked => responsible[member.id] = checked} />
-										{member.name}
-									</Label>
-								{/each}
-							</fieldset>
+							<div class="field">
+															<Label for="purpose-responsibles">Responsible members <span class="req" aria-hidden="true">*</span></Label>
+															<MemberPicker id="purpose-responsibles" name="responsible_id[]" members={purpose.members}
+																multiple placeholder="Select members" bind:value={responsible} />
+														</div>
 							<div class="field">
 								<Label for="responsible-justification">
 									Justification <span class="req" aria-hidden="true">*</span>

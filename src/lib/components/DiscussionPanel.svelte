@@ -62,7 +62,7 @@
 	});
 </script>
 
-<a class="discussion-fab" hidden={open} href={openHref} bind:this={trigger} data-discussion-trigger
+<a class="discussion-fab bg-primary shadow-lg" hidden={open} href={openHref} bind:this={trigger} data-discussion-trigger
 	data-sveltekit-reset="false" aria-label="Open discussion, {messages.length} messages" aria-expanded={open} aria-haspopup="dialog" title="Discussion">
 	<Icon name="comment" size={24} />
 	{#if messages.length > 0}<span class="discussion-count" aria-hidden="true">{messages.length > 99 ? '99+' : messages.length}</span>{/if}
@@ -103,11 +103,11 @@
 {/if}
 
 <style>
-	.discussion-fab { position: fixed; right: 24px; bottom: calc(24px + env(safe-area-inset-bottom)); z-index: 10; width: 56px; height: 56px; border-radius: 50%; background: var(--accent); color: var(--surface); box-shadow: var(--shadow-menu); }
+	.discussion-fab { position: fixed; right: 24px; bottom: calc(24px + env(safe-area-inset-bottom)); z-index: 10; width: 56px; height: 56px; border-radius: 50%; color: var(--primary-foreground); }
 	.discussion-fab:not([hidden]) { display: grid; place-items: center; }
-	.discussion-fab:hover { background: var(--link-hover); color: var(--surface); }
+	.discussion-fab:hover { background: color-mix(in srgb, var(--primary) 90%, black); }
 	.discussion-fab:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
-	.discussion-count { position: absolute; top: 0; right: 0; min-width: 18px; padding-inline: 4px; border-radius: var(--radius-badge); background: var(--surface); color: var(--accent); font-size: 11px; font-weight: 650; line-height: 18px; text-align: center; }
+	.discussion-count { position: absolute; top: 0; right: 0; min-width: 18px; padding-inline: 4px; border-radius: var(--radius-badge); background: var(--danger); color: var(--surface); box-shadow: 0 0 0 2px var(--background); font-size: 11px; font-weight: 650; line-height: 18px; text-align: center; }
 	@media (width < 640px) { .discussion-fab { right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); } }
 
 	.discussion-panel { position: fixed; inset: 0 0 auto auto; z-index: 100; margin: 0 0 0 auto; width: 400px; max-width: none; height: 100dvh; max-height: none; background: var(--surface); color: var(--text); box-shadow: -12px 0 32px rgb(0 0 0 / 0.16); overflow: hidden; container-type: size; padding-bottom: env(safe-area-inset-bottom); }

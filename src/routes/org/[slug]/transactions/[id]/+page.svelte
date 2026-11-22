@@ -6,7 +6,7 @@
 	import { fmtDateTime, parseRupiah, fmtMoney, rupiahInput } from '#lib/fmt.ts';
 	import Combobox from '#lib/components/ui/LabelCombobox.svelte';
 	import MoneyInput from '#lib/components/ui/MoneyInput.svelte';
-	import Select from '#lib/components/ui/FormSelect.svelte';
+	import MemberPicker from '#lib/components/MemberPicker.svelte';
 	import Icon, { type IconName } from '#lib/components/Icon.svelte';
 	import EvidenceGallery from '#lib/components/EvidenceGallery.svelte';
 	import Notice from '#lib/components/Notice.svelte';
@@ -106,10 +106,8 @@
 							: 'Pending review'
 	);
 
-	const memberItems = $derived([
-		{ value: '', label: txn.isIncome ? 'Not overridden' : 'Inherit' },
-		...txn.members.map((member) => ({ value: String(member.id), label: member.name }))
-	]);
+	const inheritedName = $derived(txn.members.find((member) => String(member.id) === responsible)?.name);
+	const inheritLabel = $derived(txn.isIncome ? 'Not overridden' : inheritedName ? `Inherit (${inheritedName})` : 'Inherit');
 	let editingAllocations = $state(false);
 	let editingNotes = $state(false);
 	const tabs = ['allocations', 'notes', 'history'] as const;
@@ -221,10 +219,11 @@
 							{#if !txn.isIncome}
 								<div class="field">
 									<Label for="responsible">Inherited responsible member</Label>
-									<Select
+									<MemberPicker
 										id="responsible"
 										name="responsible_member_id"
-										items={[{ value: '', label: 'None' }, ...txn.members.map((member) => ({ value: String(member.id), label: member.name }))]}
+										members={txn.members}
+										allowNone
 										bind:value={responsible}
 									/>
 									<p class="hint">Used by purposes without their own responsible members.</p>
@@ -267,7 +266,7 @@
 										</div>
 										<div class="field">
 											<Label class="visually-hidden" for="alloc-member-{index}">Responsible override {index + 1}</Label>
-											<Select id="alloc-member-{index}" name="alloc_member[]" items={memberItems} bind:value={row.member} />
+											<MemberPicker id="alloc-member-{index}" name="alloc_member[]" members={txn.members} allowNone noneLabel={inheritLabel} bind:value={row.member} />
 										</div>
 										<Button
 											class="row-action"
