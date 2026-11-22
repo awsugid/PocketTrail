@@ -11,6 +11,7 @@
 	import Notice from '#lib/components/Notice.svelte';
 	import OrgShell from '#lib/components/OrgShell.svelte';
 	import PageHead from '#lib/components/PageHead.svelte';
+	import DiscussionPanel from '#lib/components/DiscussionPanel.svelte';
 	import RichComposer from '#lib/components/RichComposer.svelte';
 	import { submit, unsavedGuard } from '#lib/forms.ts';
 	import { fmtDate } from '#lib/fmt.ts';
@@ -26,7 +27,7 @@
 	let seeded = $state(0);
 	let editingNotes = $state(false), uploading = $state(false), assigning = $state(false);
 	let review = $state<'approve' | 'requestChanges' | null>(null);
-	const tabs = ['evidence', 'transactions', 'notes', 'discussion', 'history'] as const;
+	const tabs = ['evidence', 'transactions', 'notes', 'history'] as const;
 	const tab = $derived(tabs.find((item) => item === page.url.searchParams.get('tab')) ?? 'evidence');
 	// Seed the checkbox row from the loaded purpose, and re-seed when an
 	// action reload hands back a fresh revision.
@@ -36,12 +37,16 @@
 			seeded = purpose.revision;
 		}
 	});
-	const initials = (name: string) =>
-		name
-			.split(/\s+/)
-			.slice(0, 2)
-			.map((part) => part[0]?.toUpperCase() ?? '')
-			.join('');
+	const chatOpen = $derived(page.url.searchParams.get('chat') === '1' || page.url.searchParams.get('tab') === 'discussion');
+	function sectionHref(nextTab: string | null = null, open = chatOpen) {
+		const url = new URL(page.url.href);
+		if (nextTab) url.searchParams.set('tab', nextTab);
+		else if (url.searchParams.get('tab') === 'discussion') url.searchParams.delete('tab');
+		if (open) url.searchParams.set('chat', '1');
+		else url.searchParams.delete('chat');
+		return url.pathname + url.search + url.hash;
+	}
+
 </script>
 
 <svelte:head>
@@ -49,6 +54,8 @@
 </svelte:head>
 
 <OrgShell {...data.shell} active="purposes">
+	<div class="detail-workspace">
+		<div class="purpose-main">
 	<div class="purpose-header"><PageHead title={purpose.name} back={{ href: base, label: 'Purposes' }}>
 		{#snippet actions()}
 			<p class="amount-total" class:amount--in={purpose.kind === 'income'}>{purpose.total}</p>
@@ -64,7 +71,7 @@
 		{/snippet}
 	</PageHead>
 
-		<div class="header-actions"><a href="?tab=discussion"><Icon name="comment" size={16} /> {purpose.messages.length} messages</a>
+		<div class="header-actions">
 		{#if purpose.can.assign}<button class="btn" type="button" aria-expanded={assigning} onclick={() => assigning = !assigning}>Change responsible members</button>{/if}
 		{#if purpose.approval.eligible && purpose.can.approve}<button class="btn" type="button" aria-expanded={review === 'approve'} onclick={() => review = review === 'approve' ? null : 'approve'}>Approve</button>{/if}
 		{#if purpose.approval.eligible && purpose.can.requestChanges}<button class="btn" type="button" aria-expanded={review === 'requestChanges'} onclick={() => review = review === 'requestChanges' ? null : 'requestChanges'}>Request changes</button>{/if}</div>
@@ -176,9 +183,9 @@
 
 	</div>
 	</div>
-	<nav class="purpose-tabs" aria-label="Purpose sections">{#each tabs as item}<a href={`?tab=${item}`} aria-current={tab === item ? 'page' : undefined}>{item.charAt(0).toUpperCase() + item.slice(1)}{item === 'evidence' ? ` (${purpose.evidence.length})` : item === 'transactions' ? ` (${purpose.allocations.length})` : item === 'discussion' ? ` (${purpose.messages.length})` : item === 'history' ? ` (${purpose.audit.length})` : ''}</a>{/each}</nav>
-	<div class="purpose-grid">
-		<div class="stack">
+	<div class="stack detail-content">
+		<nav class="purpose-tabs" aria-label="Purpose sections">{#each tabs as item}<a href={sectionHref(item)} data-sveltekit-noscroll data-sveltekit-replacestate aria-current={tab === item ? 'page' : undefined}>{item.charAt(0).toUpperCase() + item.slice(1)}{item === 'evidence' ? ` (${purpose.evidence.length})` : item === 'transactions' ? ` (${purpose.allocations.length})` : item === 'history' ? ` (${purpose.audit.length})` : ''}</a>{/each}</nav>
+
 			{#if tab === 'transactions'}<section class="panel" aria-labelledby="allocations-heading">
 				<div class="panel__head">
 					<Icon name="ledger" size={16} />
@@ -301,56 +308,19 @@
 					</div>
 				</section>
 			{/if}
-		</div><aside class="purpose-info panel" aria-label="Purpose information"><h2>Info</h2><dl><dt>Created</dt><dd>{purpose.createdAt} by {purpose.creatorName}</dd><dt>Updated</dt><dd>{purpose.updatedAt}</dd>{#if purpose.sourceSplit}<dt>Source split</dt><dd><a href={purpose.sourceSplit.url}>{purpose.sourceSplit.label} (#{purpose.sourceSplit.id})</a></dd>{/if}{#if purpose.suppressed}<dt>Suppression</dt><dd>By {purpose.suppressedByName ?? 'Unknown'} · {purpose.suppressedAt ?? 'Unknown date'}<br />{purpose.suppressedReason}</dd>{/if}</dl></aside></div>
-	{#if tab === 'discussion'}<aside class="discussion" aria-labelledby="discussion-heading">
-			<div class="discussion__head">
-				<Icon name="comment" size={16} />
-				<h2 id="discussion-heading">Discussion</h2>
-				<span class="count">{purpose.messages.length}</span>
-			</div>
-			<p class="discussion__context muted">About <strong>{purpose.name}</strong> · {purpose.kindLabel.toLowerCase()} purpose</p>
-			{#if purpose.messages.length > 0}
-				<ol class="chat">
-					{#each purpose.messages as message (message.id)}
-						<li class="chat__item" class:chat__item--mine={message.mine}>
-							<span class="avatar avatar--sm" aria-hidden="true">
-								{#if message.authorPicture}
-									<img src={message.authorPicture} alt="" loading="lazy" data-loaded="true" />
-								{:else}
-									{initials(message.authorName)}
-								{/if}
-							</span>
-							<div class="chat__body">
-								<p class="chat__meta">
-									<strong>{message.authorName}</strong>
-									<span class="muted"> · {message.createdAt}</span>
-								</p>
-								<MarkdownView source={message.bodyMd} />
-							</div>
-						</li>
-					{/each}
-				</ol>
-			{:else}
-				<p class="muted discussion__empty">No messages yet.</p>
-			{/if}
-			{#if purpose.can.comment}
-				<form method="POST" action="?/message" class="discussion__composer" use:submit={{ reset: true }}>
-					<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
-					<RichComposer
-						id="discussion-message"
-						name="body"
-						label="Discussion message"
-						rows={3}
-						required
-						placeholder="Message the team — @handle to mention"
-						members={purpose.members}
-					/>
-					<div class="form-actions">
-						<Button class="" type="submit" variant="outline"><Icon name="comment" size={16} />Send</Button>
-					</div>
-				</form>
-			{/if}
-	</aside>{/if}
+		<section class="purpose-info panel" aria-label="Purpose information"><h2>Info</h2><dl><dt>Created</dt><dd>{purpose.createdAt} by {purpose.creatorName}</dd><dt>Updated</dt><dd>{purpose.updatedAt}</dd>{#if purpose.sourceSplit}<dt>Source split</dt><dd><a href={purpose.sourceSplit.url}>{purpose.sourceSplit.label} (#{purpose.sourceSplit.id})</a></dd>{/if}{#if purpose.suppressed}<dt>Suppression</dt><dd>By {purpose.suppressedByName ?? 'Unknown'} · {purpose.suppressedAt ?? 'Unknown date'}<br />{purpose.suppressedReason}</dd>{/if}</dl></section></div>
+		</div>
+		<DiscussionPanel open={chatOpen} openHref={sectionHref(null, true)} closeHref={sectionHref(null, false)} messages={purpose.messages.map(m => ({ ...m, author: m.authorHandle, body: m.bodyMd }))}>
+			{#snippet composer()}
+				{#if purpose.can.comment}
+					<form method="POST" action="?/message" use:submit={{ reset: true }}>
+						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
+						<RichComposer id="discussion-message" name="body" label="Discussion message" variant="compact" required placeholder="Write a message… @handle to mention" members={purpose.members} />
+					</form>
+				{/if}
+			{/snippet}
+		</DiscussionPanel>
+</div>
 </OrgShell>
 
 <style>
@@ -363,11 +333,11 @@
 	.historical-facts dt { font-weight: 600; }
 	.historical-facts dd { margin: 0 0 8px; }
 
-	.purpose-header { position: sticky; top: var(--topbar-h); z-index: 3; background: var(--bg); padding: 12px 0; border-bottom: 1px solid var(--border); }
+	.purpose-header { position: sticky; top: var(--topbar-h); z-index: 3; background: var(--bg); padding: 4px 0; border-bottom: 1px solid var(--border); }
 	.header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 	.assignment, .review-area { max-width: 640px; margin-top: 12px; }
 	.assignment { padding: 16px; }
-	.purpose-tabs { display: flex; overflow-x: auto; white-space: nowrap; gap: 16px; padding: 12px 0; }
+	.purpose-tabs { display: flex; overflow-x: auto; white-space: nowrap; gap: 16px; padding: 4px 0; }
 	.purpose-tabs a { padding: 8px 4px; border-bottom: 2px solid transparent; }
 	.purpose-tabs a[aria-current="page"] { border-color: var(--accent); font-weight: 650; }
 	.purpose-info { padding: 16px; overflow-wrap: anywhere; }
@@ -375,4 +345,15 @@
 	.purpose-info dl { margin: 0; }
 	.purpose-info dt { color: var(--muted); margin-top: 12px; }
 	.purpose-info dd { margin: 2px 0 0; }
+
+	.purpose-main { min-width: 0; }
+	.purpose-tabs a { text-transform: capitalize; }
+	.purpose-info dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 16px; }
+	.purpose-info dt, .purpose-info dd { margin: 0; }
+	.detail-content { gap: 12px; }
+	.detail-workspace { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+	.detail-workspace :global(.page-head) { margin-bottom: 8px; gap: 4px 12px; }
+	.detail-workspace :global(.panel__head), .detail-workspace :global(.panel__body) { padding: 10px 12px; }
+	.detail-workspace :global(td), .detail-workspace :global(th) { padding-block: 8px; }
+	.detail-workspace :global(.empty) { padding: 12px; }
 </style>

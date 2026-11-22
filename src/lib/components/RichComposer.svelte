@@ -10,6 +10,8 @@
 	// the same name posts the Markdown source; after hydration the rich
 	// surface replaces it. Toolbar + Markdown shortcuts + @mention autocomplete.
 	import { renderMarkdown } from '#lib/markdown.ts';
+	import { List, ListOrdered, Quote, Code, Link, Send } from '@lucide/svelte';
+	const icons = { ul: List, ol: ListOrdered, quote: Quote, code: Code, link: Link } as const;
 
 	interface Member {
 		id: number;
@@ -29,6 +31,7 @@
 		members?: Member[];
 		rows?: number | string;
 		hint?: string;
+		variant?: 'default' | 'compact';
 	}
 
 	let {
@@ -41,7 +44,8 @@
 		maxlength = 16000,
 		members = [],
 		rows = 3,
-		hint = ''
+		hint = '',
+		variant = 'default'
 	}: Props = $props();
 
 	let textarea = $state<HTMLTextAreaElement>(null!);
@@ -554,20 +558,25 @@
 	});
 </script>
 
-<div class="composer">
-	<div class="composer__bar" role="group" aria-label="Formatting">
-		<div class="seg" role="group" aria-label="Editor mode">
-			<Button type="button" variant={mode === 'rich' ? 'secondary' : 'ghost'} aria-pressed={mode === 'rich'} onclick={() => switchMode('rich')}>Rich text</Button>
-			<Button type="button" variant={mode === 'md' ? 'secondary' : 'ghost'} aria-pressed={mode === 'md'} onclick={() => switchMode('md')}>Markdown</Button>
-		</div>
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions (handles submit shortcut from either editor surface) -->
+<div class="composer" class:compact={variant === 'compact'} onkeydown={(event) => {
+	if (variant !== 'compact' || event.defaultPrevented || event.isComposing || event.key !== 'Enter' || !(event.ctrlKey || event.metaKey)) return;
+	event.preventDefault();
+	if (textarea.value.trim()) textarea.form?.requestSubmit();
+}} role="group" aria-label={label}>
+	{#if mounted}<div class="composer__bar" role="group" aria-label="Formatting">
 		{#if mounted}
 			<div class="composer__tools">
 				{#each TOOLS as tool (tool.key)}
-					<Tooltip.Provider><Tooltip.Root><Tooltip.Trigger>{#snippet child({ props })}<Button {...props} type="button" class="tool {tool.cls ?? ''}" aria-label={tool.title} onmousedown={saveSelection} onclick={() => applyTool(tool.key)}>{tool.label}</Button>{/snippet}</Tooltip.Trigger><Tooltip.Content>{tool.title}</Tooltip.Content></Tooltip.Root></Tooltip.Provider>
+					<Tooltip.Provider><Tooltip.Root><Tooltip.Trigger>{#snippet child({ props })}<Button {...props} type="button" variant="ghost" class="tool {tool.cls ?? ''}" aria-label={tool.title} onmousedown={saveSelection} onclick={() => applyTool(tool.key)}>{@const Glyph = icons[tool.key as keyof typeof icons]}{#if Glyph}<Glyph size={14} />{:else}{tool.label}{/if}</Button>{/snippet}</Tooltip.Trigger><Tooltip.Content>{tool.title}</Tooltip.Content></Tooltip.Root></Tooltip.Provider>
 				{/each}
 			</div>
 		{/if}
-	</div>
+		<div class="seg" role="group" aria-label="Editor mode">
+			<Button type="button" variant={mode === 'rich' ? 'secondary' : 'ghost'} aria-label="Rich text" aria-pressed={mode === 'rich'} onclick={() => switchMode('rich')}>Rich</Button>
+			<Button type="button" variant={mode === 'md' ? 'secondary' : 'ghost'} aria-label="Markdown" aria-pressed={mode === 'md'} onclick={() => switchMode('md')}>MD</Button>
+		</div>
+	</div>{/if}
 	{#if linkOpen}
 		<div class="composer__link">
 			<Label class="visually-hidden" for="{id}-link-url">Link URL</Label>
@@ -624,7 +633,32 @@
 			{/each}
 		</div>
 	{/if}
+	{#if variant === 'compact'}
+		<div class="send"><Button type="submit" size="sm" onclick={(event) => { if (mounted && mode === 'rich' && !textarea.value.trim() && required) { event.preventDefault(); editor?.focus(); } }}><Send size={14} />Send</Button></div>
+	{/if}
 	{#if hint}
 		<p class="hint">{hint}</p>
 	{/if}
 </div>
+
+<style>
+	.composer { min-width: 0; gap: 0; border: 1px solid var(--control-edge); border-radius: var(--radius-control); background: var(--surface); }
+	.composer:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+	.composer__bar { flex-wrap: nowrap; gap: 4px; padding: 4px; border-bottom: 1px solid var(--border); }
+	.composer__tools { flex-wrap: nowrap; gap: 0; overflow-x: auto; padding: 2px; }
+	.composer__tools :global(.tool) { flex: none; border: 0; width: 28px; min-width: 28px; height: 30px; padding: 0; }
+	.seg { flex: none; overflow: visible; }
+	.seg :global(button) { height: 30px; min-width: 32px; padding-inline: 4px; font-size: 12px; }
+	.composer :global(.composer__source), .composer__editor { border: 0; box-shadow: none; outline: none; background: transparent; }
+	.composer :global(.composer__source) { field-sizing: content; padding: 7px 10px; max-height: 320px; }
+	.composer__editor[data-placeholder]:has(> :global(p:only-child:empty))::before { content: attr(data-placeholder); color: var(--placeholder); }
+	.compact :global(.composer__source), .compact .composer__editor { min-height: 3.75em; max-height: 40cqh; }
+	.composer__link { padding: 6px; flex-wrap: wrap; }
+	.composer__mentions { bottom: 42px; left: 8px; }
+	.hint { margin: 0; padding: 4px 10px 8px; }
+	.send { display: flex; justify-content: end; padding: 4px 6px 6px; }
+	.send :global(button) { min-height: 32px; }
+	@media (max-width: 1023px) {
+		.composer__tools :global(.tool), .seg :global(button) { min-width: 32px; min-height: 32px; }
+	}
+</style>

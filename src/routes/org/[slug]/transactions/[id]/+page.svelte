@@ -12,6 +12,7 @@
 	import Notice from '#lib/components/Notice.svelte';
 	import OrgShell from '#lib/components/OrgShell.svelte';
 	import PageHead from '#lib/components/PageHead.svelte';
+	import DiscussionPanel from '#lib/components/DiscussionPanel.svelte';
 	import RichComposer from '#lib/components/RichComposer.svelte';
 	import { submit, unsavedGuard } from '#lib/forms.ts';
 	import type { PageData } from './$types';
@@ -111,8 +112,19 @@
 	]);
 	let editingAllocations = $state(false);
 	let editingNotes = $state(false);
-	const tab = $derived(['allocations', 'notes', 'discussion', 'history'].includes(page.url.searchParams.get('tab') ?? '') ? page.url.searchParams.get('tab') : 'allocations');
+	const tabs = ['allocations', 'notes', 'history'] as const;
+	const tab = $derived(tabs.find(item => item === page.url.searchParams.get('tab')) ?? 'allocations');
 	const purposeOptions = $derived(txn.purposes.map((purpose) => purpose.name));
+	const chatOpen = $derived(page.url.searchParams.get('chat') === '1' || page.url.searchParams.get('tab') === 'discussion');
+	function sectionHref(nextTab: string | null = null, open = chatOpen) {
+		const url = new URL(page.url.href);
+		if (nextTab) url.searchParams.set('tab', nextTab);
+		else if (url.searchParams.get('tab') === 'discussion') url.searchParams.delete('tab');
+		if (open) url.searchParams.set('chat', '1');
+		else url.searchParams.delete('chat');
+		return url.pathname + url.search + url.hash;
+	}
+
 </script>
 
 <svelte:head>
@@ -120,7 +132,9 @@
 </svelte:head>
 
 <OrgShell {...data.shell} active="transactions">
-	<PageHead title={txn.counterpartyDisplay.name} back={{ href: `/org/${data.shell.org.slug}/transactions`, label: 'Ledger' }}>
+	<div class="detail-workspace">
+		<div class="detail-main">
+	<div class="detail-header"><PageHead title={txn.counterpartyDisplay.name} back={{ href: `/org/${data.shell.org.slug}/transactions`, label: 'Ledger' }}>
 		{#snippet actions()}
 			<p class="amount-total" class:amount--in={txn.amountMinor > 0}>{txn.amount}</p>
 		{/snippet}
@@ -131,9 +145,8 @@
 			<span>{txn.transactionType || 'Movement'}</span>
 			<span>{txn.pocketName}</span>
 			<span>{txn.responsibleName ?? 'No responsible member'}</span>
-			<a href="?tab=discussion"><Icon name="comment" size={14} /> {txn.comments.length}</a>
 		{/snippet}
-	</PageHead>
+	</PageHead></div>
 
 	{#if data.msg}<Notice tone="success">{data.msg}</Notice>{/if}
 
@@ -146,8 +159,8 @@
 		</Notice>
 	{/if}
 
-	<div class="detail-grid">
-		<div class="stack">
+	<div class="stack detail-content">
+<nav class="detail-tabs" aria-label="Ledger sections">{#each tabs as item}<a href={sectionHref(item)} aria-current={tab === item ? 'page' : undefined} data-sveltekit-noscroll data-sveltekit-replacestate>{item}</a>{/each}</nav>
 			{#if tab === 'notes'}
 			{#if txn.can.incomeNotes}
 				<section class="panel" aria-labelledby="explain-heading">
@@ -389,49 +402,6 @@
 				</div></section>
 			{/if}
 			{/if}
-			{#if tab === 'discussion'}
-			{#if txn.comments.length > 0 || txn.can.comment}
-				<section class="panel" aria-labelledby="discussion-heading">
-					<div class="panel__head">
-						<Icon name="comment" size={16} />
-						<h2 id="discussion-heading">Discussion</h2>
-						{#if txn.comments.length > 0}<span class="count">{txn.comments.length}</span>{/if}
-					</div>
-					{#if txn.comments.length > 0}
-						<div class="panel__body">
-							<ol class="timeline">
-								{#each txn.comments as comment, index (index)}
-									<li>
-										<p class="muted"><strong>{comment.authorName}</strong> · {comment.createdAt}</p>
-										<p class="prose-block">{comment.body}</p>
-									</li>
-								{/each}
-							</ol>
-						</div>
-					{/if}
-					{#if txn.can.comment}
-						<div class="panel__body {txn.comments.length > 0 ? 'panel__body--ruled' : ''}">
-							<form method="POST" action="?/comment" class="form" use:submit={{ reset: true }}>
-								<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
-								<RichComposer
-									id="comment-body"
-									name="body"
-									label="Comment"
-									rows={3}
-									required
-									placeholder="Mention a member with @handle"
-									members={txn.members}
-								/>
-								<div class="form-actions">
-									<Button class="" type="submit" variant="outline"><Icon name="comment" size={16} />Comment</Button>
-								</div>
-							</form>
-						</div>
-					{/if}
-				</section>
-			{/if}
-
-			{/if}
 			{#if tab === 'history' && txn.audit.length > 0}
 				<section class="panel" aria-labelledby="history-heading">
 					<div class="panel__head">
@@ -459,9 +429,7 @@
 					</div>
 				</section>
 			{/if}
-		</div>
-
-		<aside class="stack" aria-labelledby="facts-heading">
+		<div class="detail-facts" aria-labelledby="facts-heading">
 			<section class="panel">
 				<div class="panel__head"><Icon name="info" size={16} /><h2 id="facts-heading">Details</h2></div>
 				<dl class="panel__body facts"><dt>Bank account</dt><dd>{txn.counterpartyDisplay.bankAccount ?? '—'}</dd><dt>Jago ID</dt><dd class="mono">{txn.bankId || '—'}</dd><dt>Balance after</dt><dd>{txn.balance}</dd></dl>
@@ -524,14 +492,34 @@
 					</div>
 				</section>
 			{/if}
-		</aside>
+		</div></div>
+		</div>
+		<DiscussionPanel open={chatOpen} openHref={sectionHref(null, true)} closeHref={sectionHref(null, false)} messages={txn.comments.map(m => ({ ...m, author: m.authorId, body: m.body }))}>
+			{#snippet composer()}
+				{#if txn.can.comment}
+					<form method="POST" action="?/comment" use:submit={{ reset: true }}>
+						<input type="hidden" name="csrf_token" value={data.shell.csrfToken} />
+						<RichComposer id="discussion-comment" name="body" label="Discussion message" variant="compact" required placeholder="Write a message… @handle to mention" members={txn.members} />
+					</form>
+				{/if}
+			{/snippet}
+		</DiscussionPanel>
 	</div>
 </OrgShell>
 
 <style>
-	:global(.page-head) { position: sticky; top: var(--topbar-h); z-index: 3; background: var(--bg); }
+	.detail-header { position: sticky; top: var(--topbar-h); z-index: 3; background: var(--bg); }
 	.alloc-summary { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 16px; }
-	.detail-tabs { display: flex; gap: 16px; overflow-x: auto; margin: 12px 0 16px; border-bottom: 1px solid var(--border); }
+	.detail-tabs { display: flex; gap: 16px; overflow-x: auto; margin: 0; border-bottom: 1px solid var(--border); }
 	.detail-tabs a { flex: none; padding: 8px 4px; text-transform: capitalize; }
-	.detail-tabs .active-tab { border-bottom: 2px solid var(--accent); font-weight: 650; }
+	.detail-tabs a[aria-current="page"] { border-bottom: 2px solid var(--accent); font-weight: 650; }
+
+	.detail-main { min-width: 0; }
+	.detail-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; align-items: start; }
+	.detail-content { gap: 12px; }
+	.detail-workspace { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+	.detail-workspace :global(.page-head) { margin-bottom: 8px; gap: 4px 12px; }
+	.detail-workspace :global(.panel__head), .detail-workspace :global(.panel__body) { padding: 10px 12px; }
+	.detail-workspace :global(td), .detail-workspace :global(th) { padding-block: 8px; }
+	.detail-workspace :global(.empty) { padding: 12px; }
 </style>

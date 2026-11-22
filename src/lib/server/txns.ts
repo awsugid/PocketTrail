@@ -568,7 +568,7 @@ export interface TxnDetail {
 	members: Array<{ id: number; name: string; handle: string }>;
 	evidence: EvidenceItem[];
 	unassignedEvidence: EvidenceItem[];
-	comments: Array<{ authorName: string; body: string; createdAt: string }>;
+	comments: Array<{ id: number; authorId: number; authorName: string; body: string; createdAt: string; mine: boolean }>;
 	approval: { eligible: boolean; ineligibleReason: string | null };
 	reviewDecision: { status: string; statusLabel: string; authorName: string; createdAt: string; note: string } | null;
 	audit: AuditEntryView[];
@@ -832,7 +832,10 @@ export async function txnDetail(ctx: TxnCtx, txnId: number): Promise<TxnDetail> 
 		members: activeMembers(ctx),
 		evidence: evidence.filter((d) => d.purpose_id === null).map((d) => evidenceItem(d, ctx.org.slug, memName(ctx, d.uploaded_by_membership_id))),
 		unassignedEvidence: t.amount_minor > 0 ? [] : evidence.filter((d) => d.purpose_id === null).map((d) => evidenceItem(d, ctx.org.slug, memName(ctx, d.uploaded_by_membership_id))),
-		comments: comments.map((c) => ({ authorName: c.author_name, body: c.body, createdAt: fmtMoment(c.created_at) })),
+		comments: comments.map((c) => ({
+					id: c.id, authorId: c.author_membership_id, authorName: c.author_name,
+					body: c.body, createdAt: fmtTs(c.created_at), mine: c.author_membership_id === mine?.id
+				})),
 		approval,
 		reviewDecision,
 		audit,
