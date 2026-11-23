@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
-import { appendFileSync, readFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { ORIGIN, ROOT, run, withWorker } from './harness.mjs';
 
 // Exercise a legacy provider-backed handle without modifying persistent fixtures.
@@ -34,7 +34,7 @@ await withWorker(async () => {
 					labels: Array.from(node.querySelectorAll('[role=option]'), row => row.textContent)
 				};
 			});
-			assert(result.painted && result.fits && result.labels.every(text => !text.includes('Bob (fixture)')) && result.labels.every(text => !/github:|org:|email:|@example\.test/.test(text)), JSON.stringify(result));
+			assert(result.painted && result.fits && result.labels.every(text => !/github:|org:|email:|@example\.test/.test(text)), JSON.stringify(result));
 
 			await editor.press('Escape');
 			await list.waitFor({ state: 'hidden' });
@@ -73,8 +73,8 @@ await withWorker(async () => {
 		await editor.click();
 		for (const [query, name, handle] of [
 			['@budi s', 'Budi Santoso', 'budi'],
-			['@Suhri', 'Mochamad Suhri Ardiansyah', 'mochamad'],
-			['@mochamad suhri a', 'Mochamad Suhri Ardiansyah', 'mochamad'],
+			['@Suhri', 'Mochamad Suhri Ardiansyah', '{m:802}'],
+			['@mochamad suhri a', 'Mochamad Suhri Ardiansyah', '{m:802}'],
 			['@BÚDI ', 'Budi Santoso', 'budi']
 		]) {
 			await editor.fill('');
@@ -86,7 +86,11 @@ await withWorker(async () => {
 				return node.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
 			}));
 			if (query === '@budi s') await drawer.screenshot({ path: '.playwright-mcp/v8-mention-multiword.png' });
-			if (query === '@Suhri' || query === '@BÚDI ') continue;
+			if (query === '@Suhri') {
+							mkdirSync('.playwright-mcp', { recursive: true });
+							await drawer.screenshot({ path: '.playwright-mcp/v9-mention-suhri.png' });
+						}
+						if (query === '@mochamad suhri a' || query === '@BÚDI ') continue;
 			await editor.press('Enter');
 			assert.equal(await editor.locator('.mention--chip').getAttribute('data-handle'), handle);
 			await page.keyboard.type(` multiword ${handle}`);
@@ -98,7 +102,18 @@ await withWorker(async () => {
 		const [db] = JSON.parse(run('npx', ['wrangler', 'd1', 'execute', 'DB', '--local', '--json', '--command', "SELECT to_membership_id FROM notification_outbox WHERE kind = 'mention' AND transaction_id = 1 AND to_membership_id IN (801, 802) ORDER BY to_membership_id"]));
 		assert.deepEqual(db.results.map(row => row.to_membership_id), [801, 802]);
 		console.log('Multiword, folded search, posted names and notification recipients passed');
-		await page.goto(`${ORIGIN}/org/demo-jakarta/purposes/1?tab=notes`);
+		await page.goto(`${ORIGIN}/org/demo-jakarta/purposes/1?chat=1`);
+				const purposeDrawer = page.getByRole('dialog', { name: /Discussion/ });
+				const purposeEditor = purposeDrawer.getByRole('textbox', { name: 'Discussion message' });
+				await purposeEditor.click();
+				await page.keyboard.insertText('@Suhri');
+				await purposeDrawer.getByRole('option', { name: /Mochamad Suhri Ardiansyah/ }).click();
+				await purposeDrawer.getByRole('button', { name: 'Send' }).click();
+				await purposeDrawer.locator('.bubble .mention').getByText('@Mochamad Suhri Ardiansyah').waitFor();
+				const [purposeDb] = JSON.parse(run('npx', ['wrangler', 'd1', 'execute', 'DB', '--local', '--json', '--command', "SELECT to_membership_id FROM notification_outbox WHERE kind = 'mention' AND purpose_id = 1 AND to_membership_id = 802"]));
+				assert.deepEqual(purposeDb.results.map(row => row.to_membership_id), [802]);
+				console.log('Purpose discussion: posted name and notification recipient passed');
+				await page.goto(`${ORIGIN}/org/demo-jakarta/purposes/1?tab=notes`);
 		await page.getByRole('button', { name: 'Edit', exact: true }).click();
 		const notes = page.getByRole('textbox', { name: 'Purpose Notes' });
 		await notes.click();

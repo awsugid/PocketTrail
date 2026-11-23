@@ -11,7 +11,7 @@
 // link (product decision); mention and digest emails stay link-only. Rows
 // queued here are emailed when the caller runs scheduleDelivery.
 
-import { extractMentions } from '#lib/mentions.ts';
+import { extractMentions, membershipMentionKey } from '#lib/mentions.ts';
 import { documentationOwed, incomeComplete, incomeRecipients } from '#lib/domain.ts';
 import { shouldNotify } from '#lib/notify_rules.ts';
 import { permissionsFor, type Permission } from './permissions';
@@ -48,7 +48,7 @@ export function mentionRecipients(body: string, cands: readonly MentionCand[]): 
 	const tokens = extractMentions(body);
 	const out: number[] = [];
 	for (const cand of cands) {
-		const hit = tokens.some((t) => t === cand.handle) || nameMentioned(lower, cand.name.trim().toLowerCase());
+		const hit = (tokens.includes(cand.handle) || tokens.includes(membershipMentionKey(cand.id))) || nameMentioned(lower, cand.name.trim().toLowerCase());
 		if (hit && !out.includes(cand.id)) out.push(cand.id);
 	}
 	return out;

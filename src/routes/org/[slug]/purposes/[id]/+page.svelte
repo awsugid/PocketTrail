@@ -7,6 +7,7 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import Icon, { type IconName } from '#lib/components/Icon.svelte';
 	import MarkdownView from '#lib/components/MarkdownView.svelte';
+		import { mentionNameMap } from '#lib/mentions.ts';
 	import EvidenceGallery from '#lib/components/EvidenceGallery.svelte';
 	import { page } from '$app/state';
 	import Notice from '#lib/components/Notice.svelte';
@@ -230,7 +231,7 @@
 				</div>
 				<div class="panel__body stack">
 					{#if purpose.notes.trim() !== ''}
-						<MarkdownView source={purpose.notes} />
+						<MarkdownView source={purpose.notes} mentionNames={mentionNameMap(purpose.members)} />
 					{:else}
 						<p class="muted">No Notes yet.{#if purpose.kind === 'expense'} Evidence or Notes must record the missing-evidence outcome when no document exists.{/if}</p>
 					{/if}

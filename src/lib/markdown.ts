@@ -5,6 +5,10 @@
 // headings 1-3, bold, italic, unordered/ordered lists, blockquotes, inline
 // code, fenced code blocks, links, and @mention highlighting.
 
+import { membershipMentionPattern } from '#lib/mentions.ts';
+
+const mentionPattern = new RegExp(`(^|[^A-Za-z0-9._-])@(${membershipMentionPattern}|[A-Za-z0-9][A-Za-z0-9._-]*)`, 'gi');
+
 const escapeHtml = (text: string): string =>
 	text.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!);
 
@@ -37,8 +41,13 @@ function decorate(escaped: string, names?: ReadonlyMap<string, string>): string 
 	text = text.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
 	// Match text only, not attributes in generated links.
 	text = text.split(/(<[^>]+>)/g).map((part, index) => index % 2 ? part :
-		part.replace(/(^|[^A-Za-z0-9._-])@([A-Za-z0-9][A-Za-z0-9._-]*)/g, (_, prefix: string, handle: string) =>
-			`${prefix}<span class="mention">@${escapeHtml(names?.get(handle.toLowerCase()) ?? handle)}</span>`)
+		part.replace(mentionPattern, (whole, prefix: string, handle: string) => {
+			const name = names?.get(handle.toLowerCase());
+			const byId = handle.startsWith('{');
+			if (byId && name === undefined) return whole;
+			const attr = byId ? ` data-handle="${escapeHtml(handle)}"` : '';
+			return `${prefix}<span class="mention"${attr}>@${escapeHtml(name ?? handle)}</span>`;
+		})
 	).join('');
 	return text;
 }

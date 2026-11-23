@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import MarkdownView from './MarkdownView.svelte';
+		import { mentionNameMap } from '#lib/mentions.ts';
 	import { fmtDate } from '#lib/fmt.ts';
 	import { tick } from 'svelte';
 	import { beforeNavigate, goto } from '$app/navigation';
@@ -8,8 +9,8 @@
 	import Icon from './Icon.svelte';
 
 	type Message = { id: number; author: string | number; authorName: string; createdAt: string; mine: boolean; body: string };
-	let { open, openHref, closeHref, messages, composer, members }:  { open: boolean; openHref: string; closeHref: string; messages: Message[]; composer: Snippet; members: readonly { handle: string; name: string }[] } = $props();
-	const mentionNames = $derived(new Map(members.map(member => [member.handle.toLowerCase(), member.name])));
+	let { open, openHref, closeHref, messages, composer, members }:  { open: boolean; openHref: string; closeHref: string; messages: Message[]; composer: Snippet; members: readonly { id: number; handle: string; name: string }[] } = $props();
+	const mentionNames = $derived(mentionNameMap(members));
 	let viewport = $state<HTMLDivElement>();
 	const day = (m: Message) => m.createdAt.slice(0, 10);
 	const time = (m: Message) => m.createdAt.slice(11, 16);

@@ -6,4 +6,4 @@ INSERT INTO users (id, email, name, is_platform_admin, created_at) VALUES
   ('mochamad', 'mochamad@example.test', 'Mochamad Suhri Ardiansyah', 0, 0);
 INSERT INTO memberships (id, org_id, user_id, role_id, handle, created_at) VALUES
   (801, 1, 'budi', 1, 'budi', 0),
-  (802, 1, 'mochamad', 1, 'mochamad', 0);
+  (802, 1, 'mochamad', 1, 'github:12345', 0);

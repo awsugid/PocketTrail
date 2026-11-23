@@ -10,6 +10,7 @@
 	// the same name posts the Markdown source; after hydration the rich
 	// surface replaces it. Toolbar + Markdown shortcuts + @mention autocomplete.
 	import { renderMarkdown } from '#lib/markdown.ts';
+		import { membershipMentionKey, publicMentionHandle } from '#lib/mentions.ts';
 	import { List, ListOrdered, Quote, Code, Link, Send } from '@lucide/svelte';
 	const icons = { ul: List, ol: ListOrdered, quote: Quote, code: Code, link: Link } as const;
 
@@ -144,7 +145,7 @@
 
 	function renderToEditor(source: string) {
 		if (!editor) return;
-		editor.innerHTML = renderMarkdown(source);
+		editor.innerHTML = renderMarkdown(source, new Map(members.map(m => [membershipMentionKey(m.id), m.name])));
 	}
 
 	// ---------------------------------------------------------------- caret
@@ -184,8 +185,8 @@
 	let mentionOpen = $state(false);
 	const mentionListId = $derived(`${id}-mentions`);
 	const optionId = (member: Member) => `${mentionListId}-${member.id}`;
-	// Legacy memberships can store a provider subject instead of a public handle.
-	const publicHandle = (handle: string) => /^[a-z0-9][a-z0-9._-]*$/i.test(handle) ? handle : '';
+	// Keep provider subjects out of both picker labels and stored text.
+	const publicHandle = publicMentionHandle;
 	const initials = (name: string) => name.match(/[\p{L}\p{N}]+/gu)?.slice(0, 2).map(part => Array.from(part)[0]?.toUpperCase()).join('');
 	const fold = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 	let mentionQuery = $state('');
@@ -193,9 +194,8 @@
 	const mentionMatches = $derived(
 		members
 			.filter((m) => {
-				if (!publicHandle(m.handle)) return false;
 				const query = fold(mentionQuery).trim().split(/[ \u00a0]+/);
-				if (fold(m.handle).startsWith(fold(mentionQuery))) return true;
+				if (fold(publicHandle(m.handle)).startsWith(fold(mentionQuery))) return true;
 				const words = fold(m.name).match(/[\p{L}\p{N}._-]+/gu) ?? [];
 				return words.some((_, start) => query.every((part, i) => words[start + i]?.startsWith(part)));
 			})
@@ -275,15 +275,16 @@
 	}
 
 	function insertMention(member: Member) {
+		const key = publicHandle(member.handle) || membershipMentionKey(member.id);
 		if (mode === 'md') {
 			const start = textarea.selectionStart;
 			const before = textarea.value.slice(0, start);
 			const at = before.lastIndexOf('@');
 			if (at >= 0) {
-				const value = `${textarea.value.slice(0, at)}@${member.handle} ${textarea.value.slice(textarea.selectionEnd)}`;
+				const value = `${textarea.value.slice(0, at)}@${key} ${textarea.value.slice(textarea.selectionEnd)}`;
 				textarea.value = value;
 				textarea.dispatchEvent(new Event('input', { bubbles: true }));
-				const caret = at + member.handle.length + 2;
+				const caret = at + key.length + 2;
 				textarea.focus();
 				textarea.setSelectionRange(caret, caret);
 			}
@@ -299,7 +300,7 @@
 				range.deleteContents();
 				const chip = document.createElement('span');
 				chip.className = 'mention mention--chip';
-				chip.dataset.handle = member.handle;
+				chip.dataset.handle = key;
 				chip.contentEditable = 'false';
 				chip.textContent = `@${member.name}`;
 				const space = document.createTextNode(' ');
