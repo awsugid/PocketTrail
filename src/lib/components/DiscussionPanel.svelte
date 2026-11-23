@@ -8,7 +8,8 @@
 	import Icon from './Icon.svelte';
 
 	type Message = { id: number; author: string | number; authorName: string; createdAt: string; mine: boolean; body: string };
-	let { open, openHref, closeHref, messages, composer }: { open: boolean; openHref: string; closeHref: string; messages: Message[]; composer: Snippet } = $props();
+	let { open, openHref, closeHref, messages, composer, members }:  { open: boolean; openHref: string; closeHref: string; messages: Message[]; composer: Snippet; members: readonly { handle: string; name: string }[] } = $props();
+	const mentionNames = $derived(new Map(members.map(member => [member.handle.toLowerCase(), member.name])));
 	let viewport = $state<HTMLDivElement>();
 	const day = (m: Message) => m.createdAt.slice(0, 10);
 	const time = (m: Message) => m.createdAt.slice(11, 16);
@@ -89,7 +90,7 @@
 							{#if !message.mine && !joined}<span class="initials" aria-hidden="true">{initials(message.authorName)}</span>{/if}
 							<div class="bubble-wrap">
 								{#if !joined}<p class="byline"><strong>{message.mine ? 'You' : message.authorName}</strong> · {time(message)}</p>{/if}
-								<div class="bubble"><MarkdownView source={message.body} /></div>
+								<div class="bubble"><MarkdownView source={message.body} {mentionNames} /></div>
 							</div>
 						</li>
 					{/each}
@@ -137,6 +138,6 @@
 	.bubble :global(.md > *) { margin-block: 0 4px; }
 	.bubble :global(.md > :last-child) { margin-bottom: 0; }
 	.empty { display: grid; justify-items: center; gap: 6px; margin: 16px 0; color: var(--muted); text-align: center; }
-	.composer { flex: none; max-height: 65%; overflow-y: auto; padding: 10px 12px; border-top: 1px solid var(--border); }
+	.composer { flex: none; padding: 10px 12px; border-top: 1px solid var(--border); }
 	.composer :global(form) { margin: 0; padding: 0; border: 0; max-width: none; }
 </style>

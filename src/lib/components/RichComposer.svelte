@@ -119,7 +119,9 @@
 		if (!editor) return textarea.value;
 		// Browsers type straight text nodes into an empty contenteditable before
 		// any block exists; treat that as one paragraph.
-		if (editor.children.length === 0) return editor.textContent?.trim() ?? '';
+		if (Array.from(editor.children).every((el) => el.matches('span, b, strong, i, em, a, code, br'))) {
+					return serializeInline(editor).trim();
+				}
 		const out: string[] = [];
 		for (const el of Array.from(editor.children)) {
 			if (el.tagName === 'UL' || el.tagName === 'OL') {
@@ -176,17 +178,68 @@
 
 	// --------------------------------------------------------------- mention
 
+	let composer: HTMLDivElement;
+	let mentionList = $state<HTMLDivElement>();
+		let mentionAbove = $state(false);
 	let mentionOpen = $state(false);
+	const mentionListId = $derived(`${id}-mentions`);
+	const optionId = (member: Member) => `${mentionListId}-${member.id}`;
+	// Legacy memberships can store a provider subject instead of a public handle.
+	const publicHandle = (handle: string) => /^[a-z0-9][a-z0-9._-]*$/i.test(handle) ? handle : '';
+	const initials = (name: string) => name.match(/[\p{L}\p{N}]+/gu)?.slice(0, 2).map(part => Array.from(part)[0]?.toUpperCase()).join('');
+	const fold = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 	let mentionQuery = $state('');
 	let mentionIndex = $state(0);
 	const mentionMatches = $derived(
 		members
 			.filter((m) => {
-				const q = mentionQuery.toLowerCase();
-				return q === '' || m.handle.toLowerCase().startsWith(q) || m.name.toLowerCase().startsWith(q);
+				if (!publicHandle(m.handle)) return false;
+				const query = fold(mentionQuery).trim().split(/[ \u00a0]+/);
+				if (fold(m.handle).startsWith(fold(mentionQuery))) return true;
+				const words = fold(m.name).match(/[\p{L}\p{N}._-]+/gu) ?? [];
+				return words.some((_, start) => query.every((part, i) => words[start + i]?.startsWith(part)));
 			})
 			.slice(0, 8)
 	);
+
+	$effect(() => {
+		const list = mentionList;
+		if (!list) return;
+		const place = () => {
+			const rect = composer.getBoundingClientRect();
+			const drawer = composer.closest('dialog')?.getBoundingClientRect();
+			const viewport = window.visualViewport;
+			const top = Math.max(viewport?.offsetTop ?? 0, drawer?.top ?? 0);
+			const bottom = Math.min((viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight), drawer?.bottom ?? Infinity);
+			const above = rect.top - top - 8;
+			const below = bottom - rect.bottom - 8;
+			const flip = below < 240 && above > below;
+			mentionAbove = flip;
+			list.style.maxHeight = `${Math.max(0, Math.min(240, flip ? above : below))}px`;
+		};
+		place();
+		const viewport = window.visualViewport;
+		const observer = new ResizeObserver(place);
+		observer.observe(composer);
+		window.addEventListener('resize', place);
+		window.addEventListener('scroll', place, true);
+		viewport?.addEventListener('resize', place);
+		viewport?.addEventListener('scroll', place);
+		return () => {
+			observer.disconnect();
+			window.removeEventListener('resize', place);
+			window.removeEventListener('scroll', place, true);
+			viewport?.removeEventListener('resize', place);
+			viewport?.removeEventListener('scroll', place);
+		};
+	});
+
+	$effect(() => {
+		const member = mentionMatches[mentionIndex];
+		if (mentionList && member) document.getElementById(optionId(member))?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+	});
+
+	const activeMention = $derived(mentionMatches[mentionIndex]);
 
 	function mentionProbe(): { node: Text; start: number } | null {
 		const selection = window.getSelection();
@@ -195,7 +248,7 @@
 		if (!(node instanceof Text)) return null;
 		const offset = selection.getRangeAt(0).startOffset;
 		const before = node.textContent?.slice(0, offset) ?? '';
-		const match = /(^|[^A-Za-z0-9._-])@([A-Za-z0-9._-]*)$/.exec(before);
+		const match = /(^|[^\p{L}\p{M}\p{N}._-])@([\p{L}\p{M}\p{N}._\- \u00a0]*)$/u.exec(before);
 		if (!match) return null;
 		return { node, start: offset - (match[2] ?? '').length - 1 };
 	}
@@ -342,11 +395,13 @@
 				return;
 			}
 			if (event.key === 'Escape') {
+				event.preventDefault();
+				event.stopPropagation();
 				mentionOpen = false;
 				return;
 			}
 		}
-		if (event.key === ' ') {
+		if (event.key === ' ' && !mentionOpen) {
 			if (inlineShortcut()) {
 				event.preventDefault();
 				syncFromEditor();
@@ -559,7 +614,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions (handles submit shortcut from either editor surface) -->
-<div class="composer" class:compact={variant === 'compact'} onkeydown={(event) => {
+<div class="composer" bind:this={composer} class:compact={variant === 'compact'} onkeydown={(event) => {
 	if (variant !== 'compact' || event.defaultPrevented || event.isComposing || event.key !== 'Enter' || !(event.ctrlKey || event.metaKey)) return;
 	event.preventDefault();
 	if (textarea.value.trim()) textarea.form?.requestSubmit();
@@ -602,6 +657,9 @@
 			bind:this={editor}
 			role="textbox"
 			aria-multiline="true"
+			aria-autocomplete={members.length ? 'list' : undefined}
+			aria-controls={mentionOpen ? mentionListId : undefined}
+			aria-activedescendant={mentionOpen && activeMention ? optionId(activeMention) : undefined}
 			aria-label={label}
 			contenteditable="true"
 			tabindex="0"
@@ -610,26 +668,29 @@
 			onkeydown={onEditorKeydown}
 			oninput={onEditorInput}
 			onpaste={onEditorPaste}
-			onblur={() => setTimeout(() => (mentionOpen = false), 150)}
+			onblur={() => (mentionOpen = false)}
 		></div>
 	{/if}
 	{#if mounted && mode === 'rich' && mentionOpen && mentionMatches.length > 0}
-		<div class="composer__mentions" role="listbox" aria-label="Mention a member">
+		<div class="composer__mentions" class:above={mentionAbove} bind:this={mentionList} id={mentionListId} role="listbox" aria-label="Mention a member">
 			{#each mentionMatches as member, index (member.id)}
-				<Button
+				{@const handle = publicHandle(member.handle)}
+				<button
 					type="button"
+					id={optionId(member)}
 					class="composer__mention"
 					role="option"
+					tabindex="-1"
 					aria-selected={index === mentionIndex}
-					data-active={index === mentionIndex}
-					onmousedown={(event) => {
-						event.preventDefault();
-						insertMention(member);
-					}}
+					onmousedown={(event) => event.preventDefault()}
+					onclick={() => insertMention(member)}
 				>
-					@{member.handle}
-					<span class="muted">{member.name}</span>
-				</Button>
+					<span class="mention-avatar" aria-hidden="true">{initials(member.name)}</span>
+					<span class="mention-label">
+						<span class="mention-name">{member.name}</span>
+						{#if handle}<span class="mention-handle">@{handle}</span>{/if}
+					</span>
+				</button>
 			{/each}
 		</div>
 	{/if}
@@ -643,7 +704,7 @@
 
 <style>
 	.composer { min-width: 0; gap: 0; border: 1px solid var(--control-edge); border-radius: var(--radius-control); background: var(--surface); }
-	.composer:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+	.composer:has(.composer__editor:focus, :global(.composer__source:focus)) { outline: 1px solid var(--ring); outline-offset: 1px; }
 	.composer__bar { flex-wrap: nowrap; gap: 4px; padding: 4px; border-bottom: 1px solid var(--border); }
 	.composer__tools { flex-wrap: nowrap; gap: 0; overflow-x: auto; padding: 2px; }
 	.composer__tools :global(.tool) { flex: none; border: 0; width: 28px; min-width: 28px; height: 30px; padding: 0; }
@@ -654,7 +715,12 @@
 	.composer__editor[data-placeholder]:has(> :global(p:only-child:empty))::before { content: attr(data-placeholder); color: var(--placeholder); }
 	.compact :global(.composer__source), .compact .composer__editor { min-height: 3.75em; max-height: 40cqh; }
 	.composer__link { padding: 6px; flex-wrap: wrap; }
-	.composer__mentions { bottom: 42px; left: 8px; }
+	.composer__mentions { top: calc(100% + 4px); inset-inline-start: 0; }
+	.composer__mentions.above { top: auto; bottom: calc(100% + 4px); }
+	.mention-avatar { display: grid; place-items: center; flex: 0 0 24px; height: 24px; border-radius: 50%; background: var(--surface-2); font-size: 11px; font-weight: 650; }
+	.mention-label { display: grid; min-width: 0; }
+	.mention-name, .mention-handle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.mention-handle { color: var(--muted-foreground); font-size: 12px; }
 	.hint { margin: 0; padding: 4px 10px 8px; }
 	.send { display: flex; justify-content: end; padding: 4px 6px 6px; }
 	.send :global(button) { min-height: 32px; }

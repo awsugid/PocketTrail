@@ -307,7 +307,7 @@
 			{/if}
 		<section class="purpose-info panel" aria-label="Purpose information"><h2>Info</h2><dl><dt>Created</dt><dd>{purpose.createdAt} by {purpose.creatorName}</dd><dt>Updated</dt><dd>{purpose.updatedAt}</dd>{#if purpose.sourceSplit}<dt>Source split</dt><dd><a href={purpose.sourceSplit.url}>{purpose.sourceSplit.label} (#{purpose.sourceSplit.id})</a></dd>{/if}{#if purpose.suppressed}<dt>Suppression</dt><dd>By {purpose.suppressedByName ?? 'Unknown'} · {purpose.suppressedAt ?? 'Unknown date'}<br />{purpose.suppressedReason}</dd>{/if}</dl></section></div>
 		</div>
-		<DiscussionPanel open={chatOpen} openHref={sectionHref(null, true)} closeHref={sectionHref(null, false)} messages={purpose.messages.map(m => ({ ...m, author: m.authorHandle, body: m.bodyMd }))}>
+		<DiscussionPanel members={purpose.members} open={chatOpen} openHref={sectionHref(null, true)} closeHref={sectionHref(null, false)} messages={purpose.messages.map(m => ({ ...m, author: m.authorHandle, body: m.bodyMd }))}>
 			{#snippet composer()}
 				{#if purpose.can.comment}
 					<form method="POST" action="?/message" use:submit={{ reset: true }}>

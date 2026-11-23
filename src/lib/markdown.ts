@@ -11,21 +11,21 @@ const escapeHtml = (text: string): string =>
 const SAFE_LINK = /^(https?:\/\/[^\s<>"]+|\/(?!\/)[^\s<>"]*|#[^\s<>"]*)$/i;
 
 /** Inline rendering over already-escaped text. */
-function renderInline(escaped: string): string {
+function renderInline(escaped: string, names?: ReadonlyMap<string, string>): string {
 	let out = '';
 	// Code spans first: their content is literal.
 	let rest = escaped;
 	let code;
 	while ((code = /`([^`\n]+)`/.exec(rest)) !== null) {
-		out += decorate(rest.slice(0, code.index));
+		out += decorate(rest.slice(0, code.index), names);
 		out += `<code>${code[1]}</code>`;
 		rest = rest.slice(code.index + code[0].length);
 	}
-	out += decorate(rest);
+	out += decorate(rest, names);
 	return out;
 }
 
-function decorate(escaped: string): string {
+function decorate(escaped: string, names?: ReadonlyMap<string, string>): string {
 	let text = escaped;
 	// Links: [label](url). Unsafe URLs render as the literal escaped text.
 	text = text.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (whole, label: string, url: string) => {
@@ -35,7 +35,11 @@ function decorate(escaped: string): string {
 	});
 	text = text.replace(/\*\*([^*\n][^*]*?)\*\*/g, '<strong>$1</strong>');
 	text = text.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
-	text = text.replace(/(^|[^A-Za-z0-9._-])@([A-Za-z0-9][A-Za-z0-9._-]*)/g, '$1<span class="mention">@$2</span>');
+	// Match text only, not attributes in generated links.
+	text = text.split(/(<[^>]+>)/g).map((part, index) => index % 2 ? part :
+		part.replace(/(^|[^A-Za-z0-9._-])@([A-Za-z0-9][A-Za-z0-9._-]*)/g, (_, prefix: string, handle: string) =>
+			`${prefix}<span class="mention">@${escapeHtml(names?.get(handle.toLowerCase()) ?? handle)}</span>`)
+	).join('');
 	return text;
 }
 
@@ -119,7 +123,8 @@ function parseBlocks(source: string): Block[] {
 }
 
 /** Renders restricted Markdown to safe HTML. Never throws. */
-export function renderMarkdown(source: string): string {
+export function renderMarkdown(source: string, names?: ReadonlyMap<string, string>): string {
+	const inline = (text: string) => renderInline(escapeHtml(text), names);
 	if (source.trim() === '') return '';
 	const blocks = parseBlocks(source);
 	const out: string[] = [];
@@ -130,20 +135,20 @@ export function renderMarkdown(source: string): string {
 				break;
 			case 'heading': {
 				const tag = `h${block.level + 2}`; // # → h3 inside app content
-				out.push(`<${tag}>${renderInline(escapeHtml(block.text.trim()))}</${tag}>`);
+				out.push(`<${tag}>${inline(block.text.trim())}</${tag}>`);
 				break;
 			}
 			case 'quote':
-				out.push(`<blockquote><p>${renderInline(escapeHtml(block.lines.join(' ').trim()))}</p></blockquote>`);
+				out.push(`<blockquote><p>${inline(block.lines.join(' ').trim())}</p></blockquote>`);
 				break;
 			case 'list': {
 				const tag = block.ordered ? 'ol' : 'ul';
-				const items = block.items.map((item) => `<li>${renderInline(escapeHtml(item.trim()))}</li>`).join('');
+				const items = block.items.map((item) => `<li>${inline(item.trim())}</li>`).join('');
 				out.push(`<${tag}>${items}</${tag}>`);
 				break;
 			}
 			case 'paragraph':
-				out.push(`<p>${renderInline(escapeHtml(block.lines.join('\n').trim())).replace(/\n/g, '<br>')}</p>`);
+				out.push(`<p>${inline(block.lines.join('\n').trim()).replace(/\n/g, '<br>')}</p>`);
 				break;
 		}
 	}

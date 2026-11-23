@@ -493,7 +493,7 @@
 			{/if}
 		</div></div>
 		</div>
-		<DiscussionPanel open={chatOpen} openHref={sectionHref(null, true)} closeHref={sectionHref(null, false)} messages={txn.comments.map(m => ({ ...m, author: m.authorId, body: m.body }))}>
+		<DiscussionPanel members={txn.members} open={chatOpen} openHref={sectionHref(null, true)} closeHref={sectionHref(null, false)} messages={txn.comments.map(m => ({ ...m, author: m.authorId, body: m.body }))}>
 			{#snippet composer()}
 				{#if txn.can.comment}
 					<form method="POST" action="?/comment" use:submit={{ reset: true }}>
