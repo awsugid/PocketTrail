@@ -26,6 +26,7 @@ import type { D1Database } from '#lib/d1.ts';
 import { fmtDate } from '#lib/fmt.ts';
 import { fmtMoney } from '#lib/money.ts';
 import { nowMs, qAll } from './db';
+import { recordEmail } from './email_log';
 import { parseRolePermissions } from './permissions';
 import { counterpartyDisplay } from './ledger';
 import { sendSmtp, smtpConfig, SmtpError, type SmtpConnect, type SmtpMessage } from './smtp';
@@ -439,11 +440,15 @@ export async function deliverOutbox(
 		const claimed = await claim(db, job.rows, now);
 		if (claimed.length === 0) continue;
 		let failure: string | null = null;
+		let messageId: string | null = null;
+		const message = messageFor({ ...job, rows: claimed }, baseUrl);
 		try {
-			await sendSmtp(config, messageFor({ ...job, rows: claimed }, baseUrl), open as SmtpConnect);
+			await sendSmtp(config, message, open, undefined, (parts) => { messageId = parts.messageId; });
 		} catch (cause) {
 			failure = safeError(cause);
 		}
+		await recordEmail(db, { orgId, kind: claimed[0]!.kind, membershipId: claimed[0]!.to_membership_id,
+			from: config.from, message, messageId, failure, outboxIds: claimed.map((row) => row.id) });
 		await finish(db, claimed, failure, nowMs());
 		if (failure === null) sent += 1;
 		else failed += 1;

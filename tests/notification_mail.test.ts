@@ -133,6 +133,10 @@ describe('notification outbox email delivery', () => {
 		await deliverOutbox(env, database.db, 1, base);
 		expect((await deliverOutbox(env, database.db, 1, base)).sent).toBe(1);
 		expect(rows()[0]).toMatchObject({ attempts: 2, last_error: null, sent_at: expect.any(Number) });
+				expect(database.sqlite.prepare('SELECT status, error, outbox_ids FROM email_log ORDER BY id').all()).toEqual([
+					{ status: 'failed', error: 'SMTP delivery failed.', outbox_ids: '[1]' },
+					{ status: 'sent', error: null, outbox_ids: '[1]' }
+				]);
 	});
 
 	it('records invalid SMTP configuration without spending attempts', async () => {

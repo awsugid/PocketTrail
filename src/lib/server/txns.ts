@@ -154,6 +154,7 @@ function permissionLabel(permission: Permission): string {
 		ManageRoles: 'Manage roles',
 		ManageMembers: 'Manage members',
 		ManageNotifications: 'Manage notifications',
+				ViewEmailHistory: 'View email history',
 		SuppressNotifications: 'Suppress transaction notifications',
 		UpdateStock: 'Update stock'
 	};

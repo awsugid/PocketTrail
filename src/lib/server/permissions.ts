@@ -16,6 +16,7 @@ export const PERMISSIONS = [
 	'ManageRoles',
 	'ManageMembers',
 	'ManageNotifications',
+		'ViewEmailHistory',
 	'SuppressNotifications',
 	'UpdateStock'
 ] as const;

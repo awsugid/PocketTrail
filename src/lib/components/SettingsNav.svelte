@@ -3,8 +3,8 @@
 
 	interface Props {
 		slug: string;
-		current: 'overview' | 'pockets' | 'routing' | 'people' | 'roles' | 'notifications' | 'ai-clients';
-		can: { roles: boolean; members: boolean; mappings: boolean; notifications: boolean; aiClients?: boolean };
+		current: 'overview' | 'pockets' | 'routing' | 'people' | 'roles' | 'notifications' | 'ai-clients' | 'email-history';
+		can: { roles: boolean; members: boolean; mappings: boolean; notifications: boolean; aiClients?: boolean; emailHistory?: boolean };
 	}
 
 	let { slug, current, can }: Props = $props();
@@ -42,7 +42,8 @@
 				{ key: 'routing', label: 'Routing', href: `/org/${slug}/settings/routing`, icon: 'routing', show: can.mappings || can.roles },
 				{ key: 'people', label: 'People', href: `/org/${slug}/settings/people`, icon: 'people', show: can.members },
 				{ key: 'roles', label: 'Roles', href: `/org/${slug}/settings/roles`, icon: 'roles', show: can.roles },
-				{ key: 'notifications', label: 'Notifications', href: `/org/${slug}/settings/notifications`, icon: 'bell', show: can.notifications }
+				{ key: 'notifications', label: 'Notifications', href: `/org/${slug}/settings/notifications`, icon: 'bell', show: can.notifications },
+								{ key: 'email-history', label: 'Email history', href: `/org/${slug}/settings/email-history`, icon: 'history', show: can.emailHistory ?? false }
 			] satisfies Array<{ key: string; label: string; href: string; icon: IconName; show: boolean }>
 		).filter((item) => item.show)
 	);

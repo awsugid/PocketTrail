@@ -142,7 +142,10 @@ describe('SMTP configuration and MIME', () => {
 
 	it('packages HTML after plain text as a base64 multipart alternative', () => {
 		const html = '<html><body><a href="https://example.test/?token=synthetic">Accept invitation</a></body></html>';
-		const composed = composeMessage(env.SMTP_FROM, { ...message, html });
+		const composed = composeMessage(env.SMTP_FROM, { ...message, html }, (parts) => {
+					expect(parts).toEqual({ messageId: expect.stringMatching(/^<.+@example\.test>$/), from: env.SMTP_FROM,
+						to: message.to, subject: message.subject, text: message.body, html });
+				});
 		const boundary = composed.match(/Content-Type: multipart\/alternative; boundary="([^"]+)"/)?.[1];
 		expect(boundary).toMatch(/^pockettrail-/);
 		const parts = composed.split(`--${boundary}`).slice(1, -1);

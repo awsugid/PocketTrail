@@ -39,7 +39,10 @@ describe('durable invitation SMTP delivery', () => {
 		expect(sendSmtp).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
 			to: 'guest@example.test', subject: 'Join Synthetic Org on PocketTrail',
 			body: expect.stringContaining(`${args.baseUrl}/invitations/accept?token=${args.token}`)
-		}), expect.anything());
+		}), expect.anything(), undefined, expect.any(Function));
+				const log = database.sqlite.prepare('SELECT text_body, html_body FROM email_log').get();
+				expect(log).toMatchObject({ text_body: expect.stringContaining('token=••••••'), html_body: expect.stringContaining('token=••••••') });
+				expect(JSON.stringify(log)).not.toContain(args.token);
 		const message = vi.mocked(sendSmtp).mock.calls[0]![1];
 		expect(message.body).toContain('Inventory Maintainer');
 		expect(message.body).toContain('expires');

@@ -11,6 +11,7 @@ GOOGLE_CLIENT_ID=
 # Keep local delivery disabled; tests never contact a real mail server.
 # Production can enable invitation delivery with the existing SMTP settings.
 EMAIL_DELIVERY_ENABLED=false
+APP_ORIGIN=http://localhost:8787
 SMTP_HOST=
 SMTP_PORT=587
 SMTP_USERNAME=

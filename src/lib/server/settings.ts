@@ -132,6 +132,7 @@ export async function settingsPageData(ctx: TenantContext, url: URL) {
 		members: ctx.can('ManageMembers'),
 		mappings: ctx.can('ImportStatements'),
 		notifications: ctx.can('ManageNotifications'),
+				emailHistory: ctx.can('ViewEmailHistory'),
 				aiClients: ctx.can('DocumentTransactions')
 	};
 
@@ -680,39 +681,34 @@ export async function sendDigest(ctx: SettingsCtx): Promise<never> {
 	if (ctx.org.notifications_enabled === 0) {
 		throw error(400, 'Organization notifications are disabled.');
 	}
-	const targets = await digestTargets(
-		ctx.db,
-		ctx.org,
-		ctx.memberRows,
-		await rolesOfOrg(ctx.db, ctx.org.id)
-	);
-	const last = await lastDigestMs(ctx.db, ctx.org.id);
+	await queueDigest(ctx.db, ctx.org, ctx.memberRows);
+	const emailing = (await ctx.deliverMail?.()) ?? false;
+	return redirect(303, backPath(ctx.org.slug, emailing
+		? 'Eligible weekly digests queued and being emailed'
+		: 'Eligible weekly digests queued; email delivery is disabled, so no email was sent', ctx.section));
+}
+
+export async function queueDigest(db: D1Database, org: SettingsCtx['org'], members: SettingsCtx['memberRows']) {
+	if (!org.notifications_enabled) return 0;
+	const targets = await digestTargets(db, org, members, await rolesOfOrg(db, org.id));
+	const last = await lastDigestMs(db, org.id);
+	let queued = 0;
 	const now = nowMs();
 	for (const [member, items] of targets.groups) {
 		if (!digestDue(last.get(member.id) ?? null, now)) continue;
-		await insertRow(
-			ctx.db,
-			ctx.org.id,
+		queued += await insertRow(
+			db,
+			org.id,
 			'digest',
 			member.id,
 			null,
-			`Documentation digest — ${ctx.org.name}`,
-			digestBody(ctx.org.name, ctx.org.slug, items),
+			`Documentation digest — ${org.name}`,
+			digestBody(org.name, org.slug, items),
 			now,
-			ctx.org.notification_revision
+			org.notification_revision
 		);
 	}
-	const emailing = (await ctx.deliverMail?.()) ?? false;
-	return redirect(
-		303,
-		backPath(
-			ctx.org.slug,
-			emailing
-				? 'Eligible weekly digests queued and being emailed'
-				: 'Eligible weekly digests queued; email delivery is disabled, so no email was sent',
-			ctx.section
-		)
-	);
+	return queued;
 }
 
 // ------------------------------------------------- notification outbox port
@@ -761,12 +757,10 @@ export async function insertRow(
 	body: string,
 	now: number,
 	expectedRevision: number | null
-): Promise<void> {
-	await exec(
-		db,
+	): Promise<number> {
+		return (await db.prepare(
 		"INSERT INTO notification_outbox (org_id, kind, to_membership_id, transaction_id, subject, body, created_at) SELECT ?1,?2,?3,?4,?5,?6,?7 FROM organizations o JOIN memberships m ON m.org_id=o.id JOIN roles r ON r.id=m.role_id AND r.org_id=o.id LEFT JOIN transactions t ON t.id=?4 AND t.org_id=o.id WHERE o.id=?1 AND o.notifications_enabled=1 AND m.id=?3 AND m.removed_at IS NULL AND (?8 IS NULL OR o.notification_revision=?8) AND (EXISTS(SELECT 1 FROM json_each(r.permissions) WHERE value='ViewTransactions') OR (?4 IS NULL AND ?2='digest' AND (m.role_id=o.income_explanation_role_id OR (NOT EXISTS(SELECT 1 FROM memberships im WHERE im.org_id=o.id AND im.role_id=o.income_explanation_role_id AND im.removed_at IS NULL) AND EXISTS(SELECT 1 FROM pockets p WHERE p.org_id=o.id AND p.owner_membership_id=m.id)))) OR (t.amount_minor>0 AND ((m.role_id=o.income_explanation_role_id) OR (NOT EXISTS(SELECT 1 FROM memberships im WHERE im.org_id=o.id AND im.role_id=o.income_explanation_role_id AND im.removed_at IS NULL) AND m.id=(SELECT p.owner_membership_id FROM pockets p WHERE p.id=t.pocket_id AND p.org_id=o.id))))) AND (?4 IS NULL OR (t.id IS NOT NULL AND t.suppressed=0 AND (?2='mention' OR o.notification_cutoff_date IS NULL OR t.txn_date>=o.notification_cutoff_date)))",
-		[orgId, kind, toMid, txnId, subject, body, now, expectedRevision]
-	);
+		).bind(orgId, kind, toMid, txnId, subject, body, now, expectedRevision).run()).meta?.changes ?? 0;
 }
 
 /** Email delivery state of one outbox row, for the outbox table. */

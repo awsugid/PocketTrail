@@ -7,6 +7,7 @@ import { nowMs, qOne } from './db';
 import { sendSmtp, smtpConfig, SmtpError, type SmtpEnv } from './smtp';
 import type { SmtpConnect } from './smtp';
 import { invitationMessage } from './invitation_email';
+import { recordEmail } from './email_log';
 
 export interface MailEnv extends SmtpEnv {
 	EMAIL_DELIVERY_ENABLED?: string;
@@ -95,9 +96,9 @@ export async function deliverMail(
 				: null
 		};
 	}
-	const invitation = await qOne<{ email: string; org_name: string; role_name: string; expires_at: number }>(
+	const invitation = await qOne<{ org_id: number; email: string; org_name: string; role_name: string; expires_at: number }>(
 		db,
-		"SELECT i.email,o.name AS org_name,r.name AS role_name,i.expires_at FROM invitations i JOIN organizations o ON o.id=i.org_id JOIN roles r ON r.id=i.role_id AND r.org_id=i.org_id JOIN invitation_mail im ON im.invitation_id=i.id WHERE i.id=?1 AND im.token_hash=?2 AND im.status='pending' AND i.accepted_at IS NULL AND i.revoked_at IS NULL AND i.expires_at>?3",
+		"SELECT i.org_id,i.email,o.name AS org_name,r.name AS role_name,i.expires_at FROM invitations i JOIN organizations o ON o.id=i.org_id JOIN roles r ON r.id=i.role_id AND r.org_id=i.org_id JOIN invitation_mail im ON im.invitation_id=i.id WHERE i.id=?1 AND im.token_hash=?2 AND im.status='pending' AND i.accepted_at IS NULL AND i.revoked_at IS NULL AND i.expires_at>?3",
 		[args.invitationId, tokenHash, nowMs()]
 	);
 	if (!invitation) return { sent: false, disabled: false, error: 'This invitation is no longer available.' };
@@ -107,19 +108,27 @@ export async function deliverMail(
 		.run();
 	if (attempt.meta?.changes !== 1) return { sent: false, disabled: false, error: 'This invitation is no longer available.' };
 	let failure: string | null = null;
-	try {
-		const config = smtpConfig(env);
-		const connect = await workerConnect();
-		await sendSmtp(config, invitationMessage({
+	let messageId: string | null = null;
+	let smtpFrom: string | undefined;
+	const message = invitationMessage({
 			email: invitation.email,
 			organization: invitation.org_name,
 			role: invitation.role_name,
 			expiresAt: invitation.expires_at,
 			acceptUrl: `${args.baseUrl}/invitations/accept?token=${encodeURIComponent(args.token)}`
-		}), connect);
+	});
+	try {
+		const config = smtpConfig(env);
+		const connect = await workerConnect();
+		smtpFrom = config.from;
+		await sendSmtp(config, message, connect, undefined, (parts) => { messageId = parts.messageId; });
 	} catch (cause) {
 		failure = cause instanceof SmtpError ? cause.message : 'SMTP delivery failed.';
 	}
+	if (smtpFrom !== undefined) await recordEmail(db, {
+		orgId: invitation.org_id, kind: 'invitation', membershipId: null, from: smtpFrom,
+		message, messageId, failure, invitationId: args.invitationId, token: args.token
+	});
 	const changed = await mark(db, args.invitationId, tokenHash, failure ? 'failed' : 'sent', failure, failure ? null : nowMs());
 	if (changed === 0) {
 		return {

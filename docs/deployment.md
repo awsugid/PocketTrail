@@ -18,7 +18,7 @@ Wrangler can resolve the account from its credentials. Local checks must use
 One SvelteKit app (`@sveltejs/kit` 2.x, `@sveltejs/adapter-cloudflare` 7.x)
 builds to a single Worker:
 
-- `npm run build` writes `.svelte-kit/cloudflare/_worker.js` plus assets.
+- `npm run build` writes `.svelte-kit/cloudflare/worker/index.js` plus assets.
 - `wrangler.toml` binds `DB` (D1), `DOCUMENTS` (private R2) and `ASSETS`.
 - `migrations_dir = "migrations"` keeps the existing SQL history; schema and
   migration files are unchanged by the rewrite.
@@ -103,7 +103,9 @@ Only after the owning organization authorizes a specific deployment:
    gate. Each queued `notification_outbox` row records `sent_at`, `attempts`
    (at most 3) and `last_error`; unsent rows are retried on the organization's
    next delivery. With delivery disabled, rows stay queued and unsent. Rows
-   older than 7 days are never emailed. There is no reminder scheduler.
+   older than 7 days are never emailed. After applying `0022_email_log.sql`, set
+      `APP_ORIGIN` to the public origin (no trailing slash) before deploying. Cron
+      runs daily at 08:00 Asia/Jakarta; weekly digest eligibility is unchanged.
 
 Rollback: redeploy the previous commit's build. D1 migrations are append-only
 history; this repository does not ship a down-migration.
@@ -123,7 +125,7 @@ synthetic fixtures in a staging organization before real records are handled.
 - Google ID-token verification is implemented and unit-tested against synthetic
   JWKS material, but a live Google sign-in has not been exercised here.
 - Scripted SMTP tests do not establish real mail-server connectivity, credential
-  validity, or inbox delivery. Transaction notifications have no email scheduler.
+  validity, or inbox delivery.
 - Rendered checks used a system Chrome over synthetic fixtures; they are not a
   full accessibility audit.
 

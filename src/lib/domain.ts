@@ -16,6 +16,7 @@ export type Permission =
 	| 'ManageRoles'
 	| 'ManageMembers'
 	| 'ManageNotifications'
+		| 'ViewEmailHistory'
 	| 'SuppressNotifications'
 	| 'UpdateStock';
 
@@ -29,6 +30,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
 	ManageRoles: 'Manage roles',
 	ManageMembers: 'Manage members',
 	ManageNotifications: 'Manage notifications',
+		ViewEmailHistory: 'View email history',
 	SuppressNotifications: 'Suppress transaction notifications',
 	UpdateStock: 'Update stock'
 };
@@ -44,6 +46,7 @@ export const ALL_PERMISSIONS: Permission[] = [
 	'ManageRoles',
 	'ManageMembers',
 	'ManageNotifications',
+		'ViewEmailHistory',
 	'SuppressNotifications',
 	'UpdateStock'
 ];

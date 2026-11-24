@@ -68,7 +68,7 @@ export interface SmtpMessage {
 
 /** Base64 MIME avoids 8BITMIME/SMTPUTF8 requirements and SMTP dot injection.
  * Encoded words are split on Unicode code points, under RFC 2047's 75 chars. */
-export function composeMessage(from: string, message: SmtpMessage): string {
+export function composeMessage(from: string, message: SmtpMessage, onComposed?: (parts: { messageId: string; from: string; to: string; subject: string; text: string; html: string | undefined }) => void): string {
 	if (!validEmail(from) || !validEmail(message.to)) throw new SmtpError('Invalid email address.');
 	if (!message.subject.trim() || /[\x00-\x1f\x7f]/.test(message.subject)) {
 		throw new SmtpError('Invalid email subject.');
@@ -110,12 +110,14 @@ export function composeMessage(from: string, message: SmtpMessage): string {
 			encodedPart(message.html),
 			`--${boundary}--`
 		];
+	const messageId = `<${crypto.randomUUID()}@${from.split('@')[1]}>`;
+	onComposed?.({ messageId, from, to: message.to, subject: message.subject, text: message.body, html: message.html });
 	return [
 		`From: ${from}`,
 		`To: ${message.to}`,
 		`Subject: ${words.join('\r\n ')}`,
 		`Date: ${new Date().toUTCString()}`,
-		`Message-ID: <${crypto.randomUUID()}@${from.split('@')[1]}>`,
+		`Message-ID: ${messageId}`,
 		'MIME-Version: 1.0',
 		...content
 	].join('\r\n') + '\r\n';
@@ -127,9 +129,10 @@ export async function sendSmtp(
 	config: SmtpConfig,
 	message: SmtpMessage,
 	connect: SmtpConnect,
-	timeoutMs = 30_000
+	timeoutMs = 30_000,
+		onComposed?: Parameters<typeof composeMessage>[2]
 ): Promise<void> {
-	const payload = composeMessage(config.from, message);
+	const payload = composeMessage(config.from, message, onComposed);
 	const deadline = Date.now() + timeoutMs;
 	let socket: SmtpSocket | undefined;
 	let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;

@@ -12,11 +12,11 @@ VALUES
   (2, 'demo-indonesia', 'Indonesia — synthetic demo', 1, 0, '2025-01-01', 0);
 
 INSERT INTO roles (id, org_id, name, permissions) VALUES
-  (1, 1, 'Admin', '["ViewTransactions","CommentTransactions","DocumentTransactions","ApproveTransactions","ImportStatements","ManageRoles","ManageMembers","ManageNotifications","SuppressNotifications","UpdateStock"]'),
+  (1, 1, 'Admin', '["ViewTransactions","CommentTransactions","DocumentTransactions","ApproveTransactions","ImportStatements","ManageRoles","ManageMembers","ManageNotifications","SuppressNotifications","UpdateStock","ViewEmailHistory"]'),
   (2, 1, 'Approver', '["ViewTransactions","CommentTransactions","ApproveTransactions"]'),
   (3, 1, 'Editor', '["ViewTransactions","CommentTransactions","DocumentTransactions","ImportStatements","UpdateStock"]'),
   (4, 1, 'Viewer', '["ViewTransactions"]'),
-  (5, 2, 'Admin', '["ViewTransactions","CommentTransactions","DocumentTransactions","ApproveTransactions","ImportStatements","ManageRoles","ManageMembers","ManageNotifications","SuppressNotifications","UpdateStock"]');
+  (5, 2, 'Admin', '["ViewTransactions","CommentTransactions","DocumentTransactions","ApproveTransactions","ImportStatements","ManageRoles","ManageMembers","ManageNotifications","SuppressNotifications","UpdateStock","ViewEmailHistory"]');
 
 INSERT INTO memberships (id, org_id, user_id, role_id, handle, created_at) VALUES
   (1, 1, 'alice', 1, 'alice', 0),

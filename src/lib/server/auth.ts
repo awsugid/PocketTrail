@@ -165,7 +165,7 @@ async function orgBySlug(db: D1Database, slug: string): Promise<OrgRow | null> {
 	return qOne<OrgRow>(db, 'SELECT * FROM organizations WHERE slug = ?1', [slug]);
 }
 
-async function membersOfOrg(db: D1Database, orgId: number): Promise<MemberRow[]> {
+export async function membersOfOrg(db: D1Database, orgId: number): Promise<MemberRow[]> {
 	return qAll<MemberRow>(
 		db,
 		`SELECT m.id, m.org_id, m.user_id, m.role_id, m.handle, m.created_at, m.removed_at,

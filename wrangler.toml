@@ -13,6 +13,11 @@ compatibility_flags = ["nodejs_compat"]
 # production dashboard. Preserve them on deployment; secrets stay out of Git.
 keep_vars = true
 
+[triggers]
+crons = ["0 1 * * *"]
+
+# Set APP_ORIGIN (public HTTP(S) origin, no trailing slash) in the dashboard.
+
 [assets]
 directory = ".svelte-kit/cloudflare"
 binding = "ASSETS"
